@@ -1,16 +1,18 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { TrendingUp, Users, Building, DollarSign, Download, Briefcase, FileSpreadsheet } from 'lucide-react';
+import { TrendingUp, Users, Building, DollarSign, Download, Briefcase, FileSpreadsheet, Filter } from 'lucide-react';
+import { BodyCorporate } from '../types';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'];
 
 const Reports: React.FC = () => {
-    const { complexes } = useData();
+    const { complexes, managers } = useData();
     const activeComplexes = complexes.filter(c => !c.isArchived);
+    const [selectedManagerForReport, setSelectedManagerForReport] = useState<string>('');
 
-    // specific stats
+    // Manager Stats Calculation
     const stats = useMemo(() => {
         const managerMap: Record<string, { name: string; count: number; fees: number; units: number }> = {};
         
@@ -28,9 +30,11 @@ const Reports: React.FC = () => {
     }, [activeComplexes]);
 
     const totalFees = stats.reduce((acc, s) => acc + s.fees, 0);
-    const totalUnits = stats.reduce((acc, s) => acc + s.units, 0);
 
-    const downloadManagerCSV = () => {
+    // --- CSV Generators ---
+
+    // 1. Management Fee / Performance Report
+    const downloadFeeSummaryCSV = () => {
         const headers = ["Manager Name", "Total Complexes", "Total Units", "Total Management Fees (Inc GST)"];
         const rows = stats.map(s => [
             `"${s.name}"`, 
@@ -39,39 +43,56 @@ const Reports: React.FC = () => {
             s.fees.toFixed(2)
         ]);
         
-        const csvContent = "data:text/csv;charset=utf-8," 
-            + headers.join(",") + "\n" 
-            + rows.map(e => e.join(",")).join("\n");
-            
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `manager_performance_report_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        generateAndDownloadCSV(headers, rows, `management_fee_summary_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
-    const downloadPortfolioCSV = () => {
+    // 2. Detailed Property List (Reusable for All or Specific Manager)
+    const downloadPropertyDetailsCSV = (targetManager: string | null) => {
+        const dataToExport = targetManager 
+            ? activeComplexes.filter(c => c.managerName === targetManager)
+            : activeComplexes;
+
         const headers = [
-            "BC Number", "Property Name", "Complex Type", "Manager", 
-            "Units", "Management Fee (Inc GST)", "Financial Year End", 
-            "Insurance Expiry", "BWOF Expiry", "Next AGM Date"
+            "BC Number", "Property Name", "Address", "Type", "Manager", 
+            "Units", "Management Fee (Inc GST)", "Financial Year End", "Management Start", "Onboarding Type",
+            "Insurance Expiry", "Insurance Broker", "Insurance Valuer", "Next Valuation",
+            "BWOF Expiry", "BWOF Consultant", 
+            "LTMP Date", "LTMP Renewal",
+            "Next AGM Date", "Building Manager", "Building Manager Contact"
         ];
         
-        const rows = activeComplexes.map(bc => [
+        const rows = dataToExport.map(bc => [
             `"${bc.bcNumber}"`,
             `"${bc.name}"`,
+            `"${bc.address}"`,
             `"${bc.type || 'Body Corporate'}"`,
             `"${bc.managerName}"`,
             bc.units.toString(),
             (bc.managementFee || 0).toFixed(2),
             `"${bc.financialYearEnd || ''}"`,
+            `"${bc.managementStartDate || ''}"`,
+            `"${bc.onboardingType || ''}"`,
             `"${bc.insuranceExpiry || ''}"`,
+            `"${bc.insuranceBroker || ''}"`,
+            `"${bc.insuranceValuer || ''}"`,
+            `"${bc.nextValuationDue || ''}"`,
             `"${bc.bwofExpiry || ''}"`,
-            `"${bc.nextAgmDate || ''}"`
+            `"${bc.bwofConsultant || ''}"`,
+            `"${bc.ltmpCompletedDate || ''}"`,
+            `"${bc.nextLtmpRenewalDate || ''}"`,
+            `"${bc.nextAgmDate || ''}"`,
+            `"${bc.buildingManagerCompany || (bc.hasBuildingManager ? 'Yes' : 'No')}"`,
+            `"${bc.buildingManagerEmail || ''}"`
         ]);
 
+        const filename = targetManager 
+            ? `property_list_${targetManager.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`
+            : `full_portfolio_report_${new Date().toISOString().split('T')[0]}.csv`;
+
+        generateAndDownloadCSV(headers, rows, filename);
+    };
+
+    const generateAndDownloadCSV = (headers: string[], rows: string[][], filename: string) => {
         const csvContent = "data:text/csv;charset=utf-8," 
             + headers.join(",") + "\n" 
             + rows.map(e => e.join(",")).join("\n");
@@ -79,7 +100,7 @@ const Reports: React.FC = () => {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `full_portfolio_report_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", filename);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -93,16 +114,7 @@ const Reports: React.FC = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800">Reports & Analytics</h1>
-                    <p className="text-slate-500">Portfolio performance and management fee analysis.</p>
-                </div>
-                <div className="flex gap-2">
-                    <button 
-                        onClick={downloadManagerCSV}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors shadow-sm text-sm font-medium"
-                    >
-                        <Download size={16} />
-                        <span>Manager CSV</span>
-                    </button>
+                    <p className="text-slate-500">Portfolio performance and document exports.</p>
                 </div>
             </div>
 
@@ -133,6 +145,72 @@ const Reports: React.FC = () => {
                     <div>
                         <p className="text-sm text-slate-500">Active Managers</p>
                         <p className="text-2xl font-bold text-slate-800">{stats.length}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Report Generator Section */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Download size={20} className="text-blue-600" /> Report Generator
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* 1. Management Fee Report */}
+                    <div className="p-4 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
+                        <div>
+                            <h3 className="font-semibold text-slate-800">Management Fee Report</h3>
+                            <p className="text-xs text-slate-500 mt-1">Summary of total fees, units, and complexes grouped by Manager.</p>
+                        </div>
+                        <button 
+                            onClick={downloadFeeSummaryCSV}
+                            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors text-sm font-medium shadow-sm"
+                        >
+                            <FileSpreadsheet size={16} className="text-emerald-600" />
+                            Download Summary
+                        </button>
+                    </div>
+
+                    {/* 2. Full Portfolio List */}
+                    <div className="p-4 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
+                        <div>
+                            <h3 className="font-semibold text-slate-800">Full Portfolio List</h3>
+                            <p className="text-xs text-slate-500 mt-1">Detailed export of ALL active complexes with full information (Insurance, Compliance, Dates).</p>
+                        </div>
+                        <button 
+                            onClick={() => downloadPropertyDetailsCSV(null)}
+                            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors text-sm font-medium shadow-sm"
+                        >
+                            <FileSpreadsheet size={16} className="text-blue-600" />
+                            Download Full List
+                        </button>
+                    </div>
+
+                    {/* 3. Manager Specific List */}
+                    <div className="p-4 rounded-lg border border-slate-200 bg-slate-50 flex flex-col justify-between">
+                        <div>
+                            <h3 className="font-semibold text-slate-800">Manager Portfolio</h3>
+                            <p className="text-xs text-slate-500 mt-1">Detailed property list filtered for a specific manager.</p>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                            <select 
+                                className="w-full text-sm border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                value={selectedManagerForReport}
+                                onChange={(e) => setSelectedManagerForReport(e.target.value)}
+                            >
+                                <option value="">Select Manager...</option>
+                                {managers.map(m => (
+                                    <option key={m.id} value={m.name}>{m.name}</option>
+                                ))}
+                            </select>
+                            <button 
+                                onClick={() => downloadPropertyDetailsCSV(selectedManagerForReport)}
+                                disabled={!selectedManagerForReport}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium shadow-sm"
+                            >
+                                <Filter size={16} className="text-purple-600" />
+                                Download Manager List
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -196,19 +274,12 @@ const Reports: React.FC = () => {
                 </div>
             </div>
             
-            {/* Detailed Portfolio Table */}
+            {/* Detailed Portfolio Table Preview */}
              <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <FileSpreadsheet size={18} className="text-emerald-600"/> Detailed Portfolio Report
+                        <FileSpreadsheet size={18} className="text-emerald-600"/> Portfolio Snapshot
                     </h2>
-                    <button 
-                        onClick={downloadPortfolioCSV}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors shadow-sm text-sm font-medium"
-                    >
-                        <Download size={16} />
-                        <span>Export Portfolio CSV</span>
-                    </button>
                 </div>
                 <div className="overflow-x-auto max-h-[500px]">
                     <table className="w-full text-left text-sm text-slate-600">
@@ -223,7 +294,6 @@ const Reports: React.FC = () => {
                                 <th className="px-6 py-4">FYE</th>
                                 <th className="px-6 py-4">Ins. Exp.</th>
                                 <th className="px-6 py-4">BWOF Exp.</th>
-                                <th className="px-6 py-4">Next AGM</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -238,7 +308,6 @@ const Reports: React.FC = () => {
                                     <td className="px-6 py-3 text-xs">{bc.financialYearEnd}</td>
                                     <td className="px-6 py-3 text-xs">{bc.insuranceExpiry}</td>
                                     <td className="px-6 py-3 text-xs">{bc.bwofExpiry}</td>
-                                    <td className="px-6 py-3 text-xs">{bc.nextAgmDate}</td>
                                 </tr>
                             ))}
                         </tbody>

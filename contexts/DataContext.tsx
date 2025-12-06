@@ -187,24 +187,52 @@ const INITIAL_DATA: BodyCorporate[] = [
         {
             id: 'preload-mtg-1',
             type: 'AGM',
-            date: '2025-01-31',
+            date: '2026-01-31',
             time: '18:00',
             venue: 'Rawene Community Centre',
             venueAddress: '33 Rawene Road, Birkenhead, Auckland',
-            noiDueDate: '2025-01-09',
-            noiResponseDueDate: '2025-01-16'
+            noiDueDate: '2026-01-09',
+            noiResponseDueDate: '2026-01-16'
         }
     ],
-    nextAgmDate: '2025-11-25',
+    nextAgmDate: '2026-01-31',
     nextAgmTime: '18:00',
     nextAgmVenue: 'Rawene Community Centre',
     nextAgmVenueAddress: '33 Rawene Road, Birkenhead, Auckland',
-    noiDueDate: '2025-10-24', // Sent
-    noiResponseDueDate: '2025-10-31',
+    noiDueDate: '2026-01-09',
+    noiResponseDueDate: '2026-01-16',
     insuranceExpiry: '2025-11-01',
     hasBwof: true,
     bwofExpiry: '2025-10-15',
     hasBuildingManager: false
+  },
+  {
+    id: '3',
+    bcNumber: 'IS Upland',
+    name: 'Upland Road',
+    address: '12 Upland Road, Remuera, Auckland',
+    units: 12,
+    type: 'Incorporated Society',
+    managerName: 'Gary Cheung',
+    managementFee: 6000,
+    managementStartDate: '2023-01-01',
+    onboardingType: 'Takeover',
+    isArchived: false,
+    financialYearEnd: '2025-12-31',
+    isocNomDaysPrior: 7,
+    meetings: [
+         {
+            id: 'preload-mtg-upland',
+            type: 'SGM',
+            date: '2026-02-01',
+            time: '10:00',
+            venue: 'On Site',
+            venueAddress: '12 Upland Road, Remuera',
+        }
+    ],
+    nextAgmDate: '2026-02-01',
+    insuranceExpiry: '2026-02-01',
+    hasBwof: false
   }
 ];
 
@@ -393,8 +421,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const syncAgmDetails = (meeting: Meeting) => {
-      // Only sync if it's a future AGM
-      if (meeting.type === 'AGM' && new Date(meeting.date) > new Date()) {
+      // Only sync if it's a future AGM or SGM that acts as AGM
+      if ((meeting.type === 'AGM' || meeting.type === 'SGM') && new Date(meeting.date) > new Date()) {
           return {
               nextAgmDate: meeting.date,
               nextAgmTime: meeting.time,

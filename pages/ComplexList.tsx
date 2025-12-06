@@ -3,12 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Search, Filter, ShieldCheck, ShieldAlert, X, Building, Calendar, AlertTriangle, Save, Plus, Clock, MapPin, Edit2, Trash2, CheckCircle2, UserCheck } from 'lucide-react';
-import { BodyCorporate, Meeting, UserRole } from '../types';
+import { BodyCorporate, Meeting, UserRole, ComplexType } from '../types';
 
 const ComplexList: React.FC = () => {
-  const { complexes, updateComplex, addMeeting, updateMeeting, deleteMeeting } = useData();
+  const { complexes, updateComplex, addMeeting, updateMeeting, deleteMeeting, managers } = useData();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterManager, setFilterManager] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
   
   // FIX: Store the ID instead of the object. This ensures the modal always pulls the latest data from Context.
   const [selectedComplexId, setSelectedComplexId] = useState<string | null>(null);
@@ -18,11 +20,16 @@ const ComplexList: React.FC = () => {
   // Filter Logic - Only show active (non-archived) complexes
   const filteredComplexes = complexes
     .filter(c => !c.isArchived)
-    .filter(c => 
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        c.bcNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.address.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    .filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              c.bcNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              c.address.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesManager = filterManager === 'all' || c.managerName === filterManager;
+        const matchesType = filterType === 'all' || c.type === filterType;
+
+        return matchesSearch && matchesManager && matchesType;
+    });
 
   const isInsuranceValid = (dateStr?: string) => {
     if (!dateStr) return false;
@@ -45,8 +52,8 @@ const ComplexList: React.FC = () => {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {/* Filters */}
-        <div className="p-4 border-b border-slate-100 flex gap-4">
-            <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full md:max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
                     type="text" 
@@ -56,10 +63,27 @@ const ComplexList: React.FC = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 text-sm">
-                <Filter size={16} />
-                <span>Filters</span>
-            </button>
+            <div className="flex gap-2 w-full md:w-auto">
+                 <select 
+                    className="flex-1 md:flex-none py-2 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={filterManager}
+                    onChange={(e) => setFilterManager(e.target.value)}
+                >
+                    <option value="all">All Managers</option>
+                    {managers.map(m => (
+                        <option key={m.id} value={m.name}>{m.name}</option>
+                    ))}
+                </select>
+                <select 
+                    className="flex-1 md:flex-none py-2 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                >
+                    <option value="all">All Types</option>
+                    <option value="Body Corporate">Body Corporate</option>
+                    <option value="Incorporated Society">Incorporated Society</option>
+                </select>
+            </div>
         </div>
 
         {/* Table */}
@@ -71,14 +95,17 @@ const ComplexList: React.FC = () => {
                         <th className="px-6 py-4">Name & Address</th>
                         <th className="px-6 py-4">Manager</th>
                         <th className="px-6 py-4">Insurance Expiry</th>
-                        <th className="px-6 py-4">Next AGM</th>
+                        <th className="px-6 py-4">Next Meeting</th>
                         <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {filteredComplexes.map((bc) => (
                         <tr key={bc.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedComplexId(bc.id)}>
-                            <td className="px-6 py-4 font-mono font-medium text-slate-800">{bc.bcNumber}</td>
+                            <td className="px-6 py-4 font-mono font-medium text-slate-800">
+                                {bc.bcNumber}
+                                <div className="text-[10px] text-slate-400 mt-1">{bc.type}</div>
+                            </td>
                             <td className="px-6 py-4">
                                 <div className="font-medium text-slate-800">{bc.name}</div>
                                 <div className="text-xs text-slate-400">{bc.address}</div>
