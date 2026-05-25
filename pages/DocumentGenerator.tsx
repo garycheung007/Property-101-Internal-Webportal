@@ -139,13 +139,6 @@ const generateLetterHtml = (complex: BodyCorporate, meeting: Meeting | null, man
       <body>
           <div class="Section1" style="padding: 20mm;">
               <div class="letter-content">${content}</div>
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border: none; margin-top: 15pt;">
-                <tr>
-                    <td style="border: none; padding: 0;">
-                        <p style="margin-bottom: 0pt; mso-margin-bottom-alt: 0pt;"><b>${manager?.name || 'The Manager'}</b><br/>${manager?.title || 'Body Corporate Manager'}<br/>Property 101 Group Limited</p>
-                    </td>
-                </tr>
-              </table>
           </div>
       </body></html>
     `;

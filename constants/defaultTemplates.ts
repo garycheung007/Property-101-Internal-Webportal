@@ -42,6 +42,7 @@ const NOI_LETTER_BC = `{{header}}
 <p>Please complete and return the attached <strong>AGM Response Form</strong> to Property 101 Group Ltd by email info@prop101.co.nz no later than {{noi_due_date}} at {{noi_due_time}}.</p>
 <p>Yours sincerely</p>
 <p>{{manager_signature}}</p>
+<p style="margin-bottom: 0pt; mso-margin-bottom-alt: 0pt;"><strong>{{manager_name}}</strong><br/>{{manager_title}}<br/>Property 101 Group Limited</p>
 {{footer}}`;
 
 const RESPONSE_FORM_BC = `{{header}}
@@ -103,6 +104,7 @@ const NOI_LETTER_ISOC = `{{header}}
 <p>Please complete and return the attached <strong>Meeting Response Form</strong> to Property 101 Group Ltd by email info@prop101.co.nz no later than {{noi_due_date}} at {{noi_due_time}}.</p>
 <p>Yours sincerely</p>
 <p>{{manager_signature}}</p>
+<p style="margin-bottom: 0pt; mso-margin-bottom-alt: 0pt;"><strong>{{manager_name}}</strong><br/>{{manager_title}}<br/>Property 101 Group Limited</p>
 {{footer}}`;
 
 const RESPONSE_FORM_ISOC = `{{header}}
@@ -341,6 +343,7 @@ const S147 = `{{header}}
 <br/>
 <p>Yours sincerely,</p>
 <p>{{manager_signature}}</p>
+<p style="margin-bottom: 0pt; mso-margin-bottom-alt: 0pt;"><strong>{{manager_name}}</strong><br/>{{manager_title}}<br/>Property 101 Group Limited</p>
 {{footer}}`;
 
 const CPL = `{{header}}
