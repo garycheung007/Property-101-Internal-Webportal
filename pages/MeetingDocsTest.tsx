@@ -162,7 +162,13 @@ const MeetingDocsTest: React.FC = () => {
       });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(out as Blob);
-      a.download = `${key === 'noiCoverLetter' ? 'NOI_Cover_Letter' : 'Response_Form'}_${selectedComplex.bcNumber}.docx`;
+      const meetingType = selectedMeeting?.type || 'AGM';
+      const meetingDate = selectedMeeting?.date
+        ? new Date(selectedMeeting.date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '';
+      const docLabel = key === 'noiCoverLetter' ? 'Notice of Intention Cover Letter' : 'Response Form';
+      const datePart = meetingDate ? ` - ${meetingType} ${meetingDate}` : '';
+      a.download = `BC ${selectedComplex.bcNumber} ${selectedComplex.name}${datePart} ${docLabel}.docx`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch {
