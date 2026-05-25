@@ -155,7 +155,7 @@ const MeetingDocsTest: React.FC = () => {
         modules: [imageModule],
         delimiters: { start: '{{', end: '}}' },
       });
-      docTpl.render({ ...buildMergeData(selectedComplex, selectedMeeting, assignedManager), '%Manager_Signature': sigUrl });
+      docTpl.render({ ...buildMergeData(selectedComplex, selectedMeeting, assignedManager), Manager_Signature: sigUrl });
       const out = docTpl.getZip().generate({
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
