@@ -241,6 +241,12 @@ export interface Reminder {
   severity: 'high' | 'medium' | 'low';
 }
 
+export interface TemplateFileRecord {
+  name: string;
+  data: string; // base64-encoded .docx content
+  uploadedAt: string;
+}
+
 export interface ActionComment {
     id: string;
     reminderId: string;

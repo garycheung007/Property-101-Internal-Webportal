@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Building2, FileText, LogOut, BarChart3, Settings, HardHat, FileSignature, CloudCheck, CloudOff, AlertCircle, Sun, Moon, DollarSign } from 'lucide-react';
+import { LayoutDashboard, Building2, FileText, LogOut, BarChart3, Settings, HardHat, FileSignature, CloudCheck, CloudOff, AlertCircle, Sun, Moon, DollarSign, FlaskConical } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -98,6 +98,10 @@ const Sidebar: React.FC = () => {
                  <Link to="/admin" className={getNavClass('/admin')}>
                     <Settings size={20} />
                     <span>Admin Panel</span>
+                </Link>
+                 <Link to="/meeting-docs-test" className={getNavClass('/meeting-docs-test')}>
+                    <FlaskConical size={20} />
+                    <span>Meeting Docs (Test)</span>
                 </Link>
              </div>
         )}

@@ -11,6 +11,7 @@ import DocumentGenerator from './pages/DocumentGenerator';
 import DisclosureGenerator from './pages/DisclosureGenerator';
 import Reports from './pages/Reports';
 import AdminPanel from './pages/AdminPanel';
+import MeetingDocsTest from './pages/MeetingDocsTest';
 import Financials from './pages/Financials';
 import ContractorList from './pages/ContractorList';
 import Sidebar from './components/Sidebar';
@@ -38,6 +39,7 @@ const AppRoutes = () => {
       <Route path="/disclosure"  element={<ProtectedLayout><DisclosureGenerator /></ProtectedLayout>} />
       <Route path="/contractors" element={<ProtectedLayout><ContractorList /></ProtectedLayout>} />
       <Route path="/admin"       element={<ProtectedLayout><AdminPanel /></ProtectedLayout>} />
+      <Route path="/meeting-docs-test" element={<ProtectedLayout><MeetingDocsTest /></ProtectedLayout>} />
       <Route path="/financials"  element={<ProtectedLayout><Financials /></ProtectedLayout>} />
     </Routes>
   );
