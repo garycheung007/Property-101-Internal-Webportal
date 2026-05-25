@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import ImageModule from 'docxtemplater-image-module-free';
 import { FlaskConical, Upload, Download, Loader2, CheckCircle, Eye } from 'lucide-react';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
@@ -51,6 +52,11 @@ const toArrayBuffer = (base64: string): ArrayBuffer => {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
+};
+
+const dataUrlToBuffer = (dataUrl: string): ArrayBuffer => {
+  const base64 = dataUrl.split(',')[1];
+  return toArrayBuffer(base64);
 };
 
 const MeetingDocsTest: React.FC = () => {
@@ -115,6 +121,11 @@ const MeetingDocsTest: React.FC = () => {
       const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
       const data = buildMergeData(selectedComplex, selectedMeeting, assignedManager);
       let html = result.value;
+      const sigHtml = assignedManager?.signatureUrl
+        ? `<img src="${assignedManager.signatureUrl}" style="width:200px;height:auto;display:block;margin:8px 0;" />`
+        : '';
+      html = html.split('{{%Manager_Signature}}').join(sigHtml);
+      html = html.split('{{Manager_Signature}}').join(sigHtml);
       Object.entries(data).forEach(([k, v]) => { html = html.split(`{{${k}}}`).join(v); });
       setPreviewHtml(html);
     } catch {
@@ -127,9 +138,24 @@ const MeetingDocsTest: React.FC = () => {
     const tpl = templates[key];
     if (!tpl || !selectedComplex) return;
     try {
+      const sigUrl = assignedManager?.signatureUrl || '';
+      const imageModule = new ImageModule({
+        centered: false,
+        fileType: 'docx',
+        getImage: (tagValue: string) => {
+          if (tagValue && tagValue.startsWith('data:')) return dataUrlToBuffer(tagValue);
+          return new Uint8Array(0).buffer;
+        },
+        getSize: () => [200, 70],
+      });
       const zip = new PizZip(toArrayBuffer(tpl.data));
-      const docTpl = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-      docTpl.render(buildMergeData(selectedComplex, selectedMeeting, assignedManager));
+      const docTpl = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        modules: [imageModule],
+        delimiters: { start: '{{', end: '}}' },
+      });
+      docTpl.render({ ...buildMergeData(selectedComplex, selectedMeeting, assignedManager), '%Manager_Signature': sigUrl });
       const out = docTpl.getZip().generate({
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -277,7 +303,7 @@ const MeetingDocsTest: React.FC = () => {
                   '{{Meeting_Day}}', '{{Meeting_Date}}', '{{Meeting_Time}}', '{{Meeting_Venue}}',
                   '{{Nomination_Due_Day}}', '{{Nomination_Due_Date}}', '{{Nomination_Due_Time}}',
                   '{{Current_Date}}',
-                  '{{Manager_Name}}', '{{Manager_Title}}',
+                  '{{Manager_Name}}', '{{Manager_Title}}', '{{%Manager_Signature}}',
                 ].map(tag => <p key={tag}>{tag}</p>)}
               </div>
             </details>
