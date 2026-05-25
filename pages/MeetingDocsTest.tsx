@@ -16,7 +16,7 @@ const LABELS: Record<TemplateKey, string> = {
   responseForm: 'Response Form',
 };
 
-const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null) => {
+const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager?: { name?: string; title?: string }) => {
   const targetDate = meeting?.date || complex.nextAgmDate || '';
   const targetTime = meeting?.time || complex.nextAgmTime || '';
   const targetVenue = meeting?.venue || complex.nextAgmVenue || '';
@@ -41,6 +41,8 @@ const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null) => {
     Nomination_Due_Date: fmtDate(nomRaw),
     Nomination_Due_Time: complex.noiResponseDueTime ? fmtTime(complex.noiResponseDueTime) : '4:00 pm',
     Current_Date: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
+    Manager_Name: manager?.name || '',
+    Manager_Title: manager?.title || 'Body Corporate Manager',
   };
 };
 
@@ -52,7 +54,7 @@ const toArrayBuffer = (base64: string): ArrayBuffer => {
 };
 
 const MeetingDocsTest: React.FC = () => {
-  const { complexes } = useData();
+  const { complexes, managers } = useData();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -100,6 +102,7 @@ const MeetingDocsTest: React.FC = () => {
 
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
   const selectedMeeting = selectedComplex?.meetings.find(m => m.id === selectedMeetingId) || null;
+  const assignedManager = selectedComplex ? managers.find(m => m.name === selectedComplex.managerName) : undefined;
 
   const handlePreview = async (key: TemplateKey) => {
     const tpl = templates[key];
@@ -110,7 +113,7 @@ const MeetingDocsTest: React.FC = () => {
       const mammoth = await import('mammoth');
       const buffer = toArrayBuffer(tpl.data);
       const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
-      const data = buildMergeData(selectedComplex, selectedMeeting);
+      const data = buildMergeData(selectedComplex, selectedMeeting, assignedManager);
       let html = result.value;
       Object.entries(data).forEach(([k, v]) => { html = html.split(`{{${k}}}`).join(v); });
       setPreviewHtml(html);
@@ -126,7 +129,7 @@ const MeetingDocsTest: React.FC = () => {
     try {
       const zip = new PizZip(toArrayBuffer(tpl.data));
       const docTpl = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-      docTpl.render(buildMergeData(selectedComplex, selectedMeeting));
+      docTpl.render(buildMergeData(selectedComplex, selectedMeeting, assignedManager));
       const out = docTpl.getZip().generate({
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -274,6 +277,7 @@ const MeetingDocsTest: React.FC = () => {
                   '{{Meeting_Day}}', '{{Meeting_Date}}', '{{Meeting_Time}}', '{{Meeting_Venue}}',
                   '{{Nomination_Due_Day}}', '{{Nomination_Due_Date}}', '{{Nomination_Due_Time}}',
                   '{{Current_Date}}',
+                  '{{Manager_Name}}', '{{Manager_Title}}',
                 ].map(tag => <p key={tag}>{tag}</p>)}
               </div>
             </details>
