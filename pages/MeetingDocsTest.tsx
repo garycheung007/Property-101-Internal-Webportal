@@ -10,23 +10,27 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, Meeting, TemplateFileRecord } from '../types';
 
-type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'noiCoverLetterIsoc' | 'responseFormIsoc';
+type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'debtCollectionFlowchart' | 'noiCoverLetterIsoc' | 'responseFormIsoc' | 'debtCollectionFlowchartIsoc';
 
 const LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'NOI Cover Letter',
   responseForm: 'Response Form',
+  debtCollectionFlowchart: 'Debt Collection Flowchart',
   noiCoverLetterIsoc: 'NOI Cover Letter',
   responseFormIsoc: 'Response Form',
+  debtCollectionFlowchartIsoc: 'Debt Collection Flowchart',
 };
 
-const BC_KEYS: TemplateKey[] = ['noiCoverLetter', 'responseForm'];
-const IS_KEYS: TemplateKey[] = ['noiCoverLetterIsoc', 'responseFormIsoc'];
+const BC_KEYS: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart'];
+const IS_KEYS: TemplateKey[] = ['noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
 
 const DOC_LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'Notice of Intention Cover Letter',
   responseForm: 'Response Form',
+  debtCollectionFlowchart: 'Debt Collection Flowchart',
   noiCoverLetterIsoc: 'Notice of Intention Cover Letter',
   responseFormIsoc: 'Response Form',
+  debtCollectionFlowchartIsoc: 'Debt Collection Flowchart',
 };
 
 const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager?: { name?: string; title?: string }) => {
@@ -87,27 +91,35 @@ const MeetingDocsTest: React.FC = () => {
 
   const noiRef = useRef<HTMLInputElement>(null);
   const rfRef = useRef<HTMLInputElement>(null);
+  const dcRef = useRef<HTMLInputElement>(null);
   const noiIsocRef = useRef<HTMLInputElement>(null);
   const rfIsocRef = useRef<HTMLInputElement>(null);
+  const dcIsocRef = useRef<HTMLInputElement>(null);
   const inputRefs: Record<TemplateKey, React.RefObject<HTMLInputElement>> = {
     noiCoverLetter: noiRef,
     responseForm: rfRef,
+    debtCollectionFlowchart: dcRef,
     noiCoverLetterIsoc: noiIsocRef,
     responseFormIsoc: rfIsocRef,
+    debtCollectionFlowchartIsoc: dcIsocRef,
   };
 
   useEffect(() => {
     Promise.all([
       getDoc(doc(db, 'templates_v2', 'noiCoverLetter')),
       getDoc(doc(db, 'templates_v2', 'responseForm')),
+      getDoc(doc(db, 'templates_v2', 'debtCollectionFlowchart')),
       getDoc(doc(db, 'templates_v2', 'noiCoverLetterIsoc')),
       getDoc(doc(db, 'templates_v2', 'responseFormIsoc')),
-    ]).then(([noiSnap, rfSnap, noiIsocSnap, rfIsocSnap]) => {
+      getDoc(doc(db, 'templates_v2', 'debtCollectionFlowchartIsoc')),
+    ]).then(([noiSnap, rfSnap, dcSnap, noiIsocSnap, rfIsocSnap, dcIsocSnap]) => {
       const loaded: Partial<Record<TemplateKey, TemplateFileRecord>> = {};
       if (noiSnap.exists()) loaded.noiCoverLetter = noiSnap.data() as TemplateFileRecord;
       if (rfSnap.exists()) loaded.responseForm = rfSnap.data() as TemplateFileRecord;
+      if (dcSnap.exists()) loaded.debtCollectionFlowchart = dcSnap.data() as TemplateFileRecord;
       if (noiIsocSnap.exists()) loaded.noiCoverLetterIsoc = noiIsocSnap.data() as TemplateFileRecord;
       if (rfIsocSnap.exists()) loaded.responseFormIsoc = rfIsocSnap.data() as TemplateFileRecord;
+      if (dcIsocSnap.exists()) loaded.debtCollectionFlowchartIsoc = dcIsocSnap.data() as TemplateFileRecord;
       setTemplates(loaded);
       setLoadingTemplates(false);
     }).catch(() => setLoadingTemplates(false));
