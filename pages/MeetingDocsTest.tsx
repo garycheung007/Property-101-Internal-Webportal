@@ -10,11 +10,23 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, Meeting, TemplateFileRecord } from '../types';
 
-type TemplateKey = 'noiCoverLetter' | 'responseForm';
+type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'noiCoverLetterIsoc' | 'responseFormIsoc';
 
 const LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'NOI Cover Letter',
   responseForm: 'Response Form',
+  noiCoverLetterIsoc: 'NOI Cover Letter',
+  responseFormIsoc: 'Response Form',
+};
+
+const BC_KEYS: TemplateKey[] = ['noiCoverLetter', 'responseForm'];
+const IS_KEYS: TemplateKey[] = ['noiCoverLetterIsoc', 'responseFormIsoc'];
+
+const DOC_LABELS: Record<TemplateKey, string> = {
+  noiCoverLetter: 'Notice of Intention Cover Letter',
+  responseForm: 'Response Form',
+  noiCoverLetterIsoc: 'Notice of Intention Cover Letter',
+  responseFormIsoc: 'Response Form',
 };
 
 const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager?: { name?: string; title?: string }) => {
@@ -75,19 +87,27 @@ const MeetingDocsTest: React.FC = () => {
 
   const noiRef = useRef<HTMLInputElement>(null);
   const rfRef = useRef<HTMLInputElement>(null);
+  const noiIsocRef = useRef<HTMLInputElement>(null);
+  const rfIsocRef = useRef<HTMLInputElement>(null);
   const inputRefs: Record<TemplateKey, React.RefObject<HTMLInputElement>> = {
     noiCoverLetter: noiRef,
     responseForm: rfRef,
+    noiCoverLetterIsoc: noiIsocRef,
+    responseFormIsoc: rfIsocRef,
   };
 
   useEffect(() => {
     Promise.all([
       getDoc(doc(db, 'templates_v2', 'noiCoverLetter')),
       getDoc(doc(db, 'templates_v2', 'responseForm')),
-    ]).then(([noiSnap, rfSnap]) => {
+      getDoc(doc(db, 'templates_v2', 'noiCoverLetterIsoc')),
+      getDoc(doc(db, 'templates_v2', 'responseFormIsoc')),
+    ]).then(([noiSnap, rfSnap, noiIsocSnap, rfIsocSnap]) => {
       const loaded: Partial<Record<TemplateKey, TemplateFileRecord>> = {};
       if (noiSnap.exists()) loaded.noiCoverLetter = noiSnap.data() as TemplateFileRecord;
       if (rfSnap.exists()) loaded.responseForm = rfSnap.data() as TemplateFileRecord;
+      if (noiIsocSnap.exists()) loaded.noiCoverLetterIsoc = noiIsocSnap.data() as TemplateFileRecord;
+      if (rfIsocSnap.exists()) loaded.responseFormIsoc = rfIsocSnap.data() as TemplateFileRecord;
       setTemplates(loaded);
       setLoadingTemplates(false);
     }).catch(() => setLoadingTemplates(false));
@@ -109,6 +129,8 @@ const MeetingDocsTest: React.FC = () => {
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
   const selectedMeeting = selectedComplex?.meetings.find(m => m.id === selectedMeetingId) || null;
   const assignedManager = selectedComplex ? managers.find(m => m.name === selectedComplex.managerName) : undefined;
+  const isIsoc = selectedComplex?.type === 'Incorporated Society';
+  const activeKeys: TemplateKey[] = isIsoc ? IS_KEYS : BC_KEYS;
 
   const handlePreview = async (key: TemplateKey) => {
     const tpl = templates[key];
@@ -166,9 +188,10 @@ const MeetingDocsTest: React.FC = () => {
       const meetingDate = selectedMeeting?.date
         ? new Date(selectedMeeting.date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
         : '';
-      const docLabel = key === 'noiCoverLetter' ? 'Notice of Intention Cover Letter' : 'Response Form';
+      const docLabel = DOC_LABELS[key];
       const datePart = meetingDate ? ` - ${meetingType} ${meetingDate}` : '';
-      a.download = `BC ${selectedComplex.bcNumber} ${selectedComplex.name}${datePart} ${docLabel}.docx`;
+      const prefix = isIsoc ? 'IS' : 'BC';
+      a.download = `${prefix} ${selectedComplex.bcNumber} ${selectedComplex.name}${datePart} ${docLabel}.docx`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch {
@@ -284,12 +307,22 @@ const MeetingDocsTest: React.FC = () => {
           </div>
 
           {/* Template cards */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Word Templates (.docx)</p>
-            {loadingTemplates
-              ? <div className="flex items-center gap-2 text-slate-400 text-sm py-2"><Loader2 size={14} className="animate-spin" />Loading...</div>
-              : ((['noiCoverLetter', 'responseForm'] as TemplateKey[]).map(renderTemplateCard))
-            }
+            {loadingTemplates ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm py-2"><Loader2 size={14} className="animate-spin" />Loading...</div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest px-1">Body Corporate</p>
+                  {BC_KEYS.map(renderTemplateCard)}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest px-1">Incorporated Society</p>
+                  {IS_KEYS.map(renderTemplateCard)}
+                </div>
+              </>
+            )}
             {isAdmin && (
               <p className="text-[10px] text-slate-400 italic px-1 leading-relaxed">
                 Templates must use {'{{BC_Number}}'} style placeholders. See the merge field guide below.
@@ -355,7 +388,10 @@ const MeetingDocsTest: React.FC = () => {
 
             {selectedBcId && (
               <div className="space-y-3 pt-2 border-t dark:border-slate-700">
-                {(['noiCoverLetter', 'responseForm'] as TemplateKey[]).map(renderActionButtons)}
+                <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest">
+                  {isIsoc ? 'Incorporated Society' : 'Body Corporate'} Templates
+                </p>
+                {activeKeys.map(renderActionButtons)}
                 <p className="text-[10px] text-slate-400 italic">PDF opens a print dialog — select "Save as PDF".</p>
               </div>
             )}
