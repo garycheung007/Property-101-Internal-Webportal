@@ -4,223 +4,16 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, DocumentTemplates, ReminderType, TemplateFileRecord } from '../types';
-import { 
-    Users, Building, Plus, Upload, Search, Settings, 
-    UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Image as ImageIcon, Trash2, Database, ShieldCheck, Terminal, FileInput, FileQuestion, ArrowUp, ArrowDown, Mail, ShieldAlert, ChevronRight, LayoutGrid, Loader2, HardHat, ClipboardCheck, MessageSquare, PlusCircle, AlertTriangle, MessageSquareMore, FileText, Bold, Italic, List, Type as TypeIcon, HelpCircle, Underline as UnderlineIcon, Heading1, Heading2, Eye, Layout, AlignLeft, AlignCenter, AlignRight, ListOrdered, ChevronDown, Download, Table, MoveVertical, FileSignature, Scissors, Activity, CheckCircle2, MinusCircle, AlertCircle
+import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord } from '../types';
+import {
+    Users, Building, Plus, Upload, Search, Settings,
+    UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
+    LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
+    Activity, CheckCircle2, MinusCircle, AlertCircle
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'];
-
-// Sub-components moved above AdminPanel to prevent "used before declaration" errors
-const RichTemplateEditor: React.FC<{ title: string; value: string; onChange: (val: string) => void; description: string }> = ({ title, value, onChange, description }) => {
-    const editorRef = useRef<HTMLDivElement>(null);
-    const [showTableConfig, setShowTableConfig] = useState(false);
-    const [showSymbolPicker, setShowSymbolPicker] = useState(false);
-    const [tableConfig, setTableConfig] = useState({ rows: 2, cols: 2, width: '100%', border: '1pt' });
-
-    const FONTS = [
-        'Calibri', 'Arial', 'Times New Roman', 'Georgia', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Courier New'
-    ];
-
-    const SIZES = [
-        '8pt', '9pt', '10pt', '11pt', '12pt', '14pt', '16pt', '18pt', '20pt', '24pt', '28pt', '36pt'
-    ];
-
-    const SYMBOLS = [
-        { char: '☐', name: 'Square Box' },
-        { char: '☑', name: 'Checked Box' },
-        { char: '☒', name: 'Crossed Box' },
-        { char: '§', name: 'Section' },
-        { char: '©', name: 'Copyright' },
-        { char: '®', name: 'Registered' },
-        { char: '™', name: 'Trademark' },
-        { char: '•', name: 'Bullet' },
-        { char: '—', name: 'Em Dash' },
-        { char: 'NZ$', name: 'NZ Dollar' }
-    ];
-
-    useEffect(() => {
-        if (editorRef.current && editorRef.current.innerHTML !== value) {
-            editorRef.current.innerHTML = value;
-        }
-    }, [value]);
-
-    const execCommand = (command: string, value: string = '') => {
-        document.execCommand(command, false, value);
-        if (editorRef.current) {
-            onChange(editorRef.current.innerHTML);
-        }
-    };
-
-    const applyFontSize = (size: string) => {
-        document.execCommand('fontSize', false, '7');
-        if (editorRef.current) {
-            const fontEls = Array.from(editorRef.current.querySelectorAll('font[size="7"]'));
-            fontEls.forEach(el => {
-                const htmlEl = el as HTMLElement;
-                const span = document.createElement('span');
-                span.style.fontSize = size;
-                span.innerHTML = htmlEl.innerHTML;
-                htmlEl.parentNode?.replaceChild(span, htmlEl);
-            });
-
-            const spanEls = Array.from(editorRef.current.querySelectorAll('span'));
-            spanEls.forEach(el => {
-                const htmlEl = el as HTMLElement;
-                if (htmlEl.style.fontSize === 'xxx-large' || htmlEl.style.fontSize === '48px') {
-                    htmlEl.style.fontSize = size;
-                }
-            });
-            onChange(editorRef.current.innerHTML);
-        }
-    };
-
-    const insertSymbol = (char: string) => {
-        execCommand('insertHTML', char);
-        setShowSymbolPicker(false);
-    };
-
-    const insertTable = () => {
-        const { rows, cols, width, border } = tableConfig;
-        const bStyle = border === 'none' ? 'none' : `solid #000 ${border}`;
-        const tableLayout = width === '100%' ? 'table-layout: fixed;' : '';
-        const minWidth = width === '100%' ? 'min-width: 100%;' : '';
-        const displayStyle = width === '100%' ? 'display: table;' : '';
-        
-        let tableHtml = `<table style="border-collapse: collapse; width: ${width}; ${minWidth} ${tableLayout} ${displayStyle} margin-bottom: 10pt; border: ${bStyle};"><tbody>`;
-        for(let i=0; i<rows; i++) {
-            tableHtml += '<tr>';
-            for(let j=0; j<cols; j++) {
-                tableHtml += `<td style="border: ${bStyle}; padding: 5pt; height: 20pt; vertical-align: top;"></td>`;
-            }
-            tableHtml += '</tr>';
-        }
-        tableHtml += '</tbody></table>';
-        
-        execCommand('insertHTML', tableHtml);
-        setShowTableConfig(false);
-    };
-
-    const handleTableAction = (action: 'add-row' | 'delete-row') => {
-        const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0) return;
-        
-        let node = selection.anchorNode;
-        while (node && node !== editorRef.current) {
-            if (node.nodeName === 'TR') break;
-            node = node.parentNode;
-        }
-        
-        if (node && node.nodeName === 'TR') {
-            if (action === 'add-row') {
-                const newRow = node.cloneNode(true) as HTMLTableRowElement;
-                Array.from(newRow.cells).forEach(cell => {
-                    const htmlCell = cell as HTMLElement;
-                    htmlCell.innerHTML = '';
-                    // Ensure it has some height if it was empty
-                    if (!htmlCell.style.height) htmlCell.style.height = '20pt';
-                });
-                node.parentNode?.insertBefore(newRow, node.nextSibling);
-            } else if (action === 'delete-row') {
-                const parent = node.parentNode;
-                node.parentNode?.removeChild(node);
-                // If the table body is now empty, remove the table too? 
-                // Usually better to leave it to the user to delete the table if they want.
-            }
-            
-            if (editorRef.current) {
-                onChange(editorRef.current.innerHTML);
-            }
-        } else {
-            // If not in a row, maybe alert or just do nothing
-            // For better UX, we could try to find the nearest table
-        }
-    };
-
-    return (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 shadow-sm overflow-hidden flex flex-col transition-colors relative">
-            <style>{`
-                .editor-content table { border-collapse: collapse; margin-bottom: 1rem; }
-                .editor-content td { border: 1px solid #cbd5e1; padding: 8px; min-height: 24px; }
-                .dark .editor-content td { border-color: #334155; }
-                .editor-content .page-break { pointer-events: none; user-select: none; }
-            `}</style>
-            <div className="p-5 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/50">
-                <div className="space-y-1">
-                    <h3 className="font-bold text-slate-800 dark:text-white text-sm uppercase tracking-widest">{title}</h3>
-                    <p className="text-[10px] text-slate-500 italic">{description}</p>
-                </div>
-            </div>
-            
-            <div className="bg-white dark:bg-slate-900 border-b dark:border-slate-800 p-2 flex flex-wrap items-center gap-1 sticky top-0 z-10 transition-colors">
-                <select className="h-8 bg-transparent border border-slate-200 dark:border-slate-700 rounded px-2 text-[10px] font-bold uppercase tracking-tighter outline-none focus:ring-1 focus:ring-pink-500 dark:bg-slate-800 dark:text-slate-200 min-w-[100px]" onChange={(e) => execCommand('fontName', e.target.value)} defaultValue="Calibri"><option value="" disabled>Font</option>{FONTS.map(f => <option key={f} value={f}>{f}</option>)}</select>
-                <select className="h-8 bg-transparent border border-slate-200 dark:border-slate-700 rounded px-2 text-[10px] font-bold uppercase tracking-tighter outline-none focus:ring-1 focus:ring-pink-500 dark:bg-slate-800 dark:text-slate-200 min-w-[60px]" onChange={(e) => applyFontSize(e.target.value)} defaultValue="11pt"><option value="" disabled>Size</option>{SIZES.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1"></div>
-                <button title="Bold" onClick={() => execCommand('bold')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><Bold size={16}/></button>
-                <button title="Italic" onClick={() => execCommand('italic')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><Italic size={16}/></button>
-                <button title="Underline" onClick={() => execCommand('underline')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><UnderlineIcon size={16}/></button>
-                <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1"></div>
-                <button title="Heading 1" onClick={() => execCommand('formatBlock', 'h1')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400 font-bold">H1</button>
-                <button title="Heading 2" onClick={() => execCommand('formatBlock', 'h2')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400 font-bold">H2</button>
-                <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1"></div>
-                <button title="List" onClick={() => execCommand('insertUnorderedList')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><List size={16}/></button>
-                <button title="Ordered List" onClick={() => execCommand('insertOrderedList')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><ListOrdered size={16}/></button>
-                <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1"></div>
-                <button title="Align Left" onClick={() => execCommand('justifyLeft')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><AlignLeft size={16}/></button>
-                <button title="Align Center" onClick={() => execCommand('justifyCenter')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><AlignCenter size={16}/></button>
-                <button title="Align Right" onClick={() => execCommand('justifyRight')} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><AlignRight size={16}/></button>
-                <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1"></div>
-                <button title="Insert Symbol" onClick={() => setShowSymbolPicker(!showSymbolPicker)} className={`p-2 rounded transition-colors flex items-center justify-center ${showSymbolPicker ? 'bg-pink-100 text-pink-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'}`}><TypeIcon size={16}/></button>
-                <button title="Insert Table" onClick={() => setShowTableConfig(true)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"><Table size={16}/></button>
-                <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg px-1">
-                    <button title="Add Row Below" onClick={() => handleTableAction('add-row')} className="p-2 hover:text-pink-600 transition-colors text-slate-500 dark:text-slate-400"><PlusCircle size={14}/></button>
-                    <button title="Delete Current Row" onClick={() => handleTableAction('delete-row')} className="p-2 hover:text-red-600 transition-colors text-slate-500 dark:text-slate-400"><MinusCircle size={14}/></button>
-                </div>
-                <button 
-                    title="Insert Page Break" 
-                    onClick={() => {
-                        const snippet = `<div class="page-break" style="page-break-after: always; mso-special-character:page-break; border-top: 2px dashed #db2777; margin: 24pt 0; position: relative; height: 0;" contenteditable="false"><span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fdf2f8; border: 1px solid #db2777; padding: 2px 10px; font-size: 8pt; color: #db2777; font-weight: bold; font-family: sans-serif; border-radius: 4px; white-space: nowrap;">PAGE BREAK</span></div>`;
-                        execCommand('insertHTML', snippet);
-                    }} 
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors text-slate-600 dark:text-slate-400"
-                >
-                    <Scissors size={16}/>
-                </button>
-            </div>
-
-            {showSymbolPicker && (
-                <div className="absolute top-[105px] left-2 z-50 bg-white dark:bg-slate-800 shadow-2xl border dark:border-slate-700 rounded-xl p-3 grid grid-cols-5 gap-1 animate-in slide-in-from-top-2 duration-150">
-                    {SYMBOLS.map(s => (<button key={s.char} onClick={() => insertSymbol(s.char)} title={s.name} className="w-10 h-10 flex items-center justify-center text-xl hover:bg-pink-50 dark:hover:bg-pink-900/30 rounded-lg transition-colors text-slate-700 dark:text-slate-200">{s.char}</button>))}
-                </div>
-            )}
-
-            {showTableConfig && (
-                <div className="absolute inset-0 z-50 bg-white/90 dark:bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border dark:border-slate-700 p-6 w-full max-w-sm animate-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-4 border-b dark:border-slate-700 pb-2"><h4 className="text-xs font-bold uppercase tracking-widest dark:text-white">Table Config</h4><button onClick={() => setShowTableConfig(false)} className="text-slate-400 hover:text-slate-600"><X size={18}/></button></div>
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Rows</label><input type="number" min="1" max="50" className="w-full border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded p-2 text-sm outline-none" value={tableConfig.rows} onChange={e => setTableConfig({...tableConfig, rows: parseInt(e.target.value) || 1})} /></div>
-                                <div><label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Cols</label><input type="number" min="1" max="10" className="w-full border dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded p-2 text-sm outline-none" value={tableConfig.cols} onChange={e => setTableConfig({...tableConfig, cols: parseInt(e.target.value) || 1})} /></div>
-                            </div>
-                            <button onClick={insertTable} className="w-full bg-pink-600 hover:bg-pink-700 text-white py-3 rounded-xl text-xs font-bold uppercase shadow-lg flex items-center justify-center gap-2"><Plus size={16} /> Insert Table</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div 
-                ref={editorRef}
-                contentEditable
-                onInput={(e) => onChange(e.currentTarget.innerHTML)}
-                className="editor-content min-h-[350px] p-8 text-sm outline-none focus:ring-1 focus:ring-pink-500/20 bg-white dark:bg-slate-900 dark:text-slate-200 prose dark:prose-invert max-w-none custom-scrollbar overflow-y-auto"
-                style={{ fontFamily: 'Calibri, sans-serif' }}
-            />
-        </div>
-    );
-};
 
 const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: (u: User) => Promise<void> }> = ({ user, onClose, onSave }) => {
     const [form, setForm] = useState<Partial<User>>(user || { role: 'account_manager' });
@@ -269,10 +62,6 @@ const AdminPanel: React.FC = () => {
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     
     const [bwofMessage, setBwofMessage] = useState(systemSettings.bwofConfirmationMessage || '');
-    const [docTemplates, setDocTemplates] = useState<DocumentTemplates>(systemSettings.documentTemplates || { noiLetter: '', responseForm: '', s146: '', s147: '', cpl: '' });
-    const [paragraphSpacing, setParagraphSpacing] = useState(systemSettings.paragraphSpacing !== undefined ? systemSettings.paragraphSpacing : 10);
-    const [headerImage, setHeaderImage] = useState(systemSettings.headerImageUrl || '');
-    const [footerImage, setFooterImage] = useState(systemSettings.footerImageUrl || '');
 
     // Local configuration states for granular tabs
     const [localInsurance, setLocalInsurance] = useState<InsuranceSettings>(systemSettings.insuranceSettings || { valuationValidityYears: 2, workflowSteps: [] });
@@ -286,10 +75,6 @@ const AdminPanel: React.FC = () => {
 
     useEffect(() => {
         if (systemSettings.bwofConfirmationMessage) setBwofMessage(systemSettings.bwofConfirmationMessage);
-        if (systemSettings.documentTemplates) setDocTemplates(systemSettings.documentTemplates);
-        if (systemSettings.headerImageUrl) setHeaderImage(systemSettings.headerImageUrl);
-        if (systemSettings.footerImageUrl) setFooterImage(systemSettings.footerImageUrl);
-        if (systemSettings.paragraphSpacing !== undefined) setParagraphSpacing(systemSettings.paragraphSpacing);
         if (systemSettings.insuranceSettings) setLocalInsurance(systemSettings.insuranceSettings);
         if (systemSettings.contractorCategories) setLocalCategories(systemSettings.contractorCategories);
         if (systemSettings.meetingChecklistTemplates) setLocalChecklists(systemSettings.meetingChecklistTemplates);
@@ -361,31 +146,14 @@ const AdminPanel: React.FC = () => {
     if (currentUser?.role !== 'admin') return <Navigate to="/" replace />;
 
     const handleSaveSettings = async () => {
-        await updateSystemSettings({ 
-            ...systemSettings, 
+        await updateSystemSettings({
+            ...systemSettings,
             bwofConfirmationMessage: bwofMessage,
-            documentTemplates: docTemplates,
-            paragraphSpacing: paragraphSpacing,
-            headerImageUrl: headerImage,
-            footerImageUrl: footerImage,
             insuranceSettings: localInsurance,
             contractorCategories: localCategories,
             meetingChecklistTemplates: localChecklists
         });
         alert("System settings updated successfully.");
-    };
-
-    const handleAssetUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'header' | 'footer') => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64 = reader.result as string;
-                if (type === 'header') setHeaderImage(base64);
-                else setFooterImage(base64);
-            };
-            reader.readAsDataURL(file);
-        }
     };
 
     const filteredUsers = users.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -633,129 +401,29 @@ const AdminPanel: React.FC = () => {
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-slate-900 p-4 rounded-xl border dark:border-slate-800 shadow-sm gap-4">
                                 <div className="flex items-center gap-3">
                                     <FileText size={20} className="text-pink-600" />
-                                    <h2 className="text-sm font-bold uppercase tracking-widest dark:text-white">Master Document Templates</h2>
+                                    <h2 className="text-sm font-bold uppercase tracking-widest dark:text-white">Word Templates (.docx)</h2>
                                 </div>
                                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-full md:w-auto">
                                     <button onClick={() => setTemplateSubTab('bc')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'bc' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Body Corporate</button>
                                     <button onClick={() => setTemplateSubTab('isoc')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'isoc' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Inc Society</button>
-                                    <button onClick={() => setTemplateSubTab('disclosure')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'disclosure' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Disclosure</button>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                                <div className="lg:col-span-3 space-y-8">
-                                    {/* Branding Section (Always visible in templates) */}
-                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-6">
-                                            <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest border-b dark:border-slate-800 pb-3">Document Branding</h3>
-                                            <p className="text-[10px] text-slate-500 italic mb-4">These images are inserted into documents wherever the <code className="text-pink-600 font-bold">{"{{header}}"}</code> and <code className="text-pink-600 font-bold">{"{{footer}}"}</code> tags are placed in the templates below.</p>
-                                            <div className="grid grid-cols-1 gap-6">
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-pink-600 uppercase mb-2">Letterhead Header</label>
-                                                    {headerImage ? (
-                                                        <div className="relative group"><img src={headerImage} className="w-full max-h-32 object-contain border rounded-xl p-2 bg-slate-50 dark:bg-slate-950" /><button onClick={() => setHeaderImage('')} className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100"><X size={14}/></button></div>
-                                                    ) : (
-                                                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-2xl cursor-pointer hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all"><Upload size={24} className="text-slate-300 mb-2" /><span className="text-[10px] font-bold text-slate-400 uppercase">Upload Header</span><input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload(e, 'header')} /></label>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-6">
-                                            <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest border-b dark:border-slate-800 pb-3">Global Layout</h3>
-                                            <div className="p-6 bg-slate-50 dark:bg-slate-950 rounded-2xl border dark:border-slate-800 space-y-4">
-                                                <div className="flex justify-between items-center mb-1"><label className="block text-[10px] font-bold text-pink-600 uppercase tracking-widest flex items-center gap-2"><MoveVertical size={14} /> Paragraph Spacing (After)</label><span className="text-sm font-mono font-bold text-pink-600">{paragraphSpacing}pt</span></div>
-                                                <input type="range" min="0" max="36" step="1" className="flex-1 w-full accent-pink-600 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer" value={paragraphSpacing} onChange={(e) => setParagraphSpacing(parseInt(e.target.value))} />
-                                                <div className="flex justify-between text-[8px] font-bold text-slate-400 uppercase tracking-tighter"><span>Compact</span><span>Loose</span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Meeting Templates - BC */}
-                                    {templateSubTab === 'bc' && (
-                                        <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
-                                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-3">
-                                                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest border-b dark:border-slate-800 pb-3 flex items-center gap-2">
-                                                    <Upload size={14} /> Word Templates (.docx) — Body Corporate
-                                                </h3>
-                                                {renderDocxCard('noiCoverLetter', 'NOI Cover Letter')}
-                                                {renderDocxCard('responseForm', 'Response Form')}
-                                                {renderDocxCard('debtCollectionFlowchart', 'Debt Collection Flowchart')}
-                                            </div>
-                                            <RichTemplateEditor title="BC Notice of Intention (AGM/EGM)" value={docTemplates.noiLetterBC || docTemplates.noiLetter} onChange={(val) => setDocTemplates({...docTemplates, noiLetterBC: val})} description="Formal letter notifying owners of an upcoming general meeting for a Body Corporate." />
-                                            <RichTemplateEditor title="BC Meeting Response Form" value={docTemplates.responseFormBC || docTemplates.responseForm} onChange={(val) => setDocTemplates({...docTemplates, responseFormBC: val})} description="The nomination and agenda items response form for Body Corporate owners." />
-                                        </div>
-                                    )}
-
-                                    {/* Meeting Templates - ISOC */}
-                                    {templateSubTab === 'isoc' && (
-                                        <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
-                                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-3">
-                                                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest border-b dark:border-slate-800 pb-3 flex items-center gap-2">
-                                                    <Upload size={14} /> Word Templates (.docx) — Incorporated Society
-                                                </h3>
-                                                {renderDocxCard('noiCoverLetterIsoc', 'NOI Cover Letter')}
-                                                {renderDocxCard('responseFormIsoc', 'Response Form')}
-                                                {renderDocxCard('debtCollectionFlowchartIsoc', 'Debt Collection Flowchart')}
-                                            </div>
-                                            <RichTemplateEditor title="ISOC Notice of Intention (AGM/EGM)" value={docTemplates.noiLetterISOC || ''} onChange={(val) => setDocTemplates({...docTemplates, noiLetterISOC: val})} description="Formal letter notifying members of an upcoming general meeting for an Incorporated Society." />
-                                            <RichTemplateEditor title="ISOC Meeting Response Form" value={docTemplates.responseFormISOC || ''} onChange={(val) => setDocTemplates({...docTemplates, responseFormISOC: val})} description="The nomination and agenda items response form for Incorporated Society members." />
-                                        </div>
-                                    )}
-
-                                    {/* Disclosure Templates */}
-                                    {templateSubTab === 'disclosure' && (
-                                        <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
-                                            <div className="flex items-center gap-2"><FileSignature className="text-blue-500" /><h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Disclosure & CPL Packages</h3></div>
-                                            <RichTemplateEditor title="S146 - Pre-Contract Disclosure" value={docTemplates.s146 || ''} onChange={(val) => setDocTemplates({...docTemplates, s146: val})} description="Standard PCDS document for sales. Includes remediation and weathertightness fields." />
-                                            <RichTemplateEditor title="S147 - Pre-Settlement Disclosure" value={docTemplates.s147 || ''} onChange={(val) => setDocTemplates({...docTemplates, s147: val})} description="Final certification of unit levies and period details prior to settlement." />
-                                            <RichTemplateEditor title="Public Liability (CPL) Certificate" value={docTemplates.cpl || ''} onChange={(val) => setDocTemplates({...docTemplates, cpl: val})} description="Official insurance verification for the complex. Merges underwriter and expiry data." />
-                                        </div>
-                                    )}
+                            {templateSubTab === 'bc' && (
+                                <div className="space-y-2 animate-in fade-in duration-300">
+                                    {renderDocxCard('noiCoverLetter', 'NOI Cover Letter')}
+                                    {renderDocxCard('responseForm', 'Response Form')}
+                                    {renderDocxCard('debtCollectionFlowchart', 'Debt Collection Flowchart')}
                                 </div>
+                            )}
 
-                                <div className="lg:col-span-1">
-                                    <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 border dark:border-slate-700 sticky top-4">
-                                        <div className="flex items-center gap-2 mb-4 border-b dark:border-slate-700 pb-2"><HelpCircle size={18} className="text-pink-600" /><h3 className="font-bold text-xs uppercase tracking-widest text-slate-800 dark:text-white">Merge Tag Cloud</h3></div>
-                                        <p className="text-[10px] text-slate-500 mb-4 italic">Click to insert at cursor position.</p>
-                                        
-                                        <div className="space-y-6">
-                                            <div>
-                                                <h4 className="text-[9px] font-bold text-slate-400 uppercase mb-2">Core Property Data</h4>
-                                                <div className="space-y-1">
-                                                    {[ 
-                                                        { tag: '{{header}}', desc: 'Letterhead Image' },
-                                                        { tag: '{{footer}}', desc: 'Footer Image' },
-                                                        { tag: '{{bc_name}}', desc: 'Complex Name' }, 
-                                                        { tag: '{{bc_number}}', desc: 'BC/IS Number' }, 
-                                                        { tag: '{{address}}', desc: 'Full Address' }, 
-                                                        { tag: '{{current_date}}', desc: 'Today\'s Date' } 
-                                                    ].map(item => (
-                                                        <button key={item.tag} onClick={() => document.execCommand('insertHTML', false, ` ${item.tag} `)} className="w-full text-left p-2 rounded bg-white dark:bg-slate-900 border hover:border-pink-500 transition-all"><code className="text-[10px] font-bold text-pink-600">{item.tag}</code><p className="text-[9px] text-slate-500">{item.desc}</p></button>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <h4 className="text-[9px] font-bold text-slate-400 uppercase mb-2">Unit Specific Data</h4>
-                                                <div className="space-y-1">
-                                                    {[ { tag: '{{unit_number}}', desc: 'Unit/PU Number' }, { tag: '{{owner_name}}', desc: 'Owner Name' }, { tag: '{{unit_levy}}', desc: 'Annual Levy' }, { tag: '{{fy_start}}', desc: 'FY Start' }, { tag: '{{fy_end}}', desc: 'FY End' } ].map(item => (
-                                                        <button key={item.tag} onClick={() => document.execCommand('insertHTML', false, ` ${item.tag} `)} className="w-full text-left p-2 rounded bg-blue-50 dark:bg-blue-900/10 border hover:border-blue-500 transition-all"><code className="text-[10px] font-bold text-blue-600">{item.tag}</code><p className="text-[9px] text-slate-500">{item.desc}</p></button>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <h4 className="text-[9px] font-bold text-slate-400 uppercase mb-2">Insurance & Compliance</h4>
-                                                <div className="space-y-1">
-                                                    {[ { tag: '{{insurance_noting}}', desc: 'Broker Instructions' }, { tag: '{{insurance_underwriter}}', desc: 'Insurer' }, { tag: '{{insurance_expiry}}', desc: 'Policy Expiry' }, { tag: '{{remediation_text}}', desc: 'Legal Remedial Text' } ].map(item => (
-                                                        <button key={item.tag} onClick={() => document.execCommand('insertHTML', false, ` ${item.tag} `)} className="w-full text-left p-2 rounded bg-emerald-50 dark:bg-emerald-900/10 border hover:border-emerald-500 transition-all"><code className="text-[10px] font-bold text-emerald-600">{item.tag}</code><p className="text-[9px] text-slate-500">{item.desc}</p></button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                            {templateSubTab === 'isoc' && (
+                                <div className="space-y-2 animate-in fade-in duration-300">
+                                    {renderDocxCard('noiCoverLetterIsoc', 'NOI Cover Letter')}
+                                    {renderDocxCard('responseFormIsoc', 'Response Form')}
+                                    {renderDocxCard('debtCollectionFlowchartIsoc', 'Debt Collection Flowchart')}
                                 </div>
-                            </div>
+                            )}
                         </div>
                     )}
 
