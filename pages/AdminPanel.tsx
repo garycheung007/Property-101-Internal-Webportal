@@ -1,8 +1,10 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, DocumentTemplates, ReminderType } from '../types';
+import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, DocumentTemplates, ReminderType, TemplateFileRecord } from '../types';
 import { 
     Users, Building, Plus, Upload, Search, Settings, 
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Image as ImageIcon, Trash2, Database, ShieldCheck, Terminal, FileInput, FileQuestion, ArrowUp, ArrowDown, Mail, ShieldAlert, ChevronRight, LayoutGrid, Loader2, HardHat, ClipboardCheck, MessageSquare, PlusCircle, AlertTriangle, MessageSquareMore, FileText, Bold, Italic, List, Type as TypeIcon, HelpCircle, Underline as UnderlineIcon, Heading1, Heading2, Eye, Layout, AlignLeft, AlignCenter, AlignRight, ListOrdered, ChevronDown, Download, Table, MoveVertical, FileSignature, Scissors, Activity, CheckCircle2, MinusCircle, AlertCircle
@@ -277,6 +279,11 @@ const AdminPanel: React.FC = () => {
     const [localCategories, setLocalCategories] = useState<string[]>(systemSettings.contractorCategories || []);
     const [localChecklists, setLocalChecklists] = useState(systemSettings.meetingChecklistTemplates || { NOI: [], NOM: [], COMPLETE: [] });
 
+    // Docx template management
+    const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
+    const [uploadingDocx, setUploadingDocx] = useState<string | null>(null);
+    const docxInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
     useEffect(() => {
         if (systemSettings.bwofConfirmationMessage) setBwofMessage(systemSettings.bwofConfirmationMessage);
         if (systemSettings.documentTemplates) setDocTemplates(systemSettings.documentTemplates);
@@ -287,6 +294,69 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.contractorCategories) setLocalCategories(systemSettings.contractorCategories);
         if (systemSettings.meetingChecklistTemplates) setLocalChecklists(systemSettings.meetingChecklistTemplates);
     }, [systemSettings]);
+
+    useEffect(() => {
+        const keys = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
+        Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
+            const loaded: Partial<Record<string, TemplateFileRecord>> = {};
+            snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });
+            setDocxTemplates(loaded);
+        });
+    }, []);
+
+    const handleDocxUpload = (key: string, file: File) => {
+        setUploadingDocx(key);
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = (e.target?.result as string).split(',')[1];
+            const record: TemplateFileRecord = { name: file.name, data: base64, uploadedAt: new Date().toISOString() };
+            await setDoc(doc(db, 'templates_v2', key), record);
+            setDocxTemplates(prev => ({ ...prev, [key]: record }));
+            setUploadingDocx(null);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const renderDocxCard = (key: string, label: string) => {
+        const tpl = docxTemplates[key];
+        return (
+            <div key={key} className="bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+                        {tpl ? (
+                            <>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                    <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                                    <p className="text-sm text-slate-700 dark:text-slate-300 truncate">{tpl.name}</p>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Uploaded {new Date(tpl.uploadedAt).toLocaleDateString('en-NZ')}</p>
+                            </>
+                        ) : (
+                            <p className="text-sm text-slate-400 italic mt-1">No template uploaded</p>
+                        )}
+                    </div>
+                    <>
+                        <input
+                            ref={el => { docxInputRefs.current[key] = el; }}
+                            type="file"
+                            accept=".docx"
+                            className="hidden"
+                            onChange={e => { if (e.target.files?.[0]) handleDocxUpload(key, e.target.files[0]); e.target.value = ''; }}
+                        />
+                        <button
+                            onClick={() => docxInputRefs.current[key]?.click()}
+                            disabled={uploadingDocx === key}
+                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+                        >
+                            {uploadingDocx === key ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                            {tpl ? 'Replace' : 'Upload'}
+                        </button>
+                    </>
+                </div>
+            </div>
+        );
+    };
 
     if (currentUser?.role !== 'admin') return <Navigate to="/" replace />;
 
@@ -603,6 +673,14 @@ const AdminPanel: React.FC = () => {
                                     {/* Meeting Templates - BC */}
                                     {templateSubTab === 'bc' && (
                                         <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
+                                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-3">
+                                                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest border-b dark:border-slate-800 pb-3 flex items-center gap-2">
+                                                    <Upload size={14} /> Word Templates (.docx) — Body Corporate
+                                                </h3>
+                                                {renderDocxCard('noiCoverLetter', 'NOI Cover Letter')}
+                                                {renderDocxCard('responseForm', 'Response Form')}
+                                                {renderDocxCard('debtCollectionFlowchart', 'Debt Collection Flowchart')}
+                                            </div>
                                             <RichTemplateEditor title="BC Notice of Intention (AGM/EGM)" value={docTemplates.noiLetterBC || docTemplates.noiLetter} onChange={(val) => setDocTemplates({...docTemplates, noiLetterBC: val})} description="Formal letter notifying owners of an upcoming general meeting for a Body Corporate." />
                                             <RichTemplateEditor title="BC Meeting Response Form" value={docTemplates.responseFormBC || docTemplates.responseForm} onChange={(val) => setDocTemplates({...docTemplates, responseFormBC: val})} description="The nomination and agenda items response form for Body Corporate owners." />
                                         </div>
@@ -611,6 +689,14 @@ const AdminPanel: React.FC = () => {
                                     {/* Meeting Templates - ISOC */}
                                     {templateSubTab === 'isoc' && (
                                         <div className="grid grid-cols-1 gap-8 animate-in fade-in duration-300">
+                                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-3">
+                                                <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest border-b dark:border-slate-800 pb-3 flex items-center gap-2">
+                                                    <Upload size={14} /> Word Templates (.docx) — Incorporated Society
+                                                </h3>
+                                                {renderDocxCard('noiCoverLetterIsoc', 'NOI Cover Letter')}
+                                                {renderDocxCard('responseFormIsoc', 'Response Form')}
+                                                {renderDocxCard('debtCollectionFlowchartIsoc', 'Debt Collection Flowchart')}
+                                            </div>
                                             <RichTemplateEditor title="ISOC Notice of Intention (AGM/EGM)" value={docTemplates.noiLetterISOC || ''} onChange={(val) => setDocTemplates({...docTemplates, noiLetterISOC: val})} description="Formal letter notifying members of an upcoming general meeting for an Incorporated Society." />
                                             <RichTemplateEditor title="ISOC Meeting Response Form" value={docTemplates.responseFormISOC || ''} onChange={(val) => setDocTemplates({...docTemplates, responseFormISOC: val})} description="The nomination and agenda items response form for Incorporated Society members." />
                                         </div>

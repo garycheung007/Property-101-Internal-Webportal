@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
-import { FlaskConical, Upload, Download, Loader2, CheckCircle, Eye } from 'lucide-react';
+import { FlaskConical, Download, Loader2, Eye } from 'lucide-react';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -81,62 +81,20 @@ const MeetingDocsTest: React.FC = () => {
   const isAdmin = user?.role === 'admin';
 
   const [templates, setTemplates] = useState<Partial<Record<TemplateKey, TemplateFileRecord>>>({});
-  const [loadingTemplates, setLoadingTemplates] = useState(true);
-  const [uploading, setUploading] = useState<TemplateKey | null>(null);
   const [selectedBcId, setSelectedBcId] = useState('');
   const [selectedMeetingId, setSelectedMeetingId] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewKey, setPreviewKey] = useState<TemplateKey | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
-  const noiRef = useRef<HTMLInputElement>(null);
-  const rfRef = useRef<HTMLInputElement>(null);
-  const dcRef = useRef<HTMLInputElement>(null);
-  const noiIsocRef = useRef<HTMLInputElement>(null);
-  const rfIsocRef = useRef<HTMLInputElement>(null);
-  const dcIsocRef = useRef<HTMLInputElement>(null);
-  const inputRefs: Record<TemplateKey, React.RefObject<HTMLInputElement>> = {
-    noiCoverLetter: noiRef,
-    responseForm: rfRef,
-    debtCollectionFlowchart: dcRef,
-    noiCoverLetterIsoc: noiIsocRef,
-    responseFormIsoc: rfIsocRef,
-    debtCollectionFlowchartIsoc: dcIsocRef,
-  };
-
   useEffect(() => {
-    Promise.all([
-      getDoc(doc(db, 'templates_v2', 'noiCoverLetter')),
-      getDoc(doc(db, 'templates_v2', 'responseForm')),
-      getDoc(doc(db, 'templates_v2', 'debtCollectionFlowchart')),
-      getDoc(doc(db, 'templates_v2', 'noiCoverLetterIsoc')),
-      getDoc(doc(db, 'templates_v2', 'responseFormIsoc')),
-      getDoc(doc(db, 'templates_v2', 'debtCollectionFlowchartIsoc')),
-    ]).then(([noiSnap, rfSnap, dcSnap, noiIsocSnap, rfIsocSnap, dcIsocSnap]) => {
+    const keys: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
+    Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
       const loaded: Partial<Record<TemplateKey, TemplateFileRecord>> = {};
-      if (noiSnap.exists()) loaded.noiCoverLetter = noiSnap.data() as TemplateFileRecord;
-      if (rfSnap.exists()) loaded.responseForm = rfSnap.data() as TemplateFileRecord;
-      if (dcSnap.exists()) loaded.debtCollectionFlowchart = dcSnap.data() as TemplateFileRecord;
-      if (noiIsocSnap.exists()) loaded.noiCoverLetterIsoc = noiIsocSnap.data() as TemplateFileRecord;
-      if (rfIsocSnap.exists()) loaded.responseFormIsoc = rfIsocSnap.data() as TemplateFileRecord;
-      if (dcIsocSnap.exists()) loaded.debtCollectionFlowchartIsoc = dcIsocSnap.data() as TemplateFileRecord;
+      snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });
       setTemplates(loaded);
-      setLoadingTemplates(false);
-    }).catch(() => setLoadingTemplates(false));
+    });
   }, []);
-
-  const handleUpload = (key: TemplateKey, file: File) => {
-    setUploading(key);
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const base64 = (e.target?.result as string).split(',')[1];
-      const record: TemplateFileRecord = { name: file.name, data: base64, uploadedAt: new Date().toISOString() };
-      await setDoc(doc(db, 'templates_v2', key), record);
-      setTemplates(prev => ({ ...prev, [key]: record }));
-      setUploading(null);
-    };
-    reader.readAsDataURL(file);
-  };
 
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
   const selectedMeeting = selectedComplex?.meetings.find(m => m.id === selectedMeetingId) || null;
@@ -225,51 +183,6 @@ const MeetingDocsTest: React.FC = () => {
     setTimeout(() => win.print(), 400);
   };
 
-  const renderTemplateCard = (key: TemplateKey) => {
-    const tpl = templates[key];
-    return (
-      <div key={key} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{LABELS[key]}</p>
-            {tpl ? (
-              <>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <CheckCircle size={13} className="text-emerald-500 shrink-0" />
-                  <p className="text-sm text-slate-700 dark:text-slate-300 truncate">{tpl.name}</p>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Uploaded {new Date(tpl.uploadedAt).toLocaleDateString('en-NZ')}
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-slate-400 italic mt-1">No template uploaded</p>
-            )}
-          </div>
-          {isAdmin && (
-            <>
-              <input
-                ref={inputRefs[key]}
-                type="file"
-                accept=".docx"
-                className="hidden"
-                onChange={e => { if (e.target.files?.[0]) handleUpload(key, e.target.files[0]); e.target.value = ''; }}
-              />
-              <button
-                onClick={() => inputRefs[key].current?.click()}
-                disabled={uploading === key}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
-              >
-                {uploading === key ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                {tpl ? 'Replace' : 'Upload'}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   const renderActionButtons = (key: TemplateKey) => (
     <div key={key} className="space-y-1.5">
       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{LABELS[key]}</p>
@@ -315,32 +228,8 @@ const MeetingDocsTest: React.FC = () => {
                 Test
               </span>
             </h1>
-            <p className="text-slate-500 text-sm mt-1">Upload your Word templates, then generate merged documents.</p>
+            <p className="text-slate-500 text-sm mt-1">Select a property and generate merged Word documents.</p>
           </div>
-
-          {/* Template cards — admin only */}
-          {isAdmin && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Word Templates (.docx)</p>
-              {loadingTemplates ? (
-                <div className="flex items-center gap-2 text-slate-400 text-sm py-2"><Loader2 size={14} className="animate-spin" />Loading...</div>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest px-1">Body Corporate</p>
-                    {BC_KEYS.map(renderTemplateCard)}
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest px-1">Incorporated Society</p>
-                    {IS_KEYS.map(renderTemplateCard)}
-                  </div>
-                </>
-              )}
-              <p className="text-[10px] text-slate-400 italic px-1 leading-relaxed">
-                Templates must use {'{{BC_Number}}'} style placeholders. See the merge field guide below.
-              </p>
-            </div>
-          )}
 
           {/* Merge field reference */}
           {isAdmin && (
