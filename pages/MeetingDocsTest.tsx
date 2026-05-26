@@ -205,7 +205,7 @@ const MeetingDocsTest: React.FC = () => {
     if (!win) return;
     win.document.write(
       `<!DOCTYPE html><html><head><meta charset="utf-8">` +
-      `<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;padding:20mm;line-height:1.4}img{max-width:100%}@media print{body{padding:0}}</style>` +
+      `<style>@page{margin:0;size:A4}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;padding:20mm;line-height:1.4}img{max-width:100%}</style>` +
       `</head><body>${previewHtml}</body></html>`
     );
     win.document.close();
