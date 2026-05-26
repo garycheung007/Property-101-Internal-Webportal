@@ -74,7 +74,7 @@ const Sidebar: React.FC = () => {
           <BarChart3 size={20} />
           <span>Reports</span>
         </Link>
-        <Link to="/documents" className={getNavClass('/documents')}>
+        <Link to="/meeting-docs-test" className={getNavClass('/meeting-docs-test')}>
           <FileText size={20} />
           <span>Generate Meeting Document</span>
         </Link>
@@ -99,9 +99,9 @@ const Sidebar: React.FC = () => {
                     <Settings size={20} />
                     <span>Admin Panel</span>
                 </Link>
-                 <Link to="/meeting-docs-test" className={getNavClass('/meeting-docs-test')}>
+                 <Link to="/documents" className={getNavClass('/documents')}>
                     <FlaskConical size={20} />
-                    <span>Meeting Docs (Test)</span>
+                    <span>Generate Meeting Docs (Old)</span>
                 </Link>
              </div>
         )}
