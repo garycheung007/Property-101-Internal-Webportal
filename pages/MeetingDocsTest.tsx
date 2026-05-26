@@ -306,29 +306,29 @@ const MeetingDocsTest: React.FC = () => {
             <p className="text-slate-500 text-sm mt-1">Upload your Word templates, then generate merged documents.</p>
           </div>
 
-          {/* Template cards */}
-          <div className="space-y-3">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Word Templates (.docx)</p>
-            {loadingTemplates ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm py-2"><Loader2 size={14} className="animate-spin" />Loading...</div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest px-1">Body Corporate</p>
-                  {BC_KEYS.map(renderTemplateCard)}
-                </div>
-                <div className="space-y-2">
-                  <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest px-1">Incorporated Society</p>
-                  {IS_KEYS.map(renderTemplateCard)}
-                </div>
-              </>
-            )}
-            {isAdmin && (
+          {/* Template cards — admin only */}
+          {isAdmin && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Word Templates (.docx)</p>
+              {loadingTemplates ? (
+                <div className="flex items-center gap-2 text-slate-400 text-sm py-2"><Loader2 size={14} className="animate-spin" />Loading...</div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest px-1">Body Corporate</p>
+                    {BC_KEYS.map(renderTemplateCard)}
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest px-1">Incorporated Society</p>
+                    {IS_KEYS.map(renderTemplateCard)}
+                  </div>
+                </>
+              )}
               <p className="text-[10px] text-slate-400 italic px-1 leading-relaxed">
                 Templates must use {'{{BC_Number}}'} style placeholders. See the merge field guide below.
               </p>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Merge field reference */}
           {isAdmin && (
