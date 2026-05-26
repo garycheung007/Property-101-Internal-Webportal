@@ -99,10 +99,6 @@ const Sidebar: React.FC = () => {
                     <Settings size={20} />
                     <span>Admin Panel</span>
                 </Link>
-                 <Link to="/documents" className={getNavClass('/documents')}>
-                    <FlaskConical size={20} />
-                    <span>Generate Meeting Docs (Old)</span>
-                </Link>
              </div>
         )}
       </nav>

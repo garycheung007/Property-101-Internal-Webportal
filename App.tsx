@@ -7,7 +7,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ComplexList from './pages/ComplexList';
-import DocumentGenerator from './pages/DocumentGenerator';
 import DisclosureGenerator from './pages/DisclosureGenerator';
 import Reports from './pages/Reports';
 import AdminPanel from './pages/AdminPanel';
@@ -35,7 +34,6 @@ const AppRoutes = () => {
       <Route path="/"            element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
       <Route path="/complexes"   element={<ProtectedLayout><ComplexList /></ProtectedLayout>} />
       <Route path="/reports"     element={<ProtectedLayout><Reports /></ProtectedLayout>} />
-      <Route path="/documents"   element={<ProtectedLayout><DocumentGenerator /></ProtectedLayout>} />
       <Route path="/disclosure"  element={<ProtectedLayout><DisclosureGenerator /></ProtectedLayout>} />
       <Route path="/contractors" element={<ProtectedLayout><ContractorList /></ProtectedLayout>} />
       <Route path="/admin"       element={<ProtectedLayout><AdminPanel /></ProtectedLayout>} />
