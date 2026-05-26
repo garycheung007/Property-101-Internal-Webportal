@@ -4,13 +4,13 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { 
-    Search, ShieldCheck, ShieldAlert, X, Calendar, RefreshCw, Save, 
-    CheckCircle2, DollarSign, Clock, MapPin, History, Plus, Trash2, 
-    Database, Lock, ListFilter, MessageSquareMore, ToggleRight, 
-    ToggleLeft, ArrowRightCircle, Check, AlertCircle, MapPinHouse, 
+    Search, ShieldCheck, ShieldAlert, X, Calendar, RefreshCw, Save,
+    CheckCircle2, DollarSign, Clock, MapPin, History, Plus, Trash2,
+    Database, Lock, ListFilter, MessageSquareMore, ToggleRight,
+    ToggleLeft, ArrowRightCircle, Check, AlertCircle, MapPinHouse,
     Wand2, User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
-    FileSignature, Activity, AlertOctagon, Info
+    FileSignature, Activity, AlertOctagon, Info, Pencil
 } from 'lucide-react';
 import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem } from '../types';
 
@@ -181,6 +181,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [meetingForm, setMeetingForm] = useState<Partial<Meeting>>({});
     const [renewalPrompt, setRenewalPrompt] = useState<{ show: boolean, nextExpiry: string }>({ show: false, nextExpiry: '' });
     const [bwofRenewalPrompt, setBwofRenewalPrompt] = useState<{ show: boolean, pendingDate: string }>({ show: false, pendingDate: '' });
+    const [feeEditing, setFeeEditing] = useState(false);
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
     const valuers = contractors.filter(c => c.category === 'Insurance Valuer');
@@ -333,6 +334,24 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
+    const handleSaveWithLogs = async () => {
+        if (!currentUser) { onSave(form); return; }
+        const changes: string[] = [];
+        if (form.managerName !== complex.managerName)
+            changes.push(`Account Manager changed from "${complex.managerName || 'Unassigned'}" to "${form.managerName || 'Unassigned'}"`);
+        if (form.financialYearStart !== complex.financialYearStart)
+            changes.push(`FY Start changed from "${complex.financialYearStart || 'N/A'}" to "${form.financialYearStart || 'N/A'}"`);
+        if (form.financialYearEnd !== complex.financialYearEnd)
+            changes.push(`FY End changed from "${complex.financialYearEnd || 'N/A'}" to "${form.financialYearEnd || 'N/A'}"`);
+        if (form.numberOfCommitteeMeetings !== complex.numberOfCommitteeMeetings)
+            changes.push(`Contracted Committee Meetings changed from ${complex.numberOfCommitteeMeetings || 0} to ${form.numberOfCommitteeMeetings || 0}`);
+        if (form.managementFee !== complex.managementFee)
+            changes.push(`Management Fee changed from $${complex.managementFee || 0} to $${form.managementFee || 0}`);
+        if (changes.length > 0)
+            await addActionComment(`edit-${Date.now()}`, form.id, changes.join(' | '), currentUser);
+        onSave(form);
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col shadow-2xl border dark:border-slate-800 animate-in fade-in zoom-in duration-200">
@@ -356,38 +375,74 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
                                     <Building size={16} className="text-pink-600" /> Portfolio & Statutory
+                                    {currentUser?.role !== 'admin' && <Lock size={12} className="text-slate-400 ml-auto" />}
                                 </h3>
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Account Manager</label>
-                                        <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managerName || ''} onChange={e => setForm({...form, managerName: e.target.value})}>
-                                            <option value="">-- Choose Manager --</option>
-                                            {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                                        </select>
+                                        {currentUser?.role === 'admin' ? (
+                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managerName || ''} onChange={e => setForm({...form, managerName: e.target.value})}>
+                                                <option value="">-- Choose Manager --</option>
+                                                {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                            </select>
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.managerName || 'Unassigned'}</p>
+                                        )}
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY Start</label>
-                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearStart || ''} onChange={e => setForm({...form, financialYearStart: e.target.value})} placeholder="e.g. 1-May" />
+                                            {currentUser?.role === 'admin' ? (
+                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearStart || ''} onChange={e => setForm({...form, financialYearStart: e.target.value})} placeholder="e.g. 1-May" />
+                                            ) : (
+                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearStart || 'N/A'}</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY End</label>
-                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearEnd || ''} onChange={e => setForm({...form, financialYearEnd: e.target.value})} placeholder="e.g. 30-Apr" />
+                                            {currentUser?.role === 'admin' ? (
+                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearEnd || ''} onChange={e => setForm({...form, financialYearEnd: e.target.value})} placeholder="e.g. 30-Apr" />
+                                            ) : (
+                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearEnd || 'N/A'}</p>
+                                            )}
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Management Fee (Annual)</label>
-                                        <div className="relative">
-                                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                            <input type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managementFee || 0} onChange={e => setForm({...form, managementFee: parseFloat(e.target.value) || 0})} placeholder="0.00" />
-                                        </div>
+                                        {feeEditing ? (
+                                            <div className="flex gap-2 items-center">
+                                                <div className="relative flex-1">
+                                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                    <input autoFocus type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managementFee || 0} onChange={e => setForm({...form, managementFee: parseFloat(e.target.value) || 0})} placeholder="0.00" />
+                                                </div>
+                                                <button onClick={() => setFeeEditing(false)} className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold transition-colors">Done</button>
+                                                <button onClick={() => { setForm({...form, managementFee: complex.managementFee}); setFeeEditing(false); }} className="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors">Cancel</button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-between px-3 py-2.5 border dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800">
+                                                <div className="flex items-center gap-2">
+                                                    <DollarSign size={16} className="text-slate-400" />
+                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{(form.managementFee || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <button onClick={() => setFeeEditing(true)} className="flex items-center gap-1.5 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors">
+                                                    <Pencil size={12} /> Edit
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contracted Committee Meetings</label>
-                                        <div className="relative">
-                                            <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                            <input type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.numberOfCommitteeMeetings || 0} onChange={e => setForm({...form, numberOfCommitteeMeetings: parseInt(e.target.value) || 0})} placeholder="0" />
-                                        </div>
+                                        {currentUser?.role === 'admin' ? (
+                                            <div className="relative">
+                                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <input type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.numberOfCommitteeMeetings || 0} onChange={e => setForm({...form, numberOfCommitteeMeetings: parseInt(e.target.value) || 0})} placeholder="0" />
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 px-1 py-1">
+                                                <Clock size={16} className="text-slate-400" />
+                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{form.numberOfCommitteeMeetings || 0}</p>
+                                            </div>
+                                        )}
                                     </div>
                                     <div>
                                         <div className="flex justify-between items-center mb-1">
@@ -794,7 +849,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     <div className="text-[10px] font-bold text-amber-600 flex items-center gap-2"><AlertCircle size={14} /> Commit Changes to Portfolio before exiting.</div>
                     <div className="flex gap-3">
                         <button onClick={onClose} className="px-6 py-2 text-slate-500 font-bold text-sm uppercase">Cancel</button>
-                        <button onClick={() => onSave(form)} className="px-8 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 uppercase tracking-widest transition-all"><Save size={18} /> Save Portfolio</button>
+                        <button onClick={handleSaveWithLogs} className="px-8 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 uppercase tracking-widest transition-all"><Save size={18} /> Save Portfolio</button>
                     </div>
                 </div>
             </div>
