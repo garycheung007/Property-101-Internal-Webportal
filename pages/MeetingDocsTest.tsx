@@ -60,7 +60,7 @@ const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager
     Nomination_Due_Date: fmtDate(nomRaw),
     Nomination_Due_Time: complex.noiResponseDueTime ? fmtTime(complex.noiResponseDueTime) : '4:00 pm',
     Current_Date: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
-    Manager_Name: manager?.name || '',
+    Manager_Name: manager?.name || complex.managerName || '',
     Manager_Title: manager?.title || 'Body Corporate Manager',
   };
 };
@@ -120,6 +120,8 @@ const MeetingDocsTest: React.FC = () => {
         : '';
       html = html.split('{{%Manager_Signature}}').join(sigHtml);
       html = html.split('{{Manager_Signature}}').join(sigHtml);
+      // Mammoth may split {{Tag}} across multiple HTML elements; strip any HTML tags inside delimiters before replacing
+      html = html.replace(/\{\{[\s\S]*?\}\}/g, m => '{{' + m.slice(2, -2).replace(/<[^>]*>/g, '') + '}}');
       Object.entries(data).forEach(([k, v]) => { html = html.split(`{{${k}}}`).join(v); });
       setPreviewHtml(html);
     } catch {
