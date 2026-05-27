@@ -10,24 +10,26 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, Meeting, TemplateFileRecord } from '../types';
 
-type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'debtCollectionFlowchart' | 'noiCoverLetterIsoc' | 'responseFormIsoc' | 'debtCollectionFlowchartIsoc';
+type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'debtCollectionFlowchart' | 'noticeOfDelegation' | 'noiCoverLetterIsoc' | 'responseFormIsoc' | 'debtCollectionFlowchartIsoc';
 
 const LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'NOI Cover Letter',
   responseForm: 'Response Form',
   debtCollectionFlowchart: 'Debt Collection Flowchart',
+  noticeOfDelegation: 'Notice of Delegation',
   noiCoverLetterIsoc: 'NOI Cover Letter',
   responseFormIsoc: 'Response Form',
   debtCollectionFlowchartIsoc: 'Debt Collection Flowchart',
 };
 
-const BC_KEYS: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart'];
+const BC_KEYS: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation'];
 const IS_KEYS: TemplateKey[] = ['noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
 
 const DOC_LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'Notice of Intention Cover Letter',
   responseForm: 'Response Form',
   debtCollectionFlowchart: 'Debt Collection Flowchart',
+  noticeOfDelegation: 'Notice of Delegation',
   noiCoverLetterIsoc: 'Notice of Intention Cover Letter',
   responseFormIsoc: 'Response Form',
   debtCollectionFlowchartIsoc: 'Debt Collection Flowchart',
@@ -88,7 +90,7 @@ const MeetingDocsTest: React.FC = () => {
   const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
-    const keys: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
+    const keys: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
     Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
       const loaded: Partial<Record<TemplateKey, TemplateFileRecord>> = {};
       snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });
