@@ -123,7 +123,8 @@ const MeetingDocsTest: React.FC = () => {
       // Mammoth may split {{Tag}} across multiple HTML elements; strip any HTML tags inside delimiters before replacing
       html = html.replace(/\{\{[\s\S]*?\}\}/g, m => '{{' + m.slice(2, -2).replace(/<[^>]*>/g, '') + '}}');
       Object.entries(data).forEach(([k, v]) => { html = html.split(`{{${k}}}`).join(v); });
-      setPreviewHtml(html);
+      const previewStyle = '<style>*{font-family:Calibri,Arial,sans-serif;box-sizing:border-box}a{color:inherit!important;text-decoration:none!important}p{margin:0.3em 0}table{border-collapse:collapse;width:100%}td,th{vertical-align:top;padding:2px 8px}</style>';
+      setPreviewHtml(previewStyle + html);
     } catch {
       alert('Preview failed. Ensure the uploaded file is a valid .docx.');
     }
@@ -179,7 +180,7 @@ const MeetingDocsTest: React.FC = () => {
     if (!win) return;
     win.document.write(
       `<!DOCTYPE html><html><head><meta charset="utf-8">` +
-      `<style>@page{margin:0;size:A4}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;padding:20mm;line-height:1.4}img{max-width:100%}</style>` +
+      `<style>@page{margin:0;size:A4}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;padding:25mm 20mm;line-height:1.4}a{color:inherit!important;text-decoration:none!important}img{max-width:100%}table{border-collapse:collapse;width:100%}td,th{vertical-align:top;padding:2px 8px}</style>` +
       `</head><body>${previewHtml}</body></html>`
     );
     win.document.close();
