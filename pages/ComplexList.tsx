@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
     Search, ShieldCheck, ShieldAlert, X, Calendar, RefreshCw, Save,
     CheckCircle2, DollarSign, Clock, MapPin, History, Plus, Trash2,
@@ -82,14 +82,25 @@ const calculateDefaultResponseDueDate = (dateStr?: string) => {
 
 const ComplexList: React.FC = () => {
   const { complexes, updateComplex, managers, initializeDummyData, updateMeeting, deleteMeeting } = useData();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterManager, setFilterManager] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const hasInitializedFilter = useRef(false);
   const [selectedComplexId, setSelectedComplexId] = useState<string | null>(null);
   const [initialModalTab, setInitialModalTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' >('details');
 
   const selectedComplex = complexes.find(c => c.id === selectedComplexId) || null;
+
+  useEffect(() => {
+    if (!hasInitializedFilter.current && complexes.length > 0 && user) {
+      const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName === user.name);
+      if (hasOwnComplexes) setFilterManager(user.name);
+      hasInitializedFilter.current = true;
+    }
+  }, [complexes, user]);
 
   useEffect(() => {
     const idParam = searchParams.get('id');
@@ -131,7 +142,16 @@ const ComplexList: React.FC = () => {
     handleCloseModal();
   };
 
-  const handleCloseModal = () => { setSelectedComplexId(null); setInitialModalTab('details'); setSearchParams({}); };
+  const handleCloseModal = () => {
+    const fromDashboard = searchParams.get('from') === 'dashboard';
+    setSelectedComplexId(null);
+    setInitialModalTab('details');
+    if (fromDashboard) {
+      navigate('/');
+    } else {
+      setSearchParams({});
+    }
+  };
 
   return (
     <div className="space-y-6">

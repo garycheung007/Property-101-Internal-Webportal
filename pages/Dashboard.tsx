@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -12,9 +12,18 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const upcomingActionsRef = useRef<HTMLDivElement>(null);
   const criticalAlertsRef = useRef<HTMLDivElement>(null);
+  const hasInitializedFilter = useRef(false);
 
   const [selectedManager, setSelectedManager] = useState<string>('all');
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
+
+  useEffect(() => {
+    if (!hasInitializedFilter.current && complexes.length > 0 && user) {
+      const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName === user.name);
+      if (hasOwnComplexes) setSelectedManager(user.name);
+      hasInitializedFilter.current = true;
+    }
+  }, [complexes, user]);
 
   const activeComplexes = complexes.filter(c => !c.isArchived);
 
@@ -147,12 +156,11 @@ const Dashboard: React.FC = () => {
                                      message.toLowerCase().includes('bwof');
       
       if (isMeeting) {
-          navigate(`/complexes?id=${bcId}&tab=meetings`);
+          navigate(`/complexes?id=${bcId}&tab=meetings&from=dashboard`);
       } else if (isComplianceOrInsurance) {
-          navigate(`/complexes?id=${bcId}&tab=details`);
+          navigate(`/complexes?id=${bcId}&tab=details&from=dashboard`);
       } else {
-          // Default to details if unsure
-          navigate(`/complexes?id=${bcId}&tab=details`);
+          navigate(`/complexes?id=${bcId}&tab=details&from=dashboard`);
       }
   };
 
@@ -332,7 +340,7 @@ const Dashboard: React.FC = () => {
                           
                           return (
                             <div key={`${m.bcId}-${m.id}`} className="py-4 first:pt-0 group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 -mx-2 transition-all"
-                            onClick={() => navigate(`/complexes?id=${m.bcId}&tab=meetings`)}>
+                            onClick={() => navigate(`/complexes?id=${m.bcId}&tab=meetings&from=dashboard`)}>
                                     <div className="flex justify-between items-start mb-1">
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{m.bcNumber}</span>
