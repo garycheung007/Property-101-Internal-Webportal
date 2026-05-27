@@ -202,6 +202,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [renewalPrompt, setRenewalPrompt] = useState<{ show: boolean, nextExpiry: string }>({ show: false, nextExpiry: '' });
     const [bwofRenewalPrompt, setBwofRenewalPrompt] = useState<{ show: boolean, pendingDate: string }>({ show: false, pendingDate: '' });
     const [feeEditing, setFeeEditing] = useState(false);
+    const [venueOther, setVenueOther] = useState(false);
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
     const valuers = contractors.filter(c => c.category === 'Insurance Valuer');
@@ -242,6 +243,15 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         }
     }, [calculatedAgmDate]);
 
+    useEffect(() => {
+        const venues = systemSettings.meetingVenues || [];
+        if (selectedMeetingId && venues.length > 0 && meetingForm.venue && !venues.includes(meetingForm.venue)) {
+            setVenueOther(true);
+        } else {
+            setVenueOther(false);
+        }
+    }, [selectedMeetingId]);
+
     const handleToggleChecklistItem = (itemId: string, stage: 'NOI' | 'NOM' | 'COMPLETE') => {
         const currentProgress = meetingForm.checklistProgress || {};
         const updatedProgress = { ...currentProgress, [itemId]: !currentProgress[itemId] };
@@ -257,7 +267,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         let updatedMeetings = [...currentMeetings];
         const finalMeeting = { 
             id: selectedMeetingId === 'new' ? `mtg_${Date.now()}` : selectedMeetingId!,
-            type: meetingForm.type || 'Committee',
+            type: meetingForm.type || 'AGM',
             date: meetingForm.date || '',
             time: meetingForm.time || '10:00',
             venue: meetingForm.venue || 'TBC',
@@ -669,7 +679,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             <fieldset className="space-y-4" disabled={meetingForm.date ? isMeetingPassed(meetingForm.date) : false}>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'Committee'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="Committee">Committee</option></select></div>
+                                                    <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
                                                     <div className="flex items-end"><button onClick={() => { if (meetingForm.date) { setMeetingForm({ ...meetingForm, noiResponseDueDate: calculateDefaultResponseDueDate(meetingForm.date) }); } }} className="w-full py-2.5 bg-pink-50 dark:bg-pink-900/10 text-pink-600 dark:text-pink-400 rounded-xl border border-pink-100 text-[10px] font-bold uppercase tracking-widest transition-all"><Wand2 size={14} className="inline mr-2" /> Auto Deadlines</button></div>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
@@ -677,7 +687,35 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                     <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Time</label><input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.time || ''} onChange={e => setMeetingForm({...meetingForm, time: e.target.value})} /></div>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Venue</label><input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} /></div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Venue</label>
+                                                        {(systemSettings.meetingVenues?.length ?? 0) > 0 ? (
+                                                            <>
+                                                                <select
+                                                                    className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm"
+                                                                    value={venueOther ? '__other__' : (meetingForm.venue || '')}
+                                                                    onChange={e => {
+                                                                        if (e.target.value === '__other__') {
+                                                                            setVenueOther(true);
+                                                                            setMeetingForm({...meetingForm, venue: ''});
+                                                                        } else {
+                                                                            setVenueOther(false);
+                                                                            setMeetingForm({...meetingForm, venue: e.target.value});
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <option value="">-- Select Venue --</option>
+                                                                    {systemSettings.meetingVenues!.map(v => <option key={v} value={v}>{v}</option>)}
+                                                                    <option value="__other__">Other...</option>
+                                                                </select>
+                                                                {venueOther && (
+                                                                    <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm mt-2" placeholder="Enter venue..." value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />
+                                                        )}
+                                                    </div>
                                                     <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Response Due Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.noiResponseDueDate || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})} /></div>
                                                 </div>
                                             </fieldset>
@@ -719,7 +757,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 )}
                             </div>
                             <div className="lg:col-span-1 bg-slate-100 dark:bg-slate-800/40 rounded-3xl p-5 border dark:border-slate-700/50 flex flex-col shadow-inner overflow-hidden">
-                                <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Chronological History</h3><button onClick={() => { setMeetingForm({ type: 'Committee', date: '', time: '10:00', venue: 'TBC', checklistProgress: {} }); setSelectedMeetingId('new'); }} className="p-2 bg-pink-600 hover:bg-pink-700 text-white rounded-full transition-all"><Plus size={16} /></button></div>
+                                <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Chronological History</h3><button onClick={() => { setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {} }); setVenueOther(false); setSelectedMeetingId('new'); }} className="p-2 bg-pink-600 hover:bg-pink-700 text-white rounded-full transition-all"><Plus size={16} /></button></div>
                                 <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
                                     {sortedMeetings.map(m => {
                                         const passed = isMeetingPassed(m.date);

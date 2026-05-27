@@ -200,6 +200,7 @@ export interface SystemSettings {
     NOM: MeetingChecklistItem[];
     COMPLETE: MeetingChecklistItem[];
   };
+  meetingVenues?: string[];
 }
 
 export type ContractorCategory = string;

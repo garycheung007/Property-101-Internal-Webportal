@@ -67,6 +67,8 @@ const AdminPanel: React.FC = () => {
     const [localInsurance, setLocalInsurance] = useState<InsuranceSettings>(systemSettings.insuranceSettings || { valuationValidityYears: 2, workflowSteps: [] });
     const [localCategories, setLocalCategories] = useState<string[]>(systemSettings.contractorCategories || []);
     const [localChecklists, setLocalChecklists] = useState(systemSettings.meetingChecklistTemplates || { NOI: [], NOM: [], COMPLETE: [] });
+    const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
+    const [newVenueInput, setNewVenueInput] = useState('');
 
     // Docx template management
     const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
@@ -78,6 +80,7 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.insuranceSettings) setLocalInsurance(systemSettings.insuranceSettings);
         if (systemSettings.contractorCategories) setLocalCategories(systemSettings.contractorCategories);
         if (systemSettings.meetingChecklistTemplates) setLocalChecklists(systemSettings.meetingChecklistTemplates);
+        if (systemSettings.meetingVenues) setLocalVenues(systemSettings.meetingVenues);
     }, [systemSettings]);
 
     useEffect(() => {
@@ -151,7 +154,8 @@ const AdminPanel: React.FC = () => {
             bwofConfirmationMessage: bwofMessage,
             insuranceSettings: localInsurance,
             contractorCategories: localCategories,
-            meetingChecklistTemplates: localChecklists
+            meetingChecklistTemplates: localChecklists,
+            meetingVenues: localVenues
         });
         alert("System settings updated successfully.");
     };
@@ -442,6 +446,61 @@ const AdminPanel: React.FC = () => {
 
                     {activeTab === 'meetings' && (
                         <div className="space-y-6">
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-4">
+                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-4">
+                                    <ClipboardCheck size={18} className="text-pink-600" /> Meeting Venues
+                                </h2>
+                                <p className="text-xs text-slate-400">These venues appear as dropdown options when scheduling a meeting.</p>
+                                <div className="space-y-2">
+                                    {localVenues.map((venue, idx) => (
+                                        <div key={idx} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border dark:border-slate-700">
+                                            <input
+                                                type="text"
+                                                className="flex-1 bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                                value={venue}
+                                                onChange={(e) => {
+                                                    const next = [...localVenues];
+                                                    next[idx] = e.target.value;
+                                                    setLocalVenues(next);
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => setLocalVenues(localVenues.filter((_, i) => i !== idx))}
+                                                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        className="flex-1 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm"
+                                        placeholder="New venue name..."
+                                        value={newVenueInput}
+                                        onChange={e => setNewVenueInput(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newVenueInput.trim()) {
+                                                setLocalVenues([...localVenues, newVenueInput.trim()]);
+                                                setNewVenueInput('');
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            if (newVenueInput.trim()) {
+                                                setLocalVenues([...localVenues, newVenueInput.trim()]);
+                                                setNewVenueInput('');
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-2"
+                                    >
+                                        <Plus size={16} /> Add
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-8">
                                 <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-4">
                                     <ClipboardCheck size={18} className="text-pink-600" /> Master Meeting Checklists
