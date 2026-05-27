@@ -209,7 +209,7 @@ const MeetingDocsTest: React.FC = () => {
     if (!win) return;
     win.document.write(
       `<!DOCTYPE html><html><head><meta charset="utf-8">` +
-      `<style>@page{margin:0;size:A4}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;padding:25mm 20mm;line-height:1.4}a{color:inherit!important;text-decoration:none!important}img{max-width:100%}table{border-collapse:collapse;width:100%}td,th{vertical-align:top;padding:2px 8px}</style>` +
+      `<style>@page{margin:20mm;size:A4}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;padding:0;line-height:1.4}a{color:inherit!important;text-decoration:none!important}img{max-width:100%}table{border-collapse:collapse;width:100%}td,th{vertical-align:top;padding:2px 8px}</style>` +
       `</head><body>${previewHtml}</body></html>`
     );
     win.document.close();
