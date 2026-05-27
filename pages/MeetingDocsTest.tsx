@@ -77,6 +77,36 @@ const dataUrlToBuffer = (dataUrl: string): ArrayBuffer => {
   return toArrayBuffer(base64);
 };
 
+const buildIframeSrcDoc = (html: string) =>
+  `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    @page{margin:0;size:A4}
+    html{background:#525659;padding:20px;}
+    body{background:white;width:210mm;margin:0 auto;padding:25mm 20mm;box-shadow:0 2px 16px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;min-height:297mm;}
+    .pg-sep{position:absolute;left:0;right:0;height:20px;background:#525659;z-index:10;}
+    *{font-family:Calibri,Arial,sans-serif;box-sizing:border-box;}
+    a{color:inherit!important;text-decoration:none!important;}
+    p{margin:0.3em 0;}
+    table{border-collapse:collapse;width:100%;}
+    td,th{vertical-align:top;padding:2px 8px;}
+    img{max-width:100%;}
+    @media print{html{background:white;padding:0;}body{width:100%;margin:0;padding:25mm 20mm;box-shadow:none;}.pg-sep{display:none;}}
+  </style></head><body>${html}<script>(function(){
+    var PX=297*(96/25.4);
+    function run(){
+      var b=document.body;
+      var n=Math.ceil(b.scrollHeight/PX);
+      b.style.minHeight=(n*297)+'mm';
+      document.querySelectorAll('.pg-sep').forEach(function(e){e.remove();});
+      for(var i=1;i<n;i++){
+        var d=document.createElement('div');
+        d.className='pg-sep';
+        d.style.top=(i*PX-10)+'px';
+        b.appendChild(d);
+      }
+    }
+    window.addEventListener('load',function(){setTimeout(run,300);});
+  })();</script></body></html>`;
+
 const MeetingDocsTest: React.FC = () => {
   const { complexes, managers } = useData();
   const { user } = useAuth();
@@ -123,8 +153,7 @@ const MeetingDocsTest: React.FC = () => {
       // Mammoth may split {{Tag}} across multiple HTML elements; strip any HTML tags inside delimiters before replacing
       html = html.replace(/\{\{[\s\S]*?\}\}/g, m => '{{' + m.slice(2, -2).replace(/<[^>]*>/g, '') + '}}');
       Object.entries(data).forEach(([k, v]) => { html = html.split(`{{${k}}}`).join(v); });
-      const previewStyle = '<style>*{font-family:Calibri,Arial,sans-serif;box-sizing:border-box}a{color:inherit!important;text-decoration:none!important}p{margin:0.3em 0}table{border-collapse:collapse;width:100%}td,th{vertical-align:top;padding:2px 8px}</style>';
-      setPreviewHtml(previewStyle + html);
+      setPreviewHtml(html);
     } catch {
       alert('Preview failed. Ensure the uploaded file is a valid .docx.');
     }
@@ -306,11 +335,12 @@ const MeetingDocsTest: React.FC = () => {
 
         {/* Right panel — preview */}
         <div className="lg:col-span-2 bg-slate-200 dark:bg-slate-950 rounded-3xl border border-slate-300 dark:border-slate-800 flex flex-col h-full overflow-hidden relative shadow-inner">
-          <div className="absolute inset-0 overflow-y-auto p-8 flex justify-center custom-scrollbar">
+          <div className="absolute inset-0 overflow-hidden">
             {previewHtml ? (
-              <div
-                className="w-full max-w-[210mm] bg-white dark:bg-slate-900 shadow-2xl rounded-sm p-[20mm] text-sm leading-relaxed animate-in fade-in duration-300"
-                dangerouslySetInnerHTML={{ __html: previewHtml }}
+              <iframe
+                className="w-full h-full border-0"
+                srcDoc={buildIframeSrcDoc(previewHtml)}
+                title="Document Preview"
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-slate-400 h-full p-12 text-center">
