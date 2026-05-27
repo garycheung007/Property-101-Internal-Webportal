@@ -8,7 +8,7 @@ import {
     CheckCircle2, DollarSign, Clock, MapPin, History, Plus, Trash2,
     Database, Lock, ListFilter, MessageSquareMore, ToggleRight,
     ToggleLeft, ArrowRightCircle, Check, AlertCircle, MapPinHouse,
-    Wand2, User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
+    User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
     FileSignature, Activity, AlertOctagon, Info, Pencil
 } from 'lucide-react';
@@ -356,6 +356,30 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
     const sortedMeetings = [...(form.meetings || [])].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+    const computeMeetingDates = (dateStr: string) => {
+        const mDate = new Date(dateStr);
+        const shift = (days: number) => {
+            const d = new Date(mDate);
+            d.setDate(d.getDate() + days);
+            return d.toISOString().split('T')[0];
+        };
+        if (form.type === 'Incorporated Society') {
+            const period = form.isocNomDaysPrior || 7;
+            const nomDeadDate = new Date(mDate);
+            nomDeadDate.setDate(nomDeadDate.getDate() - period);
+            const nomPrefDate = new Date(nomDeadDate); nomPrefDate.setDate(nomPrefDate.getDate() - 7);
+            const noiDeadDate = new Date(nomDeadDate); noiDeadDate.setDate(noiDeadDate.getDate() - 7);
+            const noiPrefDate = new Date(nomDeadDate); noiPrefDate.setDate(noiPrefDate.getDate() - 14);
+            return {
+                noiPref: noiPrefDate.toISOString().split('T')[0],
+                noiDead: noiDeadDate.toISOString().split('T')[0],
+                nomPref: nomPrefDate.toISOString().split('T')[0],
+                nomDead: nomDeadDate.toISOString().split('T')[0],
+            };
+        }
+        return { noiPref: shift(-35), noiDead: shift(-21), nomPref: shift(-21), nomDead: shift(-14) };
+    };
+
     const toggleStatutoryField = (field: keyof BodyCorporate) => {
         setForm(prev => ({ ...prev, [field]: !prev[field] }));
     };
@@ -678,45 +702,39 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             <fieldset className="space-y-4" disabled={meetingForm.date ? isMeetingPassed(meetingForm.date) : false}>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
-                                                    <div className="flex items-end"><button onClick={() => { if (meetingForm.date) { setMeetingForm({ ...meetingForm, noiResponseDueDate: calculateDefaultResponseDueDate(meetingForm.date) }); } }} className="w-full py-2.5 bg-pink-50 dark:bg-pink-900/10 text-pink-600 dark:text-pink-400 rounded-xl border border-pink-100 text-[10px] font-bold uppercase tracking-widest transition-all"><Wand2 size={14} className="inline mr-2" /> Auto Deadlines</button></div>
-                                                </div>
+                                                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.date || ''} onChange={e => { const newDate = e.target.value; setMeetingForm({ ...meetingForm, date: newDate, noiResponseDueDate: calculateDefaultResponseDueDate(newDate) }); }} /></div>
                                                     <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Time</label><input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.time || ''} onChange={e => setMeetingForm({...meetingForm, time: e.target.value})} /></div>
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Venue</label>
-                                                        {(systemSettings.meetingVenues?.length ?? 0) > 0 ? (
-                                                            <>
-                                                                <select
-                                                                    className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm"
-                                                                    value={venueOther ? '__other__' : (meetingForm.venue || '')}
-                                                                    onChange={e => {
-                                                                        if (e.target.value === '__other__') {
-                                                                            setVenueOther(true);
-                                                                            setMeetingForm({...meetingForm, venue: ''});
-                                                                        } else {
-                                                                            setVenueOther(false);
-                                                                            setMeetingForm({...meetingForm, venue: e.target.value});
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    <option value="">-- Select Venue --</option>
-                                                                    {systemSettings.meetingVenues!.map(v => <option key={v} value={v}>{v}</option>)}
-                                                                    <option value="__other__">Other...</option>
-                                                                </select>
-                                                                {venueOther && (
-                                                                    <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm mt-2" placeholder="Enter venue..." value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />
-                                                        )}
-                                                    </div>
-                                                    <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Response Due Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.noiResponseDueDate || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})} /></div>
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Venue</label>
+                                                    {(systemSettings.meetingVenues?.length ?? 0) > 0 ? (
+                                                        <>
+                                                            <select
+                                                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm"
+                                                                value={venueOther ? '__other__' : (meetingForm.venue || '')}
+                                                                onChange={e => {
+                                                                    if (e.target.value === '__other__') {
+                                                                        setVenueOther(true);
+                                                                        setMeetingForm({...meetingForm, venue: ''});
+                                                                    } else {
+                                                                        setVenueOther(false);
+                                                                        setMeetingForm({...meetingForm, venue: e.target.value});
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <option value="">-- Select Venue --</option>
+                                                                {systemSettings.meetingVenues!.map(v => <option key={v} value={v}>{v}</option>)}
+                                                                <option value="__other__">Other...</option>
+                                                            </select>
+                                                            {venueOther && (
+                                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm mt-2" placeholder="Enter venue..." value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />
+                                                    )}
                                                 </div>
                                             </fieldset>
                                             <div className="space-y-4">
@@ -745,6 +763,59 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 </div>
                                             </div>
                                         </div>
+                                        {meetingForm.date && meetingForm.type !== 'Committee' && (() => {
+                                            const dates = computeMeetingDates(meetingForm.date);
+                                            const today = new Date(); today.setHours(0,0,0,0);
+                                            const isPast = (d: string) => new Date(d) < today;
+                                            const fmt = (d: string) => new Date(d).toLocaleDateString('en-NZ');
+                                            return (
+                                                <div className="bg-slate-50 dark:bg-slate-950/50 rounded-2xl border dark:border-slate-800 overflow-hidden">
+                                                    <div className="px-5 py-3 border-b dark:border-slate-800 flex items-center gap-2 bg-white dark:bg-slate-900">
+                                                        <Calendar size={14} className="text-pink-600" />
+                                                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Key Dates Summary</h4>
+                                                    </div>
+                                                    <table className="w-full text-xs">
+                                                        <thead>
+                                                            <tr className="text-[10px] uppercase tracking-widest text-slate-400 border-b dark:border-slate-800 bg-white dark:bg-slate-900">
+                                                                <th className="px-5 py-2 text-left font-semibold">Document</th>
+                                                                <th className="px-5 py-2 text-center font-semibold">Preferred Date</th>
+                                                                <th className="px-5 py-2 text-center font-semibold">Statutory Deadline</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y dark:divide-slate-800">
+                                                            {([
+                                                                { label: 'Notice of Intention (NOI)', pref: dates.noiPref, statutory: dates.noiDead },
+                                                                { label: 'Notice of Meeting (NOM)', pref: dates.nomPref, statutory: dates.nomDead },
+                                                            ] as const).map(row => (
+                                                                <tr key={row.label} className="hover:bg-white dark:hover:bg-slate-900/50 transition-colors">
+                                                                    <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{row.label}</td>
+                                                                    <td className={`px-5 py-3 text-center font-mono font-bold ${isPast(row.pref) ? 'text-red-500' : 'text-slate-600 dark:text-slate-300'}`}>{fmt(row.pref)}</td>
+                                                                    <td className={`px-5 py-3 text-center font-mono font-bold ${isPast(row.statutory) ? 'text-red-500' : 'text-amber-600 dark:text-amber-400'}`}>{fmt(row.statutory)}</td>
+                                                                </tr>
+                                                            ))}
+                                                            <tr className="hover:bg-white dark:hover:bg-slate-900/50 transition-colors">
+                                                                <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">
+                                                                    <div>NOI Response Due</div>
+                                                                    <div className="text-[9px] text-slate-400 font-normal mt-0.5">Editable</div>
+                                                                </td>
+                                                                <td className="px-5 py-3 text-center" colSpan={2}>
+                                                                    <input
+                                                                        type="date"
+                                                                        className={`border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono ${meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate) ? 'text-red-500 border-red-300' : 'dark:text-white'}`}
+                                                                        value={meetingForm.noiResponseDueDate || ''}
+                                                                        onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})}
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                            <tr className="bg-pink-50/50 dark:bg-pink-900/10">
+                                                                <td className="px-5 py-3 font-bold text-pink-700 dark:text-pink-400">Meeting Date</td>
+                                                                <td className="px-5 py-3 text-center font-mono font-bold text-pink-700 dark:text-pink-400" colSpan={2}>{fmt(meetingForm.date)}</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            );
+                                        })()}
                                         <div className="flex gap-3 pt-4 border-t dark:border-slate-800">
                                             {selectedMeetingId !== 'new' && !isMeetingPassed(meetingForm.date!) && <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId)} className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-colors"><Trash2 size={18}/></button>}
                                             {!isMeetingPassed(meetingForm.date || '') && <button onClick={handleSaveMeetingForm} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"><Save size={18} /> Commit Updates</button>}
