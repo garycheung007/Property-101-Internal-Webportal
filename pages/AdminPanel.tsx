@@ -183,7 +183,7 @@ const AdminPanel: React.FC = () => {
                     { id: 'users', label: 'Users', icon: <Users size={16}/> },
                     { id: 'settings', label: 'Compliance', icon: <Settings size={16}/> },
                     { id: 'templates', label: 'Templates', icon: <FileText size={16}/> },
-                    { id: 'meetings', label: 'Tasks', icon: <ClipboardCheck size={16}/> },
+                    { id: 'meetings', label: 'Meetings', icon: <ClipboardCheck size={16}/> },
                     { id: 'diagnostics', label: 'Diagnostics', icon: <Terminal size={16}/> }
                 ].map((tab) => (
                     <button 
