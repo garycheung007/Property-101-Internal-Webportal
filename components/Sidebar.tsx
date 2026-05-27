@@ -5,11 +5,13 @@ import { LayoutDashboard, Building2, FileText, LogOut, BarChart3, Settings, Hard
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { ReminderType } from '../types';
 
 const Sidebar: React.FC = () => {
   const { logout, user, isAuthenticated } = useAuth();
-  const { loading, syncError } = useData();
+  const { loading, syncError, reminders } = useData();
   const { theme, toggleTheme } = useTheme();
+  const criticalCount = reminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION).length;
   const location = useLocation();
 
   const getNavClass = (path: string) => {
@@ -65,6 +67,11 @@ const Sidebar: React.FC = () => {
         <Link to="/" className={getNavClass('/')}>
           <LayoutDashboard size={20} />
           <span>Dashboard</span>
+          {criticalCount > 0 && (
+            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {criticalCount > 9 ? '9+' : criticalCount}
+            </span>
+          )}
         </Link>
         <Link to="/complexes" className={getNavClass('/complexes')}>
           <Building2 size={20} />
@@ -76,7 +83,7 @@ const Sidebar: React.FC = () => {
         </Link>
         <Link to="/meeting-docs-test" className={getNavClass('/meeting-docs-test')}>
           <FileText size={20} />
-          <span>Generate Meeting Document</span>
+          <span>Meeting Docs</span>
         </Link>
         <Link to="/disclosure" className={getNavClass('/disclosure')}>
           <FileSignature size={20} />

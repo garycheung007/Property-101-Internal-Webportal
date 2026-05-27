@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +10,9 @@ const Dashboard: React.FC = () => {
   const { complexes, reminders, actionComments, addActionComment, removeActionComment, managers, updateComplex, updateMeeting } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+  const upcomingActionsRef = useRef<HTMLDivElement>(null);
+  const criticalAlertsRef = useRef<HTMLDivElement>(null);
+
   const [selectedManager, setSelectedManager] = useState<string>('all');
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
 
@@ -182,11 +184,11 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: 'Active Complexes', val: filteredComplexes.length, icon: <FileCheck />, color: 'pink' },
-          { label: 'Upcoming Actions', val: upcomingActions.length, icon: <ClipboardList />, color: 'pink' },
-          { label: 'Critical Alerts', val: criticalAlerts.length, icon: <AlertTriangle />, color: 'amber' }
+          { label: 'Active Complexes', val: filteredComplexes.length, icon: <FileCheck />, color: 'pink', onClick: () => navigate('/complexes') },
+          { label: 'Upcoming Actions', val: upcomingActions.length, icon: <ClipboardList />, color: 'pink', onClick: () => upcomingActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
+          { label: 'Critical Alerts', val: criticalAlerts.length, icon: <AlertTriangle />, color: 'amber', onClick: () => criticalAlertsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
         ].map((stat, i) => (
-          <div key={i} className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-colors text-left">
+          <div key={i} onClick={stat.onClick} className="cursor-pointer hover:shadow-md bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all text-left">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-lg ${
                 stat.color === 'pink' ? 'bg-pink-50 text-pink-600 dark:bg-pink-900/20' : 
@@ -204,16 +206,16 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Upcoming Actions Section */}
-        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col h-[550px] transition-colors">
+        <div ref={upcomingActionsRef} className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
           <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
             <ClipboardList className="text-pink-500" size={20} />
             Upcoming Actions
           </h2>
           <p className="text-xs text-slate-400 mb-4">Task issuance for portolios</p>
-          
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+
+          <div className="overflow-y-auto max-h-[420px] space-y-3 pr-2 custom-scrollbar">
             {upcomingActions.length === 0 ? (
                 <div className="text-slate-400 text-center py-10 flex flex-col items-center">
                     <CheckCircle2 size={32} className="mb-2 opacity-50 text-emerald-500" />
@@ -260,14 +262,14 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Critical Alerts Section (Overdue tasks move here) */}
-        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col h-[550px] transition-colors">
+        <div ref={criticalAlertsRef} className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
           <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
             <AlertTriangle className="text-amber-500" size={20} />
             Critical Alerts
           </h2>
           <p className="text-xs text-slate-400 mb-4">Compliance risk summary</p>
-          
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+
+          <div className="overflow-y-auto max-h-[420px] space-y-3 pr-2 custom-scrollbar">
             {criticalAlerts.length === 0 ? (
                 <div className="text-slate-400 text-center py-10 flex flex-col items-center">
                     <FileCheck size={32} className="mb-2 opacity-50" />
@@ -307,14 +309,14 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Upcoming Meetings Section (Maintains chronological schedule) */}
-        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col h-[550px] transition-colors">
+        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
             <Clock className="text-pink-500" size={20} />
             Upcoming Meetings
           </h2>
           <p className="text-xs text-slate-400 mb-4">Confirmed AGM schedule</p>
 
-          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="overflow-y-auto max-h-[420px] pr-2 custom-scrollbar">
               {upcomingMeetings.length === 0 ? (
                   <div className="text-center text-slate-400 py-10 flex flex-col items-center">
                       <Calendar size={32} className="mb-2 opacity-50" />
@@ -378,6 +380,11 @@ const Dashboard: React.FC = () => {
                       })}
                   </div>
               )}
+          </div>
+          <div className="pt-3 mt-3 border-t dark:border-slate-800 flex justify-end">
+            <button onClick={() => navigate('/complexes')} className="text-xs text-pink-600 dark:text-pink-400 font-bold hover:underline flex items-center gap-1">
+              View all complexes <ArrowRightCircle size={12} />
+            </button>
           </div>
         </div>
       </div>
