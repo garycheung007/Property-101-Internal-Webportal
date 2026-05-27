@@ -373,9 +373,9 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex" onClick={onClose}>
+        <div className="fixed top-0 right-0 bottom-0 left-64 z-50 flex">
             <div className="flex-1 bg-black/40 backdrop-blur-sm" />
-            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl h-full overflow-hidden flex flex-col shadow-2xl border-l dark:border-slate-800" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl h-full overflow-hidden flex flex-col shadow-2xl border-l dark:border-slate-800">
                 <div className="p-5 border-b dark:border-slate-800 flex justify-between bg-slate-50 dark:bg-slate-950">
                     <div>
                         <h2 className="text-xl font-bold dark:text-white">{form.name}</h2>
