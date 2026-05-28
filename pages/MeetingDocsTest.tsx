@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
-import { FlaskConical, Download, Loader2, Eye } from 'lucide-react';
+import { FlaskConical, Download, Loader2, Eye, X } from 'lucide-react';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -118,6 +118,19 @@ const MeetingDocsTest: React.FC = () => {
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewKey, setPreviewKey] = useState<TemplateKey | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   useEffect(() => {
     const keys: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
@@ -127,6 +140,12 @@ const MeetingDocsTest: React.FC = () => {
       setTemplates(loaded);
     });
   }, []);
+
+  const filteredComplexes = complexes.filter(c => !c.isArchived && (
+    !searchQuery ||
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.bcNumber || '').toLowerCase().includes(searchQuery.toLowerCase())
+  ));
 
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
   const selectedMeeting = selectedComplex?.meetings.find(m => m.id === selectedMeetingId) || null;
@@ -289,16 +308,54 @@ const MeetingDocsTest: React.FC = () => {
 
             <div>
               <label className="block text-xs text-slate-500 mb-1">Select Property</label>
-              <select
-                className="w-full rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 transition-colors"
-                value={selectedBcId}
-                onChange={e => { setSelectedBcId(e.target.value); setSelectedMeetingId(''); setPreviewHtml(''); setPreviewKey(null); }}
-              >
-                <option value="">-- Choose a Property --</option>
-                {complexes.filter(c => !c.isArchived).map(bc => (
-                  <option key={bc.id} value={bc.id}>{bc.bcNumber} — {bc.name}</option>
-                ))}
-              </select>
+              <div ref={searchRef} className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by name or BC number..."
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 pr-8 text-sm outline-none focus:ring-2 focus:ring-pink-500 transition-colors"
+                  value={searchQuery}
+                  onChange={e => {
+                    setSearchQuery(e.target.value);
+                    setShowSuggestions(true);
+                    if (!e.target.value) {
+                      setSelectedBcId('');
+                      setSelectedMeetingId('');
+                      setPreviewHtml('');
+                      setPreviewKey(null);
+                    }
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                />
+                {searchQuery && (
+                  <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    onClick={() => { setSearchQuery(''); setSelectedBcId(''); setSelectedMeetingId(''); setPreviewHtml(''); setPreviewKey(null); setShowSuggestions(false); }}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+                {showSuggestions && filteredComplexes.length > 0 && (
+                  <ul className="absolute z-50 w-full mt-1 max-h-56 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                    {filteredComplexes.map(bc => (
+                      <li
+                        key={bc.id}
+                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-pink-50 dark:hover:bg-slate-700 ${bc.id === selectedBcId ? 'bg-pink-50 dark:bg-slate-700 font-semibold text-pink-600' : 'text-slate-700 dark:text-slate-200'}`}
+                        onMouseDown={() => {
+                          setSelectedBcId(bc.id);
+                          setSearchQuery(`${bc.bcNumber} — ${bc.name}`);
+                          setShowSuggestions(false);
+                          setSelectedMeetingId('');
+                          setPreviewHtml('');
+                          setPreviewKey(null);
+                        }}
+                      >
+                        <span className="font-mono text-[10px] text-slate-400 mr-1.5">{bc.bcNumber}</span>
+                        {bc.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
             {selectedComplex && (
