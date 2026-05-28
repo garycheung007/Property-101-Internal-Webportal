@@ -172,7 +172,7 @@ const AdminPanel: React.FC = () => {
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Admin Panel</h1>
                 <div className="flex gap-2">
-                    <button onClick={handleSaveSettings} className="bg-pink-600 hover:bg-pink-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"><Save size={18} /> Save Changes</button>
+                    <button onClick={handleSaveSettings} className="border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all"><Save size={16} /> Save</button>
                 </div>
             </div>
 
@@ -284,7 +284,7 @@ const AdminPanel: React.FC = () => {
                     )}
 
                     {activeTab === 'settings' && (
-                        <div className="space-y-8">
+                        <div className="space-y-8 pb-24">
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
                                 <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                                     <ShieldCheck size={18} className="text-pink-600" /> Insurance Configuration
@@ -397,6 +397,10 @@ const AdminPanel: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
+                            <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-t dark:border-slate-800 py-4 flex justify-end gap-3 -mx-6 px-6 mt-6 rounded-b-xl">
+                                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500 flex items-center gap-1.5 flex-1"><AlertCircle size={13} /> Remember to save your compliance configuration changes.</p>
+                                <button onClick={handleSaveSettings} className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"><Save size={16} /> Save Compliance Config</button>
+                            </div>
                         </div>
                     )}
 
@@ -445,7 +449,7 @@ const AdminPanel: React.FC = () => {
                     )}
 
                     {activeTab === 'meetings' && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 pb-24">
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-4">
                                 <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-4">
                                     <ClipboardCheck size={18} className="text-pink-600" /> Meeting Venues
@@ -549,6 +553,10 @@ const AdminPanel: React.FC = () => {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                            <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-t dark:border-slate-800 py-4 flex justify-end gap-3 -mx-6 px-6 mt-6 rounded-b-xl">
+                                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500 flex items-center gap-1.5 flex-1"><AlertCircle size={13} /> Remember to save your meeting configuration changes.</p>
+                                <button onClick={handleSaveSettings} className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"><Save size={16} /> Save Meetings Config</button>
                             </div>
                         </div>
                     )}

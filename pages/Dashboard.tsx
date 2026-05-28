@@ -3,7 +3,7 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight } from 'lucide-react';
 import { Reminder, ReminderType } from '../types';
 
 const Dashboard: React.FC = () => {
@@ -196,19 +196,20 @@ const Dashboard: React.FC = () => {
           { label: 'Upcoming Actions', val: upcomingActions.length, icon: <ClipboardList />, color: 'pink', onClick: () => upcomingActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
           { label: 'Critical Alerts', val: criticalAlerts.length, icon: <AlertTriangle />, color: 'amber', onClick: () => criticalAlertsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
         ].map((stat, i) => (
-          <div key={i} onClick={stat.onClick} className="cursor-pointer hover:shadow-md bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all text-left">
+          <div key={i} onClick={stat.onClick} className="cursor-pointer hover:shadow-md bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all text-left group">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-lg ${
-                stat.color === 'pink' ? 'bg-pink-50 text-pink-600 dark:bg-pink-900/20' : 
-                stat.color === 'emerald' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 
+                stat.color === 'pink' ? 'bg-pink-50 text-pink-600 dark:bg-pink-900/20' :
+                stat.color === 'emerald' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' :
                 'bg-amber-50 text-amber-600 dark:bg-amber-900/20'
               }`}>
                 {stat.icon}
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-slate-500 dark:text-slate-400">{stat.label}</p>
                 <p className="text-2xl font-bold text-slate-800 dark:text-white">{stat.val}</p>
               </div>
+              <ChevronRight size={18} className="text-slate-200 dark:text-slate-700 group-hover:text-pink-500 group-hover:translate-x-0.5 transition-all" />
             </div>
           </div>
         ))}
@@ -258,8 +259,8 @@ const Dashboard: React.FC = () => {
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-3">{rem.message}</p>
                             
                             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
-                                <button onClick={(e) => { e.stopPropagation(); setSelectedReminder(rem); }} className="text-[10px] font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1 hover:underline uppercase tracking-tight">
-                                    <MessageCircle size={12} /> Log Details
+                                <button onClick={(e) => { e.stopPropagation(); setSelectedReminder(rem); }} className="text-xs font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-pink-200 dark:border-pink-900/50 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors">
+                                    <MessageCircle size={13} /> Log Details
                                 </button>
                             </div>
                         </div>
@@ -303,11 +304,11 @@ const Dashboard: React.FC = () => {
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{rem.message}</p>
                         <div className="mt-3 flex justify-between items-center">
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Click to Resolve</span>
-                             <button 
-                                onClick={(e) => { e.stopPropagation(); setSelectedReminder(rem); }} 
-                                className="text-[10px] font-bold text-slate-500 flex items-center gap-1 hover:text-pink-600 uppercase tracking-tight"
+                             <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedReminder(rem); }}
+                                className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:text-pink-600 hover:border-pink-200 dark:hover:border-pink-900/50 transition-colors"
                             >
-                                <MessageCircle size={12} /> Audit Trail
+                                <MessageCircle size={13} /> Audit Trail
                             </button>
                         </div>
                     </div>

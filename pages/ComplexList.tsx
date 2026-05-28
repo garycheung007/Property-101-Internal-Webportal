@@ -10,7 +10,7 @@ import {
     ToggleLeft, ArrowRightCircle, Check, AlertCircle, MapPinHouse,
     User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
-    FileSignature, Activity, AlertOctagon, Info, Pencil
+    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight
 } from 'lucide-react';
 import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem } from '../types';
 
@@ -157,7 +157,6 @@ const ComplexList: React.FC = () => {
     <div className="space-y-6">
        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div><h1 className="text-2xl font-bold text-slate-800 dark:text-white">Properties</h1><p className="text-slate-500">View and Update Portfolios</p></div>
-        <button onClick={initializeDummyData} className="flex items-center gap-2 bg-slate-800 dark:bg-pink-700 text-white px-4 py-2 rounded-lg text-sm shadow-lg transition-colors"><Database size={16} /> Reset Data</button>
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border dark:border-slate-800 overflow-hidden transition-colors">
@@ -180,7 +179,7 @@ const ComplexList: React.FC = () => {
                             <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{bc.name}</td>
                             <td className="px-6 py-4"><div className="flex items-center gap-2"><div className="w-7 h-7 rounded-full bg-pink-100 dark:bg-pink-900/40 text-pink-600 dark:text-pink-400 flex items-center justify-center text-[10px] font-bold border border-pink-200 dark:border-pink-800">{bc.managerName?.charAt(0) || '?'}</div><span className="text-xs font-medium">{bc.managerName || 'Unassigned'}</span></div></td>
                             <td className="px-6 py-4"><div className="flex items-center gap-2">{isInsuranceValid(bc.insuranceExpiry) ? <ShieldCheck size={16} className="text-emerald-500" /> : <ShieldAlert size={16} className="text-red-500" />}<span className="text-xs">{formatDateNZ(bc.insuranceExpiry)}</span></div></td>
-                            <td className="px-6 py-4 text-right"><button className="text-pink-600 font-bold uppercase tracking-widest text-[10px] group-hover:bg-pink-50 dark:group-hover:bg-pink-900/20 px-3 py-1.5 rounded-lg transition-all">Details</button></td>
+                            <td className="px-6 py-4 text-right"><ChevronRight size={18} className="text-slate-300 group-hover:text-pink-600 transition-colors inline-block" /></td>
                         </tr>
                     ))}
                 </tbody>
@@ -203,6 +202,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [bwofRenewalPrompt, setBwofRenewalPrompt] = useState<{ show: boolean, pendingDate: string }>({ show: false, pendingDate: '' });
     const [feeEditing, setFeeEditing] = useState(false);
     const [venueOther, setVenueOther] = useState(false);
+    const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
     const valuers = contractors.filter(c => c.category === 'Insurance Valuer');
@@ -282,11 +282,15 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
     const handleDeleteMeeting = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        if (!window.confirm("Remove this meeting from the schedule?")) return;
+        setMeetingDeleteConfirm(id);
+    };
+
+    const confirmDeleteMeeting = (id: string) => {
         const updatedMeetings = (form.meetings || []).filter(m => m.id !== id);
         setForm({ ...form, meetings: updatedMeetings });
         setSelectedMeetingId(null);
         setMeetingForm({});
+        setMeetingDeleteConfirm(null);
     };
 
     const workflowSteps = systemSettings.insuranceSettings?.workflowSteps || [];
@@ -419,9 +423,20 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                 </div>
                 
                 <div className="flex border-b dark:border-slate-800 px-6 overflow-x-auto bg-white dark:bg-slate-900 transition-colors">
-                    {[ { id: 'details', label: 'Details' }, { id: 'insurance', label: 'Insurance' }, { id: 'meetings', label: 'Meetings' }, { id: 'disclosure', label: 'Disclosure' }, { id: 'logs', label: 'History' } ].map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-3 mr-6 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-pink-600 text-pink-600' : 'border-transparent text-slate-500'}`}>{tab.label}</button>
-                    ))}
+                    {[
+                        { id: 'details', label: 'Details', icon: Building },
+                        { id: 'insurance', label: 'Insurance', icon: ShieldCheck },
+                        { id: 'meetings', label: 'Meetings', icon: Calendar },
+                        { id: 'disclosure', label: 'Disclosure', icon: FileSignature },
+                        { id: 'logs', label: 'History', icon: History }
+                    ].map(tab => {
+                        const Icon = tab.icon;
+                        return (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-3 mr-6 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${activeTab === tab.id ? 'border-pink-600 text-pink-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                                <Icon size={13} />{tab.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30 dark:bg-slate-950/30 transition-colors relative">
@@ -698,7 +713,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 <h3 className="font-bold text-xs uppercase dark:text-white tracking-widest text-slate-400">{selectedMeetingId === 'new' ? 'Schedule New Meeting' : 'Meeting Details'}</h3>
                                                 {meetingForm.date && isMeetingPassed(meetingForm.date) && <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded uppercase flex items-center gap-1"><Lock size={10} /> Locked</span>}
                                             </div>
-                                            <button onClick={() => { setSelectedMeetingId(null); setMeetingForm({}); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button>
+                                            <button onClick={() => { setSelectedMeetingId(null); setMeetingForm({}); setMeetingDeleteConfirm(null); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             <fieldset className="space-y-4" disabled={meetingForm.date ? isMeetingPassed(meetingForm.date) : false}>
@@ -816,9 +831,22 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 </div>
                                             );
                                         })()}
-                                        <div className="flex gap-3 pt-4 border-t dark:border-slate-800">
-                                            {selectedMeetingId !== 'new' && !isMeetingPassed(meetingForm.date!) && <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId)} className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-colors"><Trash2 size={18}/></button>}
-                                            {!isMeetingPassed(meetingForm.date || '') && <button onClick={handleSaveMeetingForm} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"><Save size={18} /> Commit Updates</button>}
+                                        <div className="pt-4 border-t dark:border-slate-800">
+                                            {meetingDeleteConfirm === selectedMeetingId && (
+                                                <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/30 mb-3">
+                                                    <span className="text-xs text-red-700 dark:text-red-400 font-medium flex-1">Remove this meeting permanently?</span>
+                                                    <button onClick={() => confirmDeleteMeeting(selectedMeetingId!)} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors">Delete</button>
+                                                    <button onClick={() => setMeetingDeleteConfirm(null)} className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                                                </div>
+                                            )}
+                                            <div className="flex gap-3">
+                                                {selectedMeetingId !== 'new' && !isMeetingPassed(meetingForm.date!) && (
+                                                    <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId!)} className="p-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 transition-colors"><Trash2 size={18}/></button>
+                                                )}
+                                                {!isMeetingPassed(meetingForm.date || '') && (
+                                                    <button onClick={handleSaveMeetingForm} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"><Save size={18} /> Save Meeting</button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
@@ -828,7 +856,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 )}
                             </div>
                             <div className="lg:col-span-1 bg-slate-100 dark:bg-slate-800/40 rounded-3xl p-5 border dark:border-slate-700/50 flex flex-col shadow-inner overflow-hidden">
-                                <div className="flex justify-between items-center mb-6"><h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Chronological History</h3><button onClick={() => { setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {} }); setVenueOther(false); setSelectedMeetingId('new'); }} className="p-2 bg-pink-600 hover:bg-pink-700 text-white rounded-full transition-all"><Plus size={16} /></button></div>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Scheduled Meetings</h3>
+                                    <button onClick={() => { setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {} }); setVenueOther(false); setSelectedMeetingId('new'); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm">
+                                        <Plus size={13} /> Schedule
+                                    </button>
+                                </div>
                                 <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
                                     {sortedMeetings.map(m => {
                                         const passed = isMeetingPassed(m.date);
@@ -976,10 +1009,10 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                 </div>
 
                 <div className="p-5 border-t dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center transition-colors">
-                    <div className="text-[10px] font-bold text-amber-600 flex items-center gap-2"><AlertCircle size={14} /> Commit Changes to Portfolio before exiting.</div>
+                    <div className="text-[10px] font-bold text-amber-600 dark:text-amber-500 flex items-center gap-2"><AlertCircle size={14} /> Unsaved changes will be lost.</div>
                     <div className="flex gap-3">
-                        <button onClick={onClose} className="px-6 py-2 text-slate-500 font-bold text-sm uppercase">Cancel</button>
-                        <button onClick={handleSaveWithLogs} className="px-8 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 uppercase tracking-widest transition-all"><Save size={18} /> Save Portfolio</button>
+                        <button onClick={onClose} className="px-6 py-2.5 text-slate-600 dark:text-slate-300 font-bold text-sm border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Discard</button>
+                        <button onClick={handleSaveWithLogs} className="px-8 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 transition-all"><Save size={18} /> Save Changes</button>
                     </div>
                 </div>
             </div>
