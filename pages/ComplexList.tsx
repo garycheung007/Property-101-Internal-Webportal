@@ -413,7 +413,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     return (
         <div className="fixed top-0 right-0 bottom-0 left-64 z-50 flex">
             <div className="flex-1 bg-black/40 backdrop-blur-sm" />
-            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl h-full overflow-hidden flex flex-col shadow-2xl border-l dark:border-slate-800">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-6xl h-full overflow-hidden flex flex-col shadow-2xl border-l dark:border-slate-800">
                 <div className="p-5 border-b dark:border-slate-800 flex justify-between bg-slate-50 dark:bg-slate-950">
                     <div>
                         <h2 className="text-xl font-bold dark:text-white">{form.name}</h2>
@@ -704,8 +704,8 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     )}
 
                     {activeTab === 'meetings' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[500px]">
-                            <div className="lg:col-span-2">
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[500px]">
+                            <div className="lg:col-span-3">
                                 {selectedMeetingId ? (
                                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-xl space-y-6">
                                         <div className="flex justify-between items-center border-b dark:border-slate-800 pb-3">
@@ -715,7 +715,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             </div>
                                             <button onClick={() => { setSelectedMeetingId(null); setMeetingForm({}); setMeetingDeleteConfirm(null); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <fieldset className="space-y-4" disabled={meetingForm.date ? isMeetingPassed(meetingForm.date) : false}>
                                                 <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
                                                 <div className="grid grid-cols-2 gap-4">
@@ -777,60 +777,59 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                     })}
                                                 </div>
                                             </div>
-                                        </div>
-                                        {meetingForm.date && meetingForm.type !== 'Committee' && (() => {
-                                            const dates = computeMeetingDates(meetingForm.date);
-                                            const today = new Date(); today.setHours(0,0,0,0);
-                                            const isPast = (d: string) => new Date(d) < today;
-                                            const fmt = (d: string) => new Date(d).toLocaleDateString('en-NZ');
-                                            return (
-                                                <div className="bg-slate-50 dark:bg-slate-950/50 rounded-2xl border dark:border-slate-800 overflow-hidden">
-                                                    <div className="px-5 py-3 border-b dark:border-slate-800 flex items-center gap-2 bg-white dark:bg-slate-900">
-                                                        <Calendar size={14} className="text-pink-600" />
-                                                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Key Dates Summary</h4>
-                                                    </div>
-                                                    <table className="w-full text-xs">
-                                                        <thead>
-                                                            <tr className="text-[10px] uppercase tracking-widest text-slate-400 border-b dark:border-slate-800 bg-white dark:bg-slate-900">
-                                                                <th className="px-5 py-2 text-left font-semibold">Document</th>
-                                                                <th className="px-5 py-2 text-center font-semibold">Preferred Date</th>
-                                                                <th className="px-5 py-2 text-center font-semibold">Statutory Deadline</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y dark:divide-slate-800">
-                                                            {([
-                                                                { label: 'Notice of Intention (NOI)', pref: dates.noiPref, statutory: dates.noiDead },
-                                                                { label: 'Notice of Meeting (NOM)', pref: dates.nomPref, statutory: dates.nomDead },
-                                                            ] as const).map(row => (
-                                                                <tr key={row.label} className="hover:bg-white dark:hover:bg-slate-900/50 transition-colors">
-                                                                    <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{row.label}</td>
-                                                                    <td className={`px-5 py-3 text-center font-mono font-bold ${isPast(row.pref) ? 'text-red-500' : 'text-slate-600 dark:text-slate-300'}`}>{fmt(row.pref)}</td>
-                                                                    <td className={`px-5 py-3 text-center font-mono font-bold ${isPast(row.statutory) ? 'text-red-500' : 'text-amber-600 dark:text-amber-400'}`}>{fmt(row.statutory)}</td>
-                                                                </tr>
-                                                            ))}
-                                                            <tr className="hover:bg-white dark:hover:bg-slate-900/50 transition-colors">
-                                                                <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">
-                                                                    <div>NOI Response Due</div>
-                                                                    <div className="text-[9px] text-slate-400 font-normal mt-0.5">Editable</div>
-                                                                </td>
-                                                                <td className="px-5 py-3 text-center" colSpan={2}>
-                                                                    <input
-                                                                        type="date"
-                                                                        className={`border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono ${meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate) ? 'text-red-500 border-red-300' : 'dark:text-white'}`}
-                                                                        value={meetingForm.noiResponseDueDate || ''}
-                                                                        onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})}
-                                                                    />
-                                                                </td>
-                                                            </tr>
-                                                            <tr className="bg-pink-50/50 dark:bg-pink-900/10">
-                                                                <td className="px-5 py-3 font-bold text-pink-700 dark:text-pink-400">Meeting Date</td>
-                                                                <td className="px-5 py-3 text-center font-mono font-bold text-pink-700 dark:text-pink-400" colSpan={2}>{fmt(meetingForm.date)}</td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center gap-2 border-b dark:border-slate-800 pb-2">
+                                                    <Calendar size={16} className="text-pink-600" />
+                                                    <h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Key Dates</h3>
                                                 </div>
-                                            );
-                                        })()}
+                                                {meetingForm.date && meetingForm.type !== 'Committee' ? (() => {
+                                                    const dates = computeMeetingDates(meetingForm.date);
+                                                    const today = new Date(); today.setHours(0,0,0,0);
+                                                    const isPast = (d: string) => new Date(d) < today;
+                                                    const fmt = (d: string) => new Date(d).toLocaleDateString('en-NZ');
+                                                    return (
+                                                        <div className="space-y-2">
+                                                            {([
+                                                                { label: 'NOI', pref: dates.noiPref, statutory: dates.noiDead },
+                                                                { label: 'NOM', pref: dates.nomPref, statutory: dates.nomDead },
+                                                            ] as const).map(row => (
+                                                                <div key={row.label} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border dark:border-slate-700">
+                                                                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">{row.label}</div>
+                                                                    <div className="space-y-1.5">
+                                                                        <div className="flex justify-between items-center text-xs">
+                                                                            <span className="text-slate-500">Preferred</span>
+                                                                            <span className={`font-mono font-bold ${isPast(row.pref) ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>{fmt(row.pref)}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between items-center text-xs">
+                                                                            <span className="text-slate-500">Statutory</span>
+                                                                            <span className={`font-mono font-bold ${isPast(row.statutory) ? 'text-red-500' : 'text-amber-600 dark:text-amber-400'}`}>{fmt(row.statutory)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border dark:border-slate-700">
+                                                                <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">NOI Response Due <span className="text-pink-500 font-normal normal-case">(editable)</span></div>
+                                                                <input
+                                                                    type="date"
+                                                                    className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono ${meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate) ? 'text-red-500 border-red-300' : 'dark:text-white'}`}
+                                                                    value={meetingForm.noiResponseDueDate || ''}
+                                                                    onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})}
+                                                                />
+                                                            </div>
+                                                            <div className="p-3 bg-pink-50 dark:bg-pink-900/10 rounded-xl border border-pink-200 dark:border-pink-900/30">
+                                                                <div className="text-[9px] font-bold uppercase tracking-widest text-pink-400 mb-1">Meeting Date</div>
+                                                                <div className="text-sm font-mono font-bold text-pink-700 dark:text-pink-400">{fmt(meetingForm.date)}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })() : (
+                                                    <div className="flex flex-col items-center justify-center h-32 text-center">
+                                                        <Calendar size={28} className="text-slate-200 dark:text-slate-700 mb-2" />
+                                                        <p className="text-[10px] text-slate-400">Set a meeting date to see key deadlines</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                         <div className="pt-4 border-t dark:border-slate-800">
                                             {meetingDeleteConfirm === selectedMeetingId && (
                                                 <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/30 mb-3">
