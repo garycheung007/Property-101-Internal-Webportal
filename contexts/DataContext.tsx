@@ -8,7 +8,7 @@ import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import {
   BodyCorporate, Reminder, User, Meeting, UserRole,
-  Contractor, ActionComment, SystemSettings
+  Contractor, ActionComment, SystemSettings, SnoozedAlert
 } from '../types';
 import {
   DEFAULT_CATEGORIES, DEFAULT_INSURANCE_SETTINGS,
@@ -44,6 +44,9 @@ interface DataContextType {
   addContractors: (contractors: Contractor[]) => Promise<void>;
   updateContractor: (contractor: Contractor) => Promise<void>;
   deleteContractor: (id: string) => Promise<void>;
+  snoozedAlerts: SnoozedAlert[];
+  snoozeAlert: (reminderId: string, bcId: string, days: number, reason: string, user: User) => Promise<void>;
+  unsnoozeAlert: (reminderId: string) => Promise<void>;
   addActionComment: (reminderId: string, bcId: string, text: string, user: User) => Promise<void>;
   removeActionComment: (commentId: string) => Promise<void>;
   updateSystemSettings: (settings: SystemSettings) => Promise<void>;
@@ -133,6 +136,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [users, setUsers] = useState<User[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [actionComments, setActionComments] = useState<ActionComment[]>([]);
+  const [snoozedAlerts, setSnoozedAlerts] = useState<SnoozedAlert[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [loading, setLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -160,7 +164,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const unsubUsers       = onSnapshot(collection(db, 'users'),       s => setUsers(s.docs.map(d => ({ id: d.id, ...d.data() } as User))));
     const unsubContractors = onSnapshot(collection(db, 'contractors'),  s => setContractors(s.docs.map(d => ({ id: d.id, ...d.data() } as Contractor))));
-    const unsubComments    = onSnapshot(collection(db, 'comments'),     s => setActionComments(s.docs.map(d => ({ id: d.id, ...d.data() } as ActionComment))));
+    const unsubComments    = onSnapshot(collection(db, 'comments'),       s => setActionComments(s.docs.map(d => ({ id: d.id, ...d.data() } as ActionComment))));
+    const unsubSnoozed     = onSnapshot(collection(db, 'snoozed_alerts'), s => setSnoozedAlerts(s.docs.map(d => ({ id: d.id, ...d.data() } as SnoozedAlert))));
 
     const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), docSnap => {
       if (docSnap.exists()) {
@@ -177,7 +182,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    return () => { unsubComplexes(); unsubMeetings(); unsubUsers(); unsubContractors(); unsubComments(); unsubSettings(); };
+    return () => { unsubComplexes(); unsubMeetings(); unsubUsers(); unsubContractors(); unsubComments(); unsubSnoozed(); unsubSettings(); };
   }, [isAuthenticated]);
 
   const reminders = useMemo(() => (
@@ -232,6 +237,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
   const removeActionComment = async (commentId: string) =>
     setDoc(doc(db, 'comments', commentId), { isDeleted: true }, { merge: true });
+  const snoozeAlert = async (reminderId: string, bcId: string, days: number, reason: string, snoozeUser: User): Promise<void> => {
+    const until = new Date();
+    until.setDate(until.getDate() + days);
+    const snoozedUntil = until.toISOString().split('T')[0];
+    const snoozeDocId = `snooze_${reminderId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    await setDoc(doc(db, 'snoozed_alerts', snoozeDocId), cleanData({ reminderId, bcId, snoozedUntil, reason, snoozedByUserId: snoozeUser.id, snoozedByUserName: snoozeUser.name, snoozedAt: new Date().toISOString() }));
+    await addDoc(collection(db, 'comments'), cleanData({ reminderId, bcId, userId: snoozeUser.id, userName: snoozeUser.name, text: `Snoozed ${days} day${days !== 1 ? 's' : ''} — ${reason} (alert returns ${until.toLocaleDateString('en-NZ')})`, timestamp: new Date().toISOString(), isDeleted: false }));
+  };
+  const unsnoozeAlert = async (reminderId: string): Promise<void> => {
+    const snoozeDocId = `snooze_${reminderId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    await deleteDoc(doc(db, 'snoozed_alerts', snoozeDocId));
+  };
   const updateSystemSettings = async (settings: SystemSettings) =>
     setDoc(doc(db, 'settings', 'global'), cleanData(settings), { merge: true });
 
@@ -268,11 +285,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      complexes, reminders, managers, users, contractors, actionComments, systemSettings, loading, syncError,
+      complexes, reminders, managers, users, contractors, actionComments, snoozedAlerts, systemSettings, loading, syncError,
       addComplex, addComplexes, updateComplex, toggleArchiveComplex, getComplex, assignManagerToComplex,
       addUser, updateUser, deleteUser, updateUserRole, addMeeting, updateMeeting, deleteMeeting,
       addContractor, addContractors, updateContractor, deleteContractor,
-      addActionComment, removeActionComment, updateSystemSettings, restoreData, initializeDummyData
+      addActionComment, removeActionComment, snoozeAlert, unsnoozeAlert, updateSystemSettings, restoreData, initializeDummyData
     }}>{children}</DataContext.Provider>
   );
 };

@@ -9,9 +9,11 @@ import { ReminderType } from '../types';
 
 const Sidebar: React.FC = () => {
   const { logout, user, isAuthenticated } = useAuth();
-  const { loading, syncError, reminders } = useData();
+  const { loading, syncError, reminders, snoozedAlerts } = useData();
   const { theme, toggleTheme } = useTheme();
-  const criticalCount = reminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION).length;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const snoozedIds = new Set(snoozedAlerts.filter(s => new Date(s.snoozedUntil) >= now).map(s => s.reminderId));
+  const criticalCount = reminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && !snoozedIds.has(r.id)).length;
   const location = useLocation();
 
   const getNavClass = (path: string) => {

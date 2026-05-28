@@ -3,11 +3,11 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, BellOff } from 'lucide-react';
 import { Reminder, ReminderType } from '../types';
 
 const Dashboard: React.FC = () => {
-  const { complexes, reminders, actionComments, addActionComment, removeActionComment, managers, updateComplex, updateMeeting } = useData();
+  const { complexes, reminders, actionComments, addActionComment, removeActionComment, snoozedAlerts, snoozeAlert, unsnoozeAlert, managers, updateComplex, updateMeeting } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const upcomingActionsRef = useRef<HTMLDivElement>(null);
@@ -16,6 +16,8 @@ const Dashboard: React.FC = () => {
 
   const [selectedManager, setSelectedManager] = useState<string>('all');
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
+  const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
+  const [showSnoozed, setShowSnoozed] = useState(false);
 
   useEffect(() => {
     if (!hasInitializedFilter.current && complexes.length > 0 && user) {
@@ -37,7 +39,12 @@ const Dashboard: React.FC = () => {
       return complex?.managerName === selectedManager;
   });
 
-  const criticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const activeSnoozedIds = new Set(
+    snoozedAlerts.filter(s => new Date(s.snoozedUntil) >= today).map(s => s.reminderId)
+  );
+  const criticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && !activeSnoozedIds.has(r.id));
+  const snoozedCriticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && activeSnoozedIds.has(r.id));
   const upcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION);
 
   const upcomingMeetings = filteredComplexes
@@ -302,19 +309,69 @@ const Dashboard: React.FC = () => {
                             <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
                         </p>
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{rem.message}</p>
-                        <div className="mt-3 flex justify-between items-center">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Click to Resolve</span>
-                             <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedReminder(rem); }}
-                                className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:text-pink-600 hover:border-pink-200 dark:hover:border-pink-900/50 transition-colors"
-                            >
-                                <MessageCircle size={13} /> Audit Trail
-                            </button>
+                        <div className="mt-3 flex justify-between items-center gap-2">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter shrink-0">Click to Resolve</span>
+                            <div className="flex gap-1.5">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setSnoozeTarget(rem); }}
+                                    className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                                >
+                                    <BellOff size={13} /> Snooze
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setSelectedReminder(rem); }}
+                                    className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:text-pink-600 hover:border-pink-200 dark:hover:border-pink-900/50 transition-colors"
+                                >
+                                    <MessageCircle size={13} /> Audit Trail
+                                </button>
+                            </div>
                         </div>
                     </div>
                 ))
             )}
           </div>
+
+          {snoozedCriticalAlerts.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setShowSnoozed(!showSnoozed)}
+                className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors py-1"
+              >
+                <span className="flex items-center gap-1.5">
+                  <BellOff size={12} />
+                  {snoozedCriticalAlerts.length} snoozed alert{snoozedCriticalAlerts.length !== 1 ? 's' : ''}
+                </span>
+                <span className="text-[10px]">{showSnoozed ? 'Hide' : 'Show'}</span>
+              </button>
+              {showSnoozed && (
+                <div className="mt-2 space-y-2">
+                  {snoozedCriticalAlerts.map(rem => {
+                    const snooze = snoozedAlerts.find(s => s.reminderId === rem.id);
+                    return (
+                      <div key={rem.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{rem.bcName}</p>
+                            {snooze && (
+                              <p className="text-[10px] text-amber-500 mt-0.5 flex items-center gap-1">
+                                <BellOff size={9} /> Wakes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ')}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => unsnoozeAlert(rem.id)}
+                            className="text-[10px] px-2 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900/50 transition-colors shrink-0"
+                          >
+                            Unsnooze
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Upcoming Meetings Section (Maintains chronological schedule) */}
@@ -400,13 +457,22 @@ const Dashboard: React.FC = () => {
 
       {/* Comment Modal */}
       {selectedReminder && (
-          <CommentModal 
+          <CommentModal
             reminder={selectedReminder}
             comments={actionComments.filter(c => c.reminderId === selectedReminder.id)}
             onClose={() => setSelectedReminder(null)}
             onAddComment={(id, text, u) => addActionComment(id, selectedReminder.bcId, text, u)}
             onDeleteComment={removeActionComment}
             currentUser={user}
+          />
+      )}
+      {snoozeTarget && (
+          <SnoozeModal
+            reminder={snoozeTarget}
+            onClose={() => setSnoozeTarget(null)}
+            onSnooze={(remId, bcId, days, reason) => {
+              if (user) snoozeAlert(remId, bcId, days, reason, user);
+            }}
           />
       )}
     </div>
@@ -518,5 +584,101 @@ const CommentModal: React.FC<{
         </div>
     )
 }
+
+const SnoozeModal: React.FC<{
+    reminder: Reminder;
+    onClose: () => void;
+    onSnooze: (reminderId: string, bcId: string, days: number, reason: string) => void;
+}> = ({ reminder, onClose, onSnooze }) => {
+    const [days, setDays] = useState(3);
+    const [reason, setReason] = useState('');
+
+    const previewDate = new Date();
+    previewDate.setDate(previewDate.getDate() + days);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!reason.trim()) return;
+        onSnooze(reminder.id, reminder.bcId, days, reason.trim());
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-sm shadow-2xl overflow-hidden border dark:border-slate-800 transition-colors">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900 transition-colors">
+                    <div>
+                        <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                            <BellOff size={16} className="text-amber-500" /> Snooze Alert
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{reminder.bcName}</p>
+                    </div>
+                    <button onClick={onClose}><X size={20} className="text-slate-400 hover:text-slate-600" /></button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-4 space-y-4">
+                    <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30 text-xs text-amber-800 dark:text-amber-300 line-clamp-3">
+                        {reminder.message}
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest block mb-2">
+                            Snooze for
+                        </label>
+                        <div className="grid grid-cols-7 gap-1">
+                            {[1, 2, 3, 4, 5, 6, 7].map(d => (
+                                <button
+                                    key={d}
+                                    type="button"
+                                    onClick={() => setDays(d)}
+                                    className={`py-2 rounded-lg text-sm font-bold transition-colors ${
+                                        days === d
+                                            ? 'bg-amber-500 text-white'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                                    }`}
+                                >
+                                    {d}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-2">
+                            day{days !== 1 ? 's' : ''} — alert returns <span className="font-bold text-amber-600 dark:text-amber-400">{previewDate.toLocaleDateString('en-NZ')}</span>
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest block mb-2">
+                            Reason <span className="text-red-400 font-normal normal-case">(required)</span>
+                        </label>
+                        <textarea
+                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-3 text-sm resize-none outline-none focus:ring-1 focus:ring-amber-500 min-h-[80px]"
+                            placeholder="Why is this being snoozed?"
+                            value={reason}
+                            onChange={e => setReason(e.target.value)}
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={!reason.trim()}
+                            className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                        >
+                            <BellOff size={14} /> Snooze
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
 
 export default Dashboard;

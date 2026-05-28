@@ -253,10 +253,21 @@ export interface TemplateFileRecord {
 export interface ActionComment {
     id: string;
     reminderId: string;
-    bcId: string; 
+    bcId: string;
     userId: string;
     userName: string;
     text: string;
     timestamp: string;
     isDeleted: boolean;
+}
+
+export interface SnoozedAlert {
+  id: string;
+  reminderId: string;
+  bcId: string;
+  snoozedUntil: string;
+  reason: string;
+  snoozedByUserId: string;
+  snoozedByUserName: string;
+  snoozedAt: string;
 }
