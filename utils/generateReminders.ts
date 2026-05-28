@@ -13,8 +13,12 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
       const insDate = new Date(bc.insuranceExpiry);
       const diffDays = Math.ceil((insDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
+      const hasCompletedAnyStep = workflowSteps.some(s => s.id && progress[s.id]?.completed);
+
       if (diffDays < 0) {
-        reminders.push({ id: `ins-exp-${bc.id}`, bcId: bc.id, bcName: bc.name, type: ReminderType.INSURANCE, dueDate: bc.insuranceExpiry, message: `EXPIRED: Insurance on ${bc.insuranceExpiry}`, severity: 'high' });
+        if (!hasCompletedAnyStep) {
+          reminders.push({ id: `ins-exp-${bc.id}`, bcId: bc.id, bcName: bc.name, type: ReminderType.INSURANCE, dueDate: bc.insuranceExpiry, message: `EXPIRED: Insurance on ${bc.insuranceExpiry}`, severity: 'high' });
+        }
       } else if (diffDays <= 90) {
         reminders.push({ id: `ins-${bc.id}`, bcId: bc.id, bcName: bc.name, type: ReminderType.INSURANCE, dueDate: bc.insuranceExpiry, message: `Insurance due in ${diffDays} days.`, severity: diffDays < 30 ? 'high' : 'medium' });
       }
@@ -35,7 +39,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
           const daysUntilTrigger = Math.ceil((triggerDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
           reminders.push({
             id: `wf-${step.id || Math.random()}-${bc.id}`, bcId: bc.id, bcName: bc.name,
-            type: step.isValuationCheck ? ReminderType.INSURANCE_VALUATION : ReminderType.UPCOMING_ACTION,
+            type: step.isValuationCheck ? ReminderType.INSURANCE_VALUATION : step.type === 'after' ? ReminderType.INSURANCE : ReminderType.UPCOMING_ACTION,
             dueDate: triggerDate.toISOString().split('T')[0],
             message: `INSURANCE: ${step.label}`,
             severity: daysUntilTrigger < 0 ? 'high' : 'medium'
