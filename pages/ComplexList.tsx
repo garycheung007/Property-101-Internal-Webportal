@@ -441,6 +441,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
                 <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30 dark:bg-slate-950/30 transition-colors relative">
                     {activeTab === 'details' && (
+                        <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
@@ -590,6 +591,18 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-3">
+                            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
+                                <MessageSquareMore size={16} className="text-pink-600" /> Notes
+                            </h3>
+                            <textarea
+                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-1 focus:ring-pink-500 min-h-[120px]"
+                                placeholder="Add internal notes for this complex..."
+                                value={form.notes || ''}
+                                onChange={e => setForm({...form, notes: e.target.value})}
+                            />
+                        </div>
                         </div>
                     )}
 

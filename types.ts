@@ -171,6 +171,8 @@ export interface BodyCorporate {
   lastFinancialStatementBalance?: string;
   ltmpLastRenewalDate?: string;
   ltmpNextRenewalDate?: string;
+
+  notes?: string;
 }
 
 export type UserRole = 'admin' | 'account_manager' | 'support';
