@@ -414,6 +414,7 @@ const AdminPanel: React.FC = () => {
                                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-full md:w-auto">
                                     <button onClick={() => setTemplateSubTab('bc')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'bc' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Body Corporate</button>
                                     <button onClick={() => setTemplateSubTab('isoc')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'isoc' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Inc Society</button>
+                                    <button onClick={() => setTemplateSubTab('disclosure')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'disclosure' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Disclosure & CPL</button>
                                 </div>
                             </div>
 
@@ -431,6 +432,14 @@ const AdminPanel: React.FC = () => {
                                     {renderDocxCard('noiCoverLetterIsoc', 'NOI Cover Letter')}
                                     {renderDocxCard('responseFormIsoc', 'Response Form')}
                                     {renderDocxCard('debtCollectionFlowchartIsoc', 'Debt Collection Flowchart')}
+                                </div>
+                            )}
+
+                            {templateSubTab === 'disclosure' && (
+                                <div className="space-y-2 animate-in fade-in duration-300">
+                                    {renderDocxCard('s146', 'S146 Disclosure')}
+                                    {renderDocxCard('s147', 'S147 Disclosure')}
+                                    {renderDocxCard('cpl', 'CPL Template')}
                                 </div>
                             )}
                         </div>
