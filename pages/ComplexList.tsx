@@ -1039,12 +1039,27 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 <select
                                     className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500"
                                     value={form.waterRateDescription || (systemSettings.waterRateOptions?.[0] ?? '')}
-                                    onChange={e => setForm(f => ({ ...f, waterRateDescription: e.target.value }))}
+                                    onChange={e => setForm(f => ({ ...f, waterRateDescription: e.target.value, waterRateContractorId: '' }))}
                                 >
                                     {(systemSettings.waterRateOptions ?? ['Water rate not included in levy — unit has its own meter']).map((opt, i) => (
                                         <option key={i} value={opt}>{opt}</option>
                                     ))}
                                 </select>
+                                {(form.waterRateDescription || '').toLowerCase().includes('third party') && (
+                                    <div className="mt-3">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Third Party Provider</label>
+                                        <select
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500"
+                                            value={form.waterRateContractorId || ''}
+                                            onChange={e => setForm(f => ({ ...f, waterRateContractorId: e.target.value }))}
+                                        >
+                                            <option value="">— Select contractor —</option>
+                                            {contractors.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Closing Paragraph selector */}

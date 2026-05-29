@@ -93,6 +93,7 @@ const DisclosureGenerator: React.FC = () => {
         '{{ltmp_last_renewal}}': selectedComplex.ltmpLastRenewalDate || '[Date]',
         '{{ltmp_next_renewal}}': selectedComplex.ltmpNextRenewalDate || '[Date]',
         '{{water_rate}}': selectedComplex.waterRateDescription || '[Rate Details]',
+        '{{water_rate_provider}}': contractors.find(c => c.id === selectedComplex.waterRateContractorId)?.name || '',
         '{{gst_text}}': selectedComplex.isGstRegistered ? 'inclusive of GST' : ''
     };
 

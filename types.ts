@@ -162,7 +162,8 @@ export interface BodyCorporate {
   anyOtherSignificantDefectsDetails?: string;
   involvedInProceedings?: boolean;
   proceedingsInCourt?: string;
-  waterRateDescription?: string; 
+  waterRateDescription?: string;
+  waterRateContractorId?: string;
   operatingFundBalance?: string;
   reserveFundBalance?: string;
   remedialWorkDone?: boolean;
