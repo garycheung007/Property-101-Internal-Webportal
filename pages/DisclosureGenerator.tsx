@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
-import { FileSignature, Download, Loader2, Info, FileText, Phone, Mail, AtSign, ShieldCheck, FileType, FileInput, AlertCircle, Edit3, Settings2, Image as ImageIcon } from 'lucide-react';
+import { FileSignature, Download, Loader2, FileText, ShieldCheck, Edit3 } from 'lucide-react';
 import { BodyCorporate, Contractor, User as SystemUser } from '../types';
 
 const DisclosureGenerator: React.FC = () => {
@@ -12,9 +12,7 @@ const DisclosureGenerator: React.FC = () => {
   const [unitNumber, setUnitNumber] = useState<string>('');
   const [unitLevy, setUnitLevy] = useState<string>('');
   const [ownerName, setOwnerName] = useState<string>('');
-  
-  // Dynamic manual inputs for tags found in template but not in automated data
-  const [manualData, setManualData] = useState<Record<string, string>>({});
+  const [ownerAddress, setOwnerAddress] = useState<string>('');
   
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -23,41 +21,13 @@ const DisclosureGenerator: React.FC = () => {
   const broker = contractors.find(c => c.name === selectedComplex?.insuranceBroker);
   const manager = managers.find(m => m.name === selectedComplex?.managerName);
 
-  // Synchronize manual data defaults when selected complex changes
+  // Reset per-transaction fields when complex changes
   useEffect(() => {
-    if (selectedComplex) {
-      setManualData(prev => ({
-        ...prev,
-        '{{any_other_significant_defects}}': selectedComplex.anyOtherSignificantDefects ? 'Yes' : 'No',
-        '{{proceedings_in_court}}': selectedComplex.involvedInProceedings ? 'Yes' : 'No',
-        '{{ltmp_last_renewal}}': selectedComplex.ltmpLastRenewalDate || '',
-        '{{ltmp_next_renewal}}': selectedComplex.ltmpNextRenewalDate || '',
-        '{{water_rate}}': selectedComplex.waterRateDescription || '',
-        '{{last_financial_statement}}': selectedComplex.lastFinancialStatementBalance || '',
-        '{{operating_fund_balance}}': selectedComplex.operatingFundBalance || '',
-        '{{reserve_fund_balance}}': selectedComplex.reserveFundBalance || '',
-      }));
-    }
+    setUnitNumber('');
+    setUnitLevy('');
+    setOwnerName('');
+    setOwnerAddress('');
   }, [selectedBcId]);
-
-  // Define "System Tags" that the app knows how to fill automatically
-  const SYSTEM_TAGS = [
-    '{{bc_name}}', '{{bc_number}}', '{{address}}', '{{current_date}}', 
-    '{{unit_number}}', '{{unit_levy}}', '{{owner_name}}', '{{fy_start}}', 
-    '{{fy_end}}', '{{insurance_noting}}', '{{insurance_underwriter}}', 
-    '{{insurance_expiry}}', '{{remediation_text}}', '{{manager_name}}', 
-    '{{manager_title}}', '{{manager_signature}}', '{{weathertightness_claim}}', 
-    '{{weathertightness_remediated}}', '{{weathertightness_not_remediated}}', 
-    '{{earthquake_prone}}'
-  ];
-
-  // Discover dynamic tags in the current template
-  const dynamicTags = useMemo(() => {
-    const template = systemSettings.documentTemplates?.[docType] || '';
-    const foundTags = template.match(/\{\{[a-zA-Z0-9_]+\}\}/g) || [];
-    // Filter out system tags and de-duplicate
-    return Array.from(new Set(foundTags.filter(t => !SYSTEM_TAGS.includes(t))));
-  }, [systemSettings.documentTemplates, docType]);
 
   // Handle data mapping for the high-fidelity template
   const replaceMergeTags = (template: string) => {
@@ -93,7 +63,6 @@ const DisclosureGenerator: React.FC = () => {
         return details ? `Yes - ${details}` : 'Yes';
     };
 
-    // Priority 1: Manual Generator Input, Priority 2: Database, Priority 3: Default Placeholder
     const tags: Record<string, string> = {
         '{{bc_name}}': selectedComplex.name,
         '{{bc_number}}': selectedComplex.bcNumber,
@@ -102,7 +71,7 @@ const DisclosureGenerator: React.FC = () => {
         '{{unit_number}}': unitNumber || '[Unit]',
         '{{unit_levy}}': unitLevy || '[Levy Amount]',
         '{{owner_name}}': ownerName || '[Owner Name]',
-        '{{owners_address}}': manualData['{{owners_address}}'] || '[Owner Address]',
+        '{{owners_address}}': ownerAddress || '[Owner Address]',
         '{{fy_start}}': selectedComplex.financialYearStart || '1 April',
         '{{fy_end}}': selectedComplex.financialYearEnd || '31 March',
         '{{insurance_noting}}': getInsuranceNoting(broker),
@@ -112,30 +81,19 @@ const DisclosureGenerator: React.FC = () => {
         '{{manager_name}}': manager?.name || selectedComplex.managerName,
         '{{manager_title}}': manager?.title || 'Body Corporate Manager',
         '{{manager_signature}}': sigHtml,
-        
-        // Statutory Boolean Fields (UTA Section 146) with Intelligent Narrative Builder
         '{{weathertightness_claim}}': formatStatutory(selectedComplex.weathertightnessClaimMade, selectedComplex.weathertightnessClaimDetails),
         '{{weathertightness_remediated}}': formatStatutory(selectedComplex.weathertightnessRemediatedWithoutClaim, selectedComplex.weathertightnessRemediatedDetails),
         '{{weathertightness_not_remediated}}': formatStatutory(selectedComplex.weathertightnessNotRemediated, selectedComplex.weathertightnessNotRemediatedDetails),
         '{{earthquake_prone}}': formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails),
         '{{any_other_significant_defects}}': formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails),
         '{{proceedings_in_court}}': formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt),
-        
-        // Data Fields
-        '{{last_financial_statement}}': manualData['{{last_financial_statement}}'] || selectedComplex.lastFinancialStatementBalance || '[Balance Date]',
-        '{{operating_fund_balance}}': manualData['{{operating_fund_balance}}'] || selectedComplex.operatingFundBalance || '[Amount]',
-        '{{reserve_fund_balance}}': manualData['{{reserve_fund_balance}}'] || selectedComplex.reserveFundBalance || '[Amount]',
-        '{{ltmp_last_renewal}}': manualData['{{ltmp_last_renewal}}'] || selectedComplex.ltmpLastRenewalDate || '[Date]',
-        '{{ltmp_next_renewal}}': manualData['{{ltmp_next_renewal}}'] || selectedComplex.ltmpNextRenewalDate || '[Date]',
-        '{{water_rate}}': manualData['{{water_rate}}'] || selectedComplex.waterRateDescription || '[Rate Details]'
+        '{{last_financial_statement}}': selectedComplex.lastFinancialStatementBalance || '[Balance Date]',
+        '{{operating_fund_balance}}': selectedComplex.operatingFundBalance || '[Amount]',
+        '{{reserve_fund_balance}}': selectedComplex.reserveFundBalance || '[Amount]',
+        '{{ltmp_last_renewal}}': selectedComplex.ltmpLastRenewalDate || '[Date]',
+        '{{ltmp_next_renewal}}': selectedComplex.ltmpNextRenewalDate || '[Date]',
+        '{{water_rate}}': selectedComplex.waterRateDescription || '[Rate Details]'
     };
-
-    // Merge any other dynamic tags found
-    dynamicTags.forEach(tag => {
-      if (!tags[tag]) {
-        tags[tag] = manualData[tag] || `[${tag.replace('{{', '').replace('}}', '').replace(/_/g, ' ')}]`;
-      }
-    });
 
     let result = template;
     Object.entries(tags).forEach(([tag, value]) => {
@@ -228,7 +186,7 @@ const DisclosureGenerator: React.FC = () => {
     const template = systemSettings.documentTemplates?.[docType] || '';
     const content = replaceMergeTags(template);
     return generateFullHtml(content, false);
-  }, [selectedComplex, docType, unitNumber, unitLevy, ownerName, manualData, systemSettings]);
+  }, [selectedComplex, docType, unitNumber, unitLevy, ownerName, ownerAddress, systemSettings]);
 
   const downloadDoc = () => {
     const template = systemSettings.documentTemplates?.[docType] || '';
@@ -287,38 +245,17 @@ const DisclosureGenerator: React.FC = () => {
                     </select>
                 </div>
 
-                <div className="space-y-4 pt-4 border-t dark:border-slate-800">
+                <div className="space-y-3 pt-4 border-t dark:border-slate-800">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Edit3 size={14} className="text-pink-600" /> 3. Basic Unit Info
+                      <Edit3 size={14} className="text-pink-600" /> 3. Unit Info
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                         <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Unit / PU</label><input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 5A" value={unitNumber} onChange={e => setUnitNumber(e.target.value)}/></div>
-                        <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Annual Levy</label><input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 4500" value={unitLevy} onChange={e => setUnitLevy(e.target.value)}/></div>
+                        <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Annual Levy ($)</label><input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 4500" value={unitLevy} onChange={e => setUnitLevy(e.target.value)}/></div>
                     </div>
                     <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Current Owner(s)</label><input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. John Doe" value={ownerName} onChange={e => setOwnerName(e.target.value)}/></div>
+                    <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Owner's Address</label><textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. 12 Example St, Auckland 1010" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)}/></div>
                 </div>
-
-                {dynamicTags.length > 0 && (
-                  <div className="space-y-4 pt-4 border-t dark:border-slate-800 animate-in fade-in duration-300">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Settings2 size={14} className="text-blue-600" /> 4. Additional Info Required
-                    </label>
-                    <div className="space-y-3">
-                      {dynamicTags.map(tag => (
-                        <div key={tag}>
-                          <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">{tag.replace('{{', '').replace('}}', '').replace(/_/g, ' ')}</label>
-                          <input 
-                            type="text" 
-                            className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm focus:ring-1 focus:ring-blue-500" 
-                            placeholder="Enter value..."
-                            value={manualData[tag] || ''} 
-                            onChange={e => setManualData({...manualData, [tag]: e.target.value})}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <button onClick={handleGenerate} disabled={loading || !selectedBcId} className="w-full bg-slate-900 dark:bg-pink-700 hover:opacity-90 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg uppercase tracking-widest text-xs">
                     {loading ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
