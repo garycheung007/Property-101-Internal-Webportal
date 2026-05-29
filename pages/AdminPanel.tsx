@@ -9,7 +9,7 @@ import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
@@ -71,6 +71,9 @@ const AdminPanel: React.FC = () => {
     const [newVenueInput, setNewVenueInput] = useState('');
     const [localStandardParagraph, setLocalStandardParagraph] = useState(systemSettings.disclosureStandardParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing.');
     const [localRemediationParagraph, setLocalRemediationParagraph] = useState(systemSettings.disclosureRemediationParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing. Especially with regard to item (1)(a) & disclosing information on the levies & remedial project as per updates provided to owners by the Body Corporate.');
+    const [localWaterRateOptions, setLocalWaterRateOptions] = useState<string[]>(
+        systemSettings.waterRateOptions ?? ['Water rate not included in levy — unit has its own meter']
+    );
 
     // Docx template management
     const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
@@ -83,6 +86,7 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.contractorCategories) setLocalCategories(systemSettings.contractorCategories);
         if (systemSettings.meetingChecklistTemplates) setLocalChecklists(systemSettings.meetingChecklistTemplates);
         if (systemSettings.meetingVenues) setLocalVenues(systemSettings.meetingVenues);
+        if (systemSettings.waterRateOptions) setLocalWaterRateOptions(systemSettings.waterRateOptions);
     }, [systemSettings]);
 
     useEffect(() => {
@@ -159,7 +163,8 @@ const AdminPanel: React.FC = () => {
             meetingChecklistTemplates: localChecklists,
             meetingVenues: localVenues,
             disclosureStandardParagraph: localStandardParagraph,
-            disclosureRemediationParagraph: localRemediationParagraph
+            disclosureRemediationParagraph: localRemediationParagraph,
+            waterRateOptions: localWaterRateOptions
         });
         alert("System settings updated successfully.");
     };
@@ -425,6 +430,44 @@ const AdminPanel: React.FC = () => {
                                             onChange={e => setLocalRemediationParagraph(e.target.value)}
                                         />
                                     </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
+                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <Droplets size={18} className="text-pink-600" /> Water Rate Options
+                                </h2>
+                                <p className="text-xs text-slate-400">Configure the water rate descriptions available for each complex. The first option is the default shown when no selection has been made.</p>
+                                <div className="space-y-2">
+                                    {localWaterRateOptions.map((opt, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 group">
+                                            <input
+                                                type="text"
+                                                className="flex-1 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm dark:text-white"
+                                                value={opt}
+                                                onChange={e => {
+                                                    const next = [...localWaterRateOptions];
+                                                    next[idx] = e.target.value;
+                                                    setLocalWaterRateOptions(next);
+                                                }}
+                                            />
+                                            {idx === 0 && <span className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">Default</span>}
+                                            {idx > 0 && (
+                                                <button
+                                                    onClick={() => setLocalWaterRateOptions(localWaterRateOptions.filter((_, i) => i !== idx))}
+                                                    className="p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button
+                                        onClick={() => setLocalWaterRateOptions([...localWaterRateOptions, ''])}
+                                        className="w-full flex items-center justify-center gap-2 p-2 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 hover:text-pink-600 hover:border-pink-300 transition-all text-sm font-bold uppercase"
+                                    >
+                                        <Plus size={16} /> Add Option
+                                    </button>
                                 </div>
                             </div>
 

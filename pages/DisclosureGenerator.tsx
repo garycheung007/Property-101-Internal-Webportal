@@ -92,7 +92,8 @@ const DisclosureGenerator: React.FC = () => {
         '{{reserve_fund_balance}}': selectedComplex.reserveFundBalance || '[Amount]',
         '{{ltmp_last_renewal}}': selectedComplex.ltmpLastRenewalDate || '[Date]',
         '{{ltmp_next_renewal}}': selectedComplex.ltmpNextRenewalDate || '[Date]',
-        '{{water_rate}}': selectedComplex.waterRateDescription || '[Rate Details]'
+        '{{water_rate}}': selectedComplex.waterRateDescription || '[Rate Details]',
+        '{{gst_text}}': selectedComplex.isGstRegistered ? 'inclusive of GST' : ''
     };
 
     let result = template;

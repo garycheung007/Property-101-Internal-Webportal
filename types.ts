@@ -205,6 +205,7 @@ export interface SystemSettings {
   meetingVenues?: string[];
   disclosureStandardParagraph?: string;
   disclosureRemediationParagraph?: string;
+  waterRateOptions?: string[];
 }
 
 export type ContractorCategory = string;

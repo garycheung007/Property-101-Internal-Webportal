@@ -10,7 +10,7 @@ import {
     ToggleLeft, ArrowRightCircle, Check, AlertCircle, MapPinHouse,
     User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
-    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight
+    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets
 } from 'lucide-react';
 import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem } from '../types';
 
@@ -485,6 +485,15 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             ) : (
                                                 <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearEnd || 'N/A'}</p>
                                             )}
+                                        </div>
+                                    </div>
+                                    <div
+                                        className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 cursor-pointer select-none"
+                                        onClick={() => currentUser?.role === 'admin' && setForm(f => ({ ...f, isGstRegistered: !f.isGstRegistered }))}
+                                    >
+                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">GST Registered</span>
+                                        <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form.isGstRegistered ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form.isGstRegistered ? 'translate-x-6' : 'translate-x-0'}`}></div>
                                         </div>
                                     </div>
                                     <div>
@@ -1014,6 +1023,28 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     <Info size={16} className="text-blue-500 flex-shrink-0" />
                                     <span>These settings provide the default "Yes/No" values for your PCDS/Disclosure packages. Details entered here will be appended to the "Yes" response in generated documents.</span>
                                 </div>
+                            </div>
+
+                            {/* Water Rate */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
+                                <div className="flex items-center gap-3 mb-6 border-b dark:border-slate-800 pb-5">
+                                    <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
+                                        <Droplets size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg dark:text-white">Water Rate</h3>
+                                        <p className="text-xs text-slate-500">How water is charged for this complex. Used in the S146 disclosure.</p>
+                                    </div>
+                                </div>
+                                <select
+                                    className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500"
+                                    value={form.waterRateDescription || (systemSettings.waterRateOptions?.[0] ?? '')}
+                                    onChange={e => setForm(f => ({ ...f, waterRateDescription: e.target.value }))}
+                                >
+                                    {(systemSettings.waterRateOptions ?? ['Water rate not included in levy — unit has its own meter']).map((opt, i) => (
+                                        <option key={i} value={opt}>{opt}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Closing Paragraph selector */}
