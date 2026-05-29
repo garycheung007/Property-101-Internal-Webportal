@@ -203,6 +203,8 @@ export interface SystemSettings {
     COMPLETE: MeetingChecklistItem[];
   };
   meetingVenues?: string[];
+  disclosureStandardParagraph?: string;
+  disclosureRemediationParagraph?: string;
 }
 
 export type ContractorCategory = string;

@@ -9,7 +9,7 @@ import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
@@ -69,6 +69,8 @@ const AdminPanel: React.FC = () => {
     const [localChecklists, setLocalChecklists] = useState(systemSettings.meetingChecklistTemplates || { NOI: [], NOM: [], COMPLETE: [] });
     const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
     const [newVenueInput, setNewVenueInput] = useState('');
+    const [localStandardParagraph, setLocalStandardParagraph] = useState(systemSettings.disclosureStandardParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing.');
+    const [localRemediationParagraph, setLocalRemediationParagraph] = useState(systemSettings.disclosureRemediationParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing. Especially with regard to item (1)(a) & disclosing information on the levies & remedial project as per updates provided to owners by the Body Corporate.');
 
     // Docx template management
     const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
@@ -155,7 +157,9 @@ const AdminPanel: React.FC = () => {
             insuranceSettings: localInsurance,
             contractorCategories: localCategories,
             meetingChecklistTemplates: localChecklists,
-            meetingVenues: localVenues
+            meetingVenues: localVenues,
+            disclosureStandardParagraph: localStandardParagraph,
+            disclosureRemediationParagraph: localRemediationParagraph
         });
         alert("System settings updated successfully.");
     };
@@ -397,6 +401,33 @@ const AdminPanel: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
+                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <FileSignature size={18} className="text-pink-600" /> Disclosure Closing Paragraphs
+                                </h2>
+                                <p className="text-xs text-slate-400">These paragraphs appear at the end of the S146 cover letter. Select which one to use per-property in the complex's Disclosure tab.</p>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Standard (No Remediation)</label>
+                                        <textarea
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-pink-500"
+                                            rows={4}
+                                            value={localStandardParagraph}
+                                            onChange={e => setLocalStandardParagraph(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Remediation Works Applies</label>
+                                        <textarea
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-pink-500"
+                                            rows={4}
+                                            value={localRemediationParagraph}
+                                            onChange={e => setLocalRemediationParagraph(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-t dark:border-slate-800 py-4 flex justify-end gap-3 -mx-6 px-6 mt-6 rounded-b-xl">
                                 <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500 flex items-center gap-1.5 flex-1"><AlertCircle size={13} /> Remember to save your compliance configuration changes.</p>
                                 <button onClick={handleSaveSettings} className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"><Save size={16} /> Save Compliance Config</button>

@@ -1015,6 +1015,34 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     <span>These settings provide the default "Yes/No" values for your PCDS/Disclosure packages. Details entered here will be appended to the "Yes" response in generated documents.</span>
                                 </div>
                             </div>
+
+                            {/* Closing Paragraph selector */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
+                                <div className="flex items-center gap-3 mb-6 border-b dark:border-slate-800 pb-5">
+                                    <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
+                                        <FileSignature size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg dark:text-white">Closing Paragraph</h3>
+                                        <p className="text-xs text-slate-500">Selects which paragraph appears at the end of the S146 cover letter.</p>
+                                    </div>
+                                </div>
+                                <div
+                                    className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 hover:bg-white dark:hover:bg-slate-900 transition-all cursor-pointer mb-4"
+                                    onClick={() => setForm(f => ({ ...f, remedialWorkDone: !f.remedialWorkDone }))}
+                                >
+                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Has remediation works</span>
+                                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form.remedialWorkDone ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form.remedialWorkDone ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 leading-relaxed italic">
+                                    {form.remedialWorkDone
+                                        ? (systemSettings.disclosureRemediationParagraph || 'Remediation paragraph not configured. Set it in Admin Panel → Compliance/Settings.')
+                                        : (systemSettings.disclosureStandardParagraph || 'Standard paragraph not configured. Set it in Admin Panel → Compliance/Settings.')
+                                    }
+                                </div>
+                            </div>
                         </div>
                     )}
 
