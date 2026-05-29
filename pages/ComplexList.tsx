@@ -348,6 +348,14 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         setBwofRenewalPrompt({ show: true, pendingDate: newDate });
     };
 
+    const handleBwofRemove = async () => {
+        const oldExpiry = form.bwofExpiry;
+        if (currentUser) {
+            await addActionComment(`bwof-rem-${Date.now()}`, form.id, `BWOF expiry removed (was ${oldExpiry || 'N/A'}).`, currentUser);
+        }
+        setForm(f => ({ ...f, bwofExpiry: '' }));
+    };
+
     const confirmBwofRenewal = async () => {
         const oldExpiry = form.bwofExpiry;
         const newExpiry = bwofRenewalPrompt.pendingDate;
@@ -552,7 +560,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">BWOF Expiry Date</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">BWOF Expiry Date</label>
+                                            {currentUser?.role === 'admin' && form.bwofExpiry && (
+                                                <button type="button" onClick={handleBwofRemove} className="text-[10px] font-bold text-pink-500 hover:text-pink-700 dark:hover:text-pink-300 transition-colors">Remove</button>
+                                            )}
+                                        </div>
                                         <div className="relative">
                                             <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                             <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm cursor-pointer" value={form.bwofExpiry || ''} onChange={e => handleBwofDateChange(e.target.value)} />
