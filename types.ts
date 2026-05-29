@@ -221,6 +221,7 @@ export interface Contractor {
   email: string;
   phone: string;
   notingRequirements?: NotingRequirement[];
+  notingInstructions?: string;
 }
 
 export enum ReminderType {

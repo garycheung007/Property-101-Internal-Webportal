@@ -198,7 +198,8 @@ const ContractorModal: React.FC<{
                     contactPerson: form.contactPerson || '',
                     email: form.email || '',
                     phone: form.phone || '',
-                    notingRequirements: form.notingRequirements || []
+                    notingRequirements: form.notingRequirements || [],
+                    notingInstructions: form.notingInstructions || ''
                 });
             } catch (err: any) {
                 alert(`Save Error: ${err.message}`);
@@ -299,6 +300,16 @@ const ContractorModal: React.FC<{
                                         </div>
                                     ))}
                                  </div>
+                                <div className="mt-3">
+                                    <label className="block text-[10px] font-bold text-pink-700 dark:text-pink-400 uppercase tracking-widest mb-1">Insurance Noting Instructions</label>
+                                    <textarea
+                                        className="w-full border border-pink-100 dark:border-pink-900/40 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs resize-none outline-none focus:ring-2 focus:ring-pink-500"
+                                        rows={2}
+                                        placeholder="e.g. Email notings to notings@lumley.co.nz"
+                                        value={form.notingInstructions || ''}
+                                        onChange={e => setForm({ ...form, notingInstructions: e.target.value })}
+                                    />
+                                </div>
                             </div>
                         )}
 
