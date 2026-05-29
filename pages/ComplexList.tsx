@@ -195,6 +195,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const { contractors, actionComments, addActionComment, systemSettings, managers } = useData();
     const { user: currentUser } = useAuth();
     const [form, setForm] = useState<BodyCorporate>(complex);
+    const [hasBuildingManager, setHasBuildingManager] = useState<boolean>(!!complex.buildingManagerName);
     const [activeTab, setActiveTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs'>(initialTab);
     const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
     const [meetingForm, setMeetingForm] = useState<Partial<Meeting>>({});
@@ -570,26 +571,44 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
                                     <UserCircle size={16} className="text-pink-600" /> Building Manager
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (hasBuildingManager) {
+                                                setHasBuildingManager(false);
+                                                setForm(f => ({ ...f, buildingManagerName: '', buildingManagerPhone: '', buildingManagerEmail: '' }));
+                                            } else {
+                                                setHasBuildingManager(true);
+                                            }
+                                        }}
+                                        className="ml-auto text-[10px] font-bold text-pink-500 hover:text-pink-700 dark:hover:text-pink-300 transition-colors"
+                                    >
+                                        {hasBuildingManager ? 'Remove' : '+ Add'}
+                                    </button>
                                 </h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Name</label>
-                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.buildingManagerName || ''} onChange={e => setForm({...form, buildingManagerName: e.target.value})} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contact Details</label>
-                                        <div className="space-y-2">
-                                            <div className="relative">
-                                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                                <input type="text" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs" placeholder="Phone" value={form.buildingManagerPhone || ''} onChange={e => setForm({...form, buildingManagerPhone: e.target.value})} />
-                                            </div>
-                                            <div className="relative">
-                                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                                <input type="email" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs" placeholder="Email" value={form.buildingManagerEmail || ''} onChange={e => setForm({...form, buildingManagerEmail: e.target.value})} />
+                                {hasBuildingManager ? (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Name</label>
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.buildingManagerName || ''} onChange={e => setForm({...form, buildingManagerName: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contact Details</label>
+                                            <div className="space-y-2">
+                                                <div className="relative">
+                                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                    <input type="text" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs" placeholder="Phone" value={form.buildingManagerPhone || ''} onChange={e => setForm({...form, buildingManagerPhone: e.target.value})} />
+                                                </div>
+                                                <div className="relative">
+                                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                    <input type="email" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs" placeholder="Email" value={form.buildingManagerEmail || ''} onChange={e => setForm({...form, buildingManagerEmail: e.target.value})} />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <p className="text-xs text-slate-400 italic">No building manager assigned.</p>
+                                )}
                             </div>
                         </div>
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-3">
