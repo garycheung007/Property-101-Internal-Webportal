@@ -15,12 +15,17 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
 
       const hasCompletedAnyStep = workflowSteps.some(s => s.id && progress[s.id]?.completed);
 
+      const lastPriorStep = workflowSteps
+        .filter(s => s.type === 'prior' && s.id && !(s.isBcOnly && bc.type !== 'Body Corporate'))
+        .sort((a, b) => a.offsetDays - b.offsetDays)[0];
+      const lastPriorStepDone = lastPriorStep ? !!progress[lastPriorStep.id!]?.completed : false;
+
       if (diffDays < 0) {
         if (!hasCompletedAnyStep) {
           reminders.push({ id: `ins-exp-${bc.id}`, bcId: bc.id, bcName: bc.name, type: ReminderType.INSURANCE, dueDate: bc.insuranceExpiry, message: `EXPIRED: Insurance on ${bc.insuranceExpiry}`, severity: 'high' });
         }
       } else if (diffDays <= 90) {
-        if (!hasCompletedAnyStep) {
+        if (!lastPriorStepDone) {
           reminders.push({ id: `ins-${bc.id}`, bcId: bc.id, bcName: bc.name, type: ReminderType.INSURANCE, dueDate: bc.insuranceExpiry, message: `Insurance due in ${diffDays} days.`, severity: diffDays < 30 ? 'high' : 'medium' });
         }
       }
