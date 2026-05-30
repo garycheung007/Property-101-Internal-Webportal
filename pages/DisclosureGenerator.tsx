@@ -4,6 +4,36 @@ import { useData } from '../contexts/DataContext';
 import { FileSignature, Download, Loader2, FileText, ShieldCheck, Edit3 } from 'lucide-react';
 import { BodyCorporate, Contractor, User as SystemUser } from '../types';
 
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTH_MAP: Record<string, number> = {
+    jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,
+    may:4,jun:5,june:5,jul:6,july:6,aug:7,august:7,
+    sep:8,september:8,oct:9,october:9,nov:10,november:10,dec:11,december:11,
+};
+
+function parseDayMonth(str: string): { day: number; month: number } | null {
+    const match = str.trim().match(/^(\d{1,2})[\s\-\/]([a-zA-Z]+)$/);
+    if (!match) return null;
+    const month = MONTH_MAP[match[2].toLowerCase()];
+    if (month === undefined) return null;
+    return { day: parseInt(match[1]), month };
+}
+
+function deriveFyDates(startStr: string, endStr: string): { fyStart: string; fyEnd: string } {
+    const start = parseDayMonth(startStr);
+    const end = parseDayMonth(endStr);
+    if (!start || !end) return { fyStart: startStr, fyEnd: endStr };
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const fyStartThisYear = new Date(currentYear, start.month, start.day);
+    const fyStartYear = today >= fyStartThisYear ? currentYear : currentYear - 1;
+    const fyEndYear = fyStartYear + 1;
+    return {
+        fyStart: `${start.day} ${MONTH_NAMES[start.month]} ${fyStartYear}`,
+        fyEnd: `${end.day} ${MONTH_NAMES[end.month]} ${fyEndYear}`,
+    };
+}
+
 const DisclosureGenerator: React.FC = () => {
   const { complexes, contractors, managers, systemSettings } = useData();
   
@@ -72,8 +102,8 @@ const DisclosureGenerator: React.FC = () => {
         '{{unit_levy}}': unitLevy || '[Levy Amount]',
         '{{owner_name}}': ownerName || '[Owner Name]',
         '{{owners_address}}': ownerAddress || '[Owner Address]',
-        '{{fy_start}}': selectedComplex.financialYearStart || '1 April',
-        '{{fy_end}}': selectedComplex.financialYearEnd || '31 March',
+        '{{fy_start}}': deriveFyDates(selectedComplex.financialYearStart || '1 April', selectedComplex.financialYearEnd || '31 March').fyStart,
+        '{{fy_end}}': deriveFyDates(selectedComplex.financialYearStart || '1 April', selectedComplex.financialYearEnd || '31 March').fyEnd,
         '{{insurance_noting}}': getInsuranceNoting(broker),
         '{{insurance_underwriter}}': selectedComplex.insuranceUnderwriter || 'TBC',
         '{{insurance_expiry}}': selectedComplex.insuranceExpiry || 'TBC',
