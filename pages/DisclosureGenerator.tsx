@@ -126,6 +126,7 @@ const DisclosureGenerator: React.FC = () => {
         '{{insurance_underwriter}}': selectedComplex.insuranceUnderwriter || 'TBC',
         '{{insurance_expiry}}': selectedComplex.insuranceExpiry || 'TBC',
         '{{remediation_text}}': remediationText,
+        '{{Remediation_Text}}': remediationText,
         '{{manager_name}}': manager?.name || selectedComplex.managerName,
         '{{manager_title}}': manager?.title || 'Body Corporate Manager',
         '{{manager_email}}': manager?.email || '',
@@ -160,7 +161,7 @@ const DisclosureGenerator: React.FC = () => {
     result = result.split('Email: info@prop101.co.nz<br/>Ph: 09 523 3161').join(`Email: ${managerEmail}`);
     result = result.split(', Phone: +64 9 523 3161').join('');
     result = result.split(', Phone: 09 523 3161').join('');
-    result = result.split('info@prop101.co.nz').join(managerEmail);
+    result = result.split('Email: info@prop101.co.nz').join(`Email: ${managerEmail}`);
 
     return result;
   };
