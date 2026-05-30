@@ -174,6 +174,14 @@ const DisclosureGenerator: React.FC = () => {
     result = result.split(', Phone: 09 523 3161').join('');
     result = result.split('Email: info@prop101.co.nz').join(`Email: ${managerEmail}`);
 
+    // Inject remediation text if the stored template predates the {{remediation_text}} tag
+    if (!result.includes(remediationText)) {
+        const yoursLine = '<p>Yours faithfully</p>';
+        if (result.includes(yoursLine)) {
+            result = result.replace(yoursLine, `<p>${remediationText}</p>\n${yoursLine}`);
+        }
+    }
+
     return result;
   };
 
