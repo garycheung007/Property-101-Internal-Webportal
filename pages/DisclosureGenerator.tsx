@@ -19,19 +19,30 @@ function parseDayMonth(str: string): { day: number; month: number } | null {
     return { day: parseInt(match[1]), month };
 }
 
-function deriveFyDates(startStr: string, endStr: string): { fyStart: string; fyEnd: string } {
+function deriveFyDates(startStr: string, endStr: string): { fyStart: string; fyEnd: string; lastFinancialStatement: string } {
     const start = parseDayMonth(startStr);
     const end = parseDayMonth(endStr);
-    if (!start || !end) return { fyStart: startStr, fyEnd: endStr };
+    if (!start || !end) return { fyStart: startStr, fyEnd: endStr, lastFinancialStatement: '[Balance Date]' };
     const today = new Date();
     const currentYear = today.getFullYear();
     const fyStartThisYear = new Date(currentYear, start.month, start.day);
     const fyStartYear = today >= fyStartThisYear ? currentYear : currentYear - 1;
     const fyEndYear = fyStartYear + 1;
+    const fyStartDate = new Date(fyStartYear, start.month, start.day);
+    const lastStmtDate = new Date(fyStartDate.getTime() - 86400000);
     return {
         fyStart: `${start.day} ${MONTH_NAMES[start.month]} ${fyStartYear}`,
         fyEnd: `${end.day} ${MONTH_NAMES[end.month]} ${fyEndYear}`,
+        lastFinancialStatement: `${lastStmtDate.getDate()} ${MONTH_NAMES[lastStmtDate.getMonth()]} ${lastStmtDate.getFullYear()}`,
     };
+}
+
+function deriveLtmpNextRenewal(lastRenewalDateStr: string): string {
+    if (!lastRenewalDateStr) return '[Date]';
+    const d = new Date(lastRenewalDateStr);
+    if (isNaN(d.getTime())) return '[Date]';
+    d.setFullYear(d.getFullYear() + 3);
+    return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 const DisclosureGenerator: React.FC = () => {
@@ -93,6 +104,8 @@ const DisclosureGenerator: React.FC = () => {
         return details ? `Yes - ${details}` : 'Yes';
     };
 
+    const fyDates = deriveFyDates(selectedComplex.financialYearStart || '1 April', selectedComplex.financialYearEnd || '31 March');
+
     const tags: Record<string, string> = {
         '{{bc_name}}': selectedComplex.name,
         '{{bc_number}}': selectedComplex.bcNumber,
@@ -102,8 +115,8 @@ const DisclosureGenerator: React.FC = () => {
         '{{unit_levy}}': unitLevy || '[Levy Amount]',
         '{{owner_name}}': ownerName || '[Owner Name]',
         '{{owners_address}}': ownerAddress || '[Owner Address]',
-        '{{fy_start}}': deriveFyDates(selectedComplex.financialYearStart || '1 April', selectedComplex.financialYearEnd || '31 March').fyStart,
-        '{{fy_end}}': deriveFyDates(selectedComplex.financialYearStart || '1 April', selectedComplex.financialYearEnd || '31 March').fyEnd,
+        '{{fy_start}}': fyDates.fyStart,
+        '{{fy_end}}': fyDates.fyEnd,
         '{{insurance_noting}}': getInsuranceNoting(broker),
         '{{insurance_underwriter}}': selectedComplex.insuranceUnderwriter || 'TBC',
         '{{insurance_expiry}}': selectedComplex.insuranceExpiry || 'TBC',
@@ -117,11 +130,12 @@ const DisclosureGenerator: React.FC = () => {
         '{{earthquake_prone}}': formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails),
         '{{any_other_significant_defects}}': formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails),
         '{{proceedings_in_court}}': formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt),
-        '{{last_financial_statement}}': selectedComplex.lastFinancialStatementBalance || '[Balance Date]',
+        '{{last_financial_statement}}': fyDates.lastFinancialStatement,
         '{{operating_fund_balance}}': selectedComplex.operatingFundBalance || '[Amount]',
         '{{reserve_fund_balance}}': selectedComplex.reserveFundBalance || '[Amount]',
-        '{{ltmp_last_renewal}}': selectedComplex.ltmpLastRenewalDate || '[Date]',
-        '{{ltmp_next_renewal}}': selectedComplex.ltmpNextRenewalDate || '[Date]',
+        '{{ltmp_last_renewal}}': selectedComplex.ltmpLastRenewalDate ? new Date(selectedComplex.ltmpLastRenewalDate).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '[Date]',
+        '{{ltmp_next_renewal}}': deriveLtmpNextRenewal(selectedComplex.ltmpLastRenewalDate || ''),
+        '{{ltmp_prepared_by}}': selectedComplex.ltmpCompletedBy || '',
         '{{water_rate}}': selectedComplex.waterRateDescription || '[Rate Details]',
         '{{water_rate_provider}}': contractors.find(c => c.id === selectedComplex.waterRateContractorId)?.name || '',
         '{{gst_text}}': selectedComplex.isGstRegistered ? 'inclusive of GST' : ''

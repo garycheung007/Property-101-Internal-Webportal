@@ -202,6 +202,8 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [renewalPrompt, setRenewalPrompt] = useState<{ show: boolean, nextExpiry: string }>({ show: false, nextExpiry: '' });
     const [bwofRenewalPrompt, setBwofRenewalPrompt] = useState<{ show: boolean, pendingDate: string }>({ show: false, pendingDate: '' });
     const [feeEditing, setFeeEditing] = useState(false);
+    const [balanceEditing, setBalanceEditing] = useState(false);
+    const [ltmpEditing, setLtmpEditing] = useState(false);
     const [venueOther, setVenueOther] = useState(false);
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
     
@@ -1022,6 +1024,102 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 <div className="mt-12 p-4 bg-slate-100 dark:bg-slate-800/50 rounded-2xl text-[10px] text-slate-500 italic leading-relaxed flex gap-3">
                                     <Info size={16} className="text-blue-500 flex-shrink-0" />
                                     <span>These settings provide the default "Yes/No" values for your PCDS/Disclosure packages. Details entered here will be appended to the "Yes" response in generated documents.</span>
+                                </div>
+                            </div>
+
+                            {/* Financial Balances */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
+                                <div className="flex items-center justify-between mb-6 border-b dark:border-slate-800 pb-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
+                                            <DollarSign size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg dark:text-white">Financial Balances</h3>
+                                            <p className="text-xs text-slate-500">Fund balances as at the last financial statement date.</p>
+                                        </div>
+                                    </div>
+                                    {!balanceEditing && (
+                                        <button onClick={() => setBalanceEditing(true)} className="flex items-center gap-1.5 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors">
+                                            <Pencil size={12} /> Edit
+                                        </button>
+                                    )}
+                                    {balanceEditing && (
+                                        <button onClick={() => setBalanceEditing(false)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors">
+                                            <Check size={12} /> Done
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Operating Fund Balance</label>
+                                        {balanceEditing ? (
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.operatingFundBalance || ''} onChange={e => setForm(f => ({ ...f, operatingFundBalance: e.target.value }))} placeholder="e.g. $12,345.67" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.operatingFundBalance || '—'}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Reserve Fund Balance</label>
+                                        {balanceEditing ? (
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.reserveFundBalance || ''} onChange={e => setForm(f => ({ ...f, reserveFundBalance: e.target.value }))} placeholder="e.g. $45,678.90" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.reserveFundBalance || '—'}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Long Term Maintenance Plan */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
+                                <div className="flex items-center justify-between mb-6 border-b dark:border-slate-800 pb-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
+                                            <ClipboardCheck size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg dark:text-white">Long Term Maintenance Plan</h3>
+                                            <p className="text-xs text-slate-500">LTMP dates used in disclosure documents. Next review is auto-calculated.</p>
+                                        </div>
+                                    </div>
+                                    {!ltmpEditing && (
+                                        <button onClick={() => setLtmpEditing(true)} className="flex items-center gap-1.5 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors">
+                                            <Pencil size={12} /> Edit
+                                        </button>
+                                    )}
+                                    {ltmpEditing && (
+                                        <button onClick={() => setLtmpEditing(false)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors">
+                                            <Check size={12} /> Done
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Last Renewal Date</label>
+                                        {ltmpEditing ? (
+                                            <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.ltmpLastRenewalDate || ''} onChange={e => setForm(f => ({ ...f, ltmpLastRenewalDate: e.target.value }))} />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.ltmpLastRenewalDate ? new Date(form.ltmpLastRenewalDate).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Prepared By</label>
+                                        {ltmpEditing ? (
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.ltmpCompletedBy || ''} onChange={e => setForm(f => ({ ...f, ltmpCompletedBy: e.target.value }))} placeholder="e.g. Smith LTMP Ltd" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.ltmpCompletedBy || '—'}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Next Review Date <span className="text-pink-500 normal-case font-normal">(auto)</span></label>
+                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">
+                                            {form.ltmpLastRenewalDate ? (() => {
+                                                const d = new Date(form.ltmpLastRenewalDate);
+                                                d.setFullYear(d.getFullYear() + 3);
+                                                return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
+                                            })() : '—'}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 
