@@ -493,7 +493,10 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 cursor-pointer select-none"
                                         onClick={() => currentUser?.role === 'admin' && setForm(f => ({ ...f, isGstRegistered: !f.isGstRegistered }))}
                                     >
-                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">GST Registered</span>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">GST Registered</span>
+                                            <span className="text-[9px] text-slate-400">Used in S146 disclosure</span>
+                                        </div>
                                         <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form.isGstRegistered ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
                                             <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form.isGstRegistered ? 'translate-x-6' : 'translate-x-0'}`}></div>
                                         </div>
@@ -555,7 +558,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
-                                    <Shield size={16} className="text-pink-600" /> Compliance & Insurance
+                                    <Shield size={16} className="text-pink-600" /> Compliance Status
                                 </h3>
                                 <div className="space-y-4">
                                     <div>
@@ -631,7 +634,10 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         </div>
                                     </div>
                                 ) : (
-                                    <p className="text-xs text-slate-400 italic">No building manager assigned.</p>
+                                    <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+                                        <UserCircle size={28} className="text-slate-200 dark:text-slate-700" />
+                                        <p className="text-xs text-slate-400 italic">No building manager assigned</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -942,88 +948,23 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
                     {activeTab === 'disclosure' && (
                         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300 pb-20">
-                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
-                                <div className="flex items-center gap-3 mb-8 border-b dark:border-slate-800 pb-5">
-                                    <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
-                                        <FileSignature size={24} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-lg dark:text-white">Statutory Disclosure Settings</h3>
-                                        <p className="text-xs text-slate-500">Configure property-wide legal status for automated disclosure statements.</p>
-                                    </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                                    {/* Weathertightness Section */}
-                                    <div className="space-y-6">
-                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                            <Activity size={14} className="text-pink-600" /> Weathertightness Status
-                                        </h4>
-                                        <div className="space-y-6">
-                                            {[
-                                                { field: 'weathertightnessClaimMade', detailField: 'weathertightnessClaimDetails', label: 'Claim made under UTA 2006' },
-                                                { field: 'weathertightnessRemediatedWithoutClaim', detailField: 'weathertightnessRemediatedDetails', label: 'Remediated without claim/proceedings' },
-                                                { field: 'weathertightnessNotRemediated', detailField: 'weathertightnessNotRemediatedDetails', label: 'Known issues - NOT remediated' }
-                                            ].map(item => (
-                                                <div key={item.field} className="space-y-2">
-                                                    <div className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 hover:bg-white dark:hover:bg-slate-900 transition-all cursor-pointer group" onClick={() => toggleStatutoryField(item.field as any)}>
-                                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{item.label}</span>
-                                                        <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form[item.field as keyof BodyCorporate] ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
-                                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form[item.field as keyof BodyCorporate] ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                                                        </div>
-                                                    </div>
-                                                    {form[item.field as keyof BodyCorporate] && (
-                                                        <div className="animate-in slide-in-from-top-2 duration-200">
-                                                            <textarea 
-                                                                placeholder={`Provide details for: ${item.label}...`}
-                                                                className="w-full p-3 text-xs border-2 border-pink-100 dark:border-pink-900/30 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none dark:bg-slate-800 dark:text-white min-h-[80px]"
-                                                                value={(form[item.detailField as keyof BodyCorporate] as string) || ''}
-                                                                onChange={(e) => handleDetailChange(item.detailField as any, e.target.value)}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
+                            {/* Generation Readiness */}
+                            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border dark:border-slate-800">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <CheckCircle2 size={14} className="text-pink-600" /> Generation Readiness
+                                </h4>
+                                <div className="flex flex-wrap gap-3">
+                                    {[
+                                        { label: 'Operating Fund Balance', ready: !!form.operatingFundBalance },
+                                        { label: 'Reserve Fund Balance', ready: !!form.reserveFundBalance },
+                                        { label: 'LTMP Date', ready: !!form.ltmpLastRenewalDate },
+                                    ].map(item => (
+                                        <div key={item.label} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${item.ready ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'}`}>
+                                            {item.ready ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                                            {item.label}
                                         </div>
-                                    </div>
-
-                                    {/* Other Defects Section */}
-                                    <div className="space-y-6">
-                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                            <AlertOctagon size={14} className="text-amber-500" /> Defects & Legal
-                                        </h4>
-                                        <div className="space-y-6">
-                                            {[
-                                                { field: 'earthquakeProneIssues', detailField: 'earthquakeProneDetails', label: 'Earthquake-prone issues' },
-                                                { field: 'anyOtherSignificantDefects', detailField: 'anyOtherSignificantDefectsDetails', label: 'Other significant land/building defects' },
-                                                { field: 'involvedInProceedings', detailField: 'proceedingsInCourt', label: 'Involved in active court/tribunal proceedings' }
-                                            ].map(item => (
-                                                <div key={item.field} className="space-y-2">
-                                                    <div className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 hover:bg-white dark:hover:bg-slate-900 transition-all cursor-pointer group" onClick={() => toggleStatutoryField(item.field as any)}>
-                                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{item.label}</span>
-                                                        <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form[item.field as keyof BodyCorporate] ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
-                                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form[item.field as keyof BodyCorporate] ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                                                        </div>
-                                                    </div>
-                                                    {form[item.field as keyof BodyCorporate] && (
-                                                        <div className="animate-in slide-in-from-top-2 duration-200">
-                                                            <textarea 
-                                                                placeholder={`Provide details for: ${item.label}...`}
-                                                                className="w-full p-3 text-xs border-2 border-pink-100 dark:border-pink-900/30 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none dark:bg-slate-800 dark:text-white min-h-[80px]"
-                                                                value={(form[item.detailField as keyof BodyCorporate] as string) || ''}
-                                                                onChange={(e) => handleDetailChange(item.detailField as any, e.target.value)}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-12 p-4 bg-slate-100 dark:bg-slate-800/50 rounded-2xl text-[10px] text-slate-500 italic leading-relaxed flex gap-3">
-                                    <Info size={16} className="text-blue-500 flex-shrink-0" />
-                                    <span>These settings provide the default "Yes/No" values for your PCDS/Disclosure packages. Details entered here will be appended to the "Yes" response in generated documents.</span>
+                                    ))}
                                 </div>
                             </div>
 
@@ -1105,7 +1046,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Prepared By</label>
                                         {ltmpEditing ? (
-                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.ltmpCompletedBy || ''} onChange={e => setForm(f => ({ ...f, ltmpCompletedBy: e.target.value }))} placeholder="e.g. Smith LTMP Ltd" />
+                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.ltmpCompletedBy || ''} onChange={e => setForm(f => ({ ...f, ltmpCompletedBy: e.target.value }))}>
+                                                <option value="">— Select consultant —</option>
+                                                {contractors.filter(c => c.category === 'Consultant').map(c => (
+                                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                                ))}
+                                            </select>
                                         ) : (
                                             <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.ltmpCompletedBy || '—'}</p>
                                         )}
@@ -1160,22 +1106,108 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 )}
                             </div>
 
-                            {/* Closing Paragraph selector */}
+                            {/* Statutory Disclosure Settings */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
+                                <div className="flex items-center gap-3 mb-8 border-b dark:border-slate-800 pb-5">
+                                    <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
+                                        <FileSignature size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg dark:text-white">Statutory Disclosure Settings</h3>
+                                        <p className="text-xs text-slate-500">Configure property-wide legal status for automated disclosure statements.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+                                    {/* Weathertightness Section */}
+                                    <div className="space-y-6">
+                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Activity size={14} className="text-pink-600" /> Weathertightness Status
+                                        </h4>
+                                        <div className="space-y-6">
+                                            {[
+                                                { field: 'weathertightnessClaimMade', detailField: 'weathertightnessClaimDetails', label: 'Claim made under UTA 2006' },
+                                                { field: 'weathertightnessRemediatedWithoutClaim', detailField: 'weathertightnessRemediatedDetails', label: 'Remediated without claim/proceedings' },
+                                                { field: 'weathertightnessNotRemediated', detailField: 'weathertightnessNotRemediatedDetails', label: 'Known issues - NOT remediated' }
+                                            ].map(item => (
+                                                <div key={item.field} className="space-y-2">
+                                                    <div className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 hover:bg-white dark:hover:bg-slate-900 transition-all cursor-pointer group" onClick={() => toggleStatutoryField(item.field as any)}>
+                                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{item.label}</span>
+                                                        <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form[item.field as keyof BodyCorporate] ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form[item.field as keyof BodyCorporate] ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                                        </div>
+                                                    </div>
+                                                    {form[item.field as keyof BodyCorporate] && (
+                                                        <div className="animate-in slide-in-from-top-2 duration-200">
+                                                            <textarea
+                                                                placeholder={`Provide details for: ${item.label}...`}
+                                                                className="w-full p-3 text-xs border-2 border-pink-100 dark:border-pink-900/30 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none dark:bg-slate-800 dark:text-white min-h-[80px]"
+                                                                value={(form[item.detailField as keyof BodyCorporate] as string) || ''}
+                                                                onChange={(e) => handleDetailChange(item.detailField as any, e.target.value)}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Other Defects Section */}
+                                    <div className="space-y-6">
+                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <AlertOctagon size={14} className="text-amber-500" /> Defects & Legal
+                                        </h4>
+                                        <div className="space-y-6">
+                                            {[
+                                                { field: 'earthquakeProneIssues', detailField: 'earthquakeProneDetails', label: 'Earthquake-prone issues' },
+                                                { field: 'anyOtherSignificantDefects', detailField: 'anyOtherSignificantDefectsDetails', label: 'Other significant land/building defects' },
+                                                { field: 'involvedInProceedings', detailField: 'proceedingsInCourt', label: 'Involved in active court/tribunal proceedings' }
+                                            ].map(item => (
+                                                <div key={item.field} className="space-y-2">
+                                                    <div className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 hover:bg-white dark:hover:bg-slate-900 transition-all cursor-pointer group" onClick={() => toggleStatutoryField(item.field as any)}>
+                                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{item.label}</span>
+                                                        <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form[item.field as keyof BodyCorporate] ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form[item.field as keyof BodyCorporate] ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                                        </div>
+                                                    </div>
+                                                    {form[item.field as keyof BodyCorporate] && (
+                                                        <div className="animate-in slide-in-from-top-2 duration-200">
+                                                            <textarea
+                                                                placeholder={`Provide details for: ${item.label}...`}
+                                                                className="w-full p-3 text-xs border-2 border-pink-100 dark:border-pink-900/30 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none dark:bg-slate-800 dark:text-white min-h-[80px]"
+                                                                value={(form[item.detailField as keyof BodyCorporate] as string) || ''}
+                                                                onChange={(e) => handleDetailChange(item.detailField as any, e.target.value)}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-12 p-4 bg-slate-100 dark:bg-slate-800/50 rounded-2xl text-[10px] text-slate-500 italic leading-relaxed flex gap-3">
+                                    <Info size={16} className="text-blue-500 flex-shrink-0" />
+                                    <span>These settings provide the default "Yes/No" values for your PCDS/Disclosure packages. Details entered here will be appended to the "Yes" response in generated documents.</span>
+                                </div>
+                            </div>
+
+                            {/* Cover Letter Template */}
                             <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
                                 <div className="flex items-center gap-3 mb-6 border-b dark:border-slate-800 pb-5">
                                     <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
                                         <FileSignature size={24} />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-lg dark:text-white">Closing Paragraph</h3>
-                                        <p className="text-xs text-slate-500">Selects which paragraph appears at the end of the S146 cover letter.</p>
+                                        <h3 className="font-bold text-lg dark:text-white">Cover Letter Template</h3>
+                                        <p className="text-xs text-slate-500">Choose which closing paragraph appears in the generated S146 cover letter.</p>
                                     </div>
                                 </div>
                                 <div
                                     className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 hover:bg-white dark:hover:bg-slate-900 transition-all cursor-pointer mb-4"
                                     onClick={() => setForm(f => ({ ...f, remedialWorkDone: !f.remedialWorkDone }))}
                                 >
-                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Has remediation works</span>
+                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Include remediation paragraph</span>
                                     <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form.remedialWorkDone ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
                                         <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form.remedialWorkDone ? 'translate-x-6' : 'translate-x-0'}`}></div>
                                     </div>
