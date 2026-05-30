@@ -139,8 +139,7 @@ ${COMMITTEE_TABLE_HTML}
 <p style="text-align: center; font-weight: bold; margin-top: 10pt;">Please return to email: <a href="mailto:info@prop101.co.nz">info@prop101.co.nz</a></p>
 {{footer}}`;
 
-const S146 = `{{header}}
-<p>{{current_date}}</p>
+const S146 = `<p>{{current_date}}</p>
 <p>{{owner_name}}</p>
 <p>{{owners_address}}</p>
 <br/>

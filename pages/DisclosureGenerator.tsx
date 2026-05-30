@@ -153,6 +153,7 @@ const DisclosureGenerator: React.FC = () => {
     });
 
     // Legacy fallback: replace hardcoded literals present in older stored templates
+    result = result.split('{{header}}').join('');
     const managerEmail = manager?.email || '';
     const managerTitle = manager?.title || 'Body Corporate Manager';
     result = result.split('<br/>Director<br/>').join(`<br/>${managerTitle}<br/>`);
