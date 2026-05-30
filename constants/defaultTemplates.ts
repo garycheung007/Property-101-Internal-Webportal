@@ -160,7 +160,7 @@ i) Body Corporate Rules.</p>
 <p>{{remediation_text}}</p>
 <p>Yours faithfully</p>
 <p>{{manager_signature}}</p>
-<p><strong>{{manager_name}}</strong><br/>Director<br/>Email: info@prop101.co.nz<br/>Ph: 09 523 3161</p>
+<p><strong>{{manager_name}}</strong><br/>{{manager_title}}<br/>Email: {{manager_email}}</p>
 
 ${PAGE_BREAK_SNIPPET}
 
@@ -188,7 +188,7 @@ ${PAGE_BREAK_SNIPPET}
 <p>(b) If the body corporate is involved in any proceedings in any court or tribunal: <b>{{proceedings_in_court}}</b>: and, if so, details of the proceedings: not applicable.</p>
 <p>(c) Audit reports (if available) for those of the previous 3 years for which an audit was carried out, and a financial statement of the years in that time period for which no audit was carried out are <b>ATTACHED</b>.</p>
 <p>(d) The notices and minutes of general meetings of the body corporate and the body corporate committee for the previous 3 years: (i) including all supporting documentation; but (ii) excluding any information that may be redacted for the reasons specified in regulation 27A(2); are <b>ATTACHED</b>.</p>
-<p>(e) The name and contact details of the body corporate manager is as follows: <b>Property 101 Group C/- {{manager_name}}</b>, Email: info@prop101.co.nz, Phone: +64 9 523 3161</p>
+<p>(e) The name and contact details of the body corporate manager is as follows: <b>Property 101 Group C/- {{manager_name}}</b>, Email: {{manager_email}}</p>
 <p>(f) The 12 month period comprising the current financial year for the purposes of the financial statements of the body corporate is <b>{{fy_start}} to {{fy_end}}</b>.</p>
 <p>(g) The body corporate levies payable for the unit for the current financial year is <b>\${{unit_levy}}</b> inclusive of GST to {{fy_end}}.</p>
 <p>(h) (i) The details of maintenance that the body corporate proposes to carry out in the unit title development in the year following the date of this disclosure statement are as discussed/agreed by the committee and at general meetings; and (ii) The body corporate proposes to meet the cost of that maintenance as agreed by the committee and at general meetings.</p>

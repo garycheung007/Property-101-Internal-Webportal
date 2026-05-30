@@ -49,6 +49,8 @@ const DisclosureGenerator: React.FC = () => {
   const { complexes, contractors, managers, systemSettings } = useData();
   
   const [selectedBcId, setSelectedBcId] = useState<string>('');
+  const [complexSearch, setComplexSearch] = useState('');
+  const [showComplexDropdown, setShowComplexDropdown] = useState(false);
   const [docType, setDocType] = useState<'s146' | 's147' | 'cpl'>('s146');
   const [unitNumber, setUnitNumber] = useState<string>('');
   const [unitLevy, setUnitLevy] = useState<string>('');
@@ -59,6 +61,9 @@ const DisclosureGenerator: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
 
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
+  const filteredComplexes = complexSearch
+    ? complexes.filter(c => c.name.toLowerCase().includes(complexSearch.toLowerCase()) || c.bcNumber.toLowerCase().includes(complexSearch.toLowerCase()))
+    : complexes;
   const broker = contractors.find(c => c.name === selectedComplex?.insuranceBroker);
   const manager = managers.find(m => m.name === selectedComplex?.managerName);
 
@@ -123,6 +128,7 @@ const DisclosureGenerator: React.FC = () => {
         '{{remediation_text}}': remediationText,
         '{{manager_name}}': manager?.name || selectedComplex.managerName,
         '{{manager_title}}': manager?.title || 'Body Corporate Manager',
+        '{{manager_email}}': manager?.email || '',
         '{{manager_signature}}': sigHtml,
         '{{weathertightness_claim}}': formatStatutory(selectedComplex.weathertightnessClaimMade, selectedComplex.weathertightnessClaimDetails),
         '{{weathertightness_remediated}}': formatStatutory(selectedComplex.weathertightnessRemediatedWithoutClaim, selectedComplex.weathertightnessRemediatedDetails),
@@ -145,6 +151,16 @@ const DisclosureGenerator: React.FC = () => {
     Object.entries(tags).forEach(([tag, value]) => {
         result = result.split(tag).join(value);
     });
+
+    // Legacy fallback: replace hardcoded literals present in older stored templates
+    const managerEmail = manager?.email || '';
+    const managerTitle = manager?.title || 'Body Corporate Manager';
+    result = result.split('<br/>Director<br/>').join(`<br/>${managerTitle}<br/>`);
+    result = result.split('Email: info@prop101.co.nz<br/>Ph: 09 523 3161').join(`Email: ${managerEmail}`);
+    result = result.split(', Phone: +64 9 523 3161').join('');
+    result = result.split(', Phone: 09 523 3161').join('');
+    result = result.split('info@prop101.co.nz').join(managerEmail);
+
     return result;
   };
 
@@ -285,10 +301,32 @@ const DisclosureGenerator: React.FC = () => {
 
                 <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">2. Property Selection</label>
-                    <select className="w-full rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-3 text-sm focus:ring-2 focus:ring-pink-500 outline-none" value={selectedBcId} onChange={(e) => { setSelectedBcId(e.target.value); setShowPreview(false); }}>
-                        <option value="">-- Select Complex --</option>
-                        {complexes.map(bc => (<option key={bc.id} value={bc.id}>{bc.bcNumber} - {bc.name}</option>))}
-                    </select>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            className="w-full rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-3 text-sm focus:ring-2 focus:ring-pink-500 outline-none"
+                            placeholder="Type to search complex..."
+                            value={complexSearch}
+                            onChange={e => { setComplexSearch(e.target.value); setSelectedBcId(''); setShowPreview(false); setShowComplexDropdown(true); }}
+                            onFocus={() => setShowComplexDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowComplexDropdown(false), 150)}
+                        />
+                        {selectedBcId && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 text-xs font-bold">✓</span>}
+                        {showComplexDropdown && filteredComplexes.length > 0 && (
+                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                                {filteredComplexes.map(bc => (
+                                    <button
+                                        key={bc.id}
+                                        type="button"
+                                        className="w-full text-left px-3 py-2.5 text-sm hover:bg-pink-50 dark:hover:bg-pink-900/20 dark:text-white border-b dark:border-slate-700 last:border-0"
+                                        onMouseDown={() => { setSelectedBcId(bc.id); setComplexSearch(`${bc.bcNumber} - ${bc.name}`); setShowComplexDropdown(false); setShowPreview(false); }}
+                                    >
+                                        <span className="font-bold text-pink-600 mr-1">{bc.bcNumber}</span>{bc.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="space-y-3 pt-4 border-t dark:border-slate-800">
