@@ -90,7 +90,7 @@ const AdminPanel: React.FC = () => {
     }, [systemSettings]);
 
     useEffect(() => {
-        const keys = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
+        const keys = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 's146', 's147', 'cpl'];
         Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
             const loaded: Partial<Record<string, TemplateFileRecord>> = {};
             snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });

@@ -1098,7 +1098,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             onChange={e => setForm(f => ({ ...f, waterRateContractorId: e.target.value }))}
                                         >
                                             <option value="">— Select contractor —</option>
-                                            {contractors.map(c => (
+                                            {contractors.filter(c => c.category === 'Utility').map(c => (
                                                 <option key={c.id} value={c.id}>{c.name}</option>
                                             ))}
                                         </select>
