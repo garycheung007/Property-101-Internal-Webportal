@@ -126,7 +126,6 @@ const DisclosureGenerator: React.FC = () => {
         '{{insurance_underwriter}}': selectedComplex.insuranceUnderwriter || 'TBC',
         '{{insurance_expiry}}': selectedComplex.insuranceExpiry || 'TBC',
         '{{remediation_text}}': remediationText,
-        '{{Remediation_Text}}': remediationText,
         '{{manager_name}}': manager?.name || selectedComplex.managerName,
         '{{manager_title}}': manager?.title || 'Body Corporate Manager',
         '{{manager_email}}': manager?.email || '',
@@ -152,6 +151,18 @@ const DisclosureGenerator: React.FC = () => {
     Object.entries(tags).forEach(([tag, value]) => {
         result = result.split(tag).join(value);
     });
+
+    // Case-insensitive regex pass — catches tag casing mismatches in older stored templates
+    const regexReplace = (tag: string, value: string) => {
+        result = result.replace(new RegExp(`\\{\\{${tag}\\}\\}`, 'gi'), value);
+    };
+    regexReplace('remediation_text', remediationText);
+    regexReplace('weathertightness_claim', formatStatutory(selectedComplex.weathertightnessClaimMade, selectedComplex.weathertightnessClaimDetails));
+    regexReplace('weathertightness_remediated', formatStatutory(selectedComplex.weathertightnessRemediatedWithoutClaim, selectedComplex.weathertightnessRemediatedDetails));
+    regexReplace('weathertightness_not_remediated', formatStatutory(selectedComplex.weathertightnessNotRemediated, selectedComplex.weathertightnessNotRemediatedDetails));
+    regexReplace('earthquake_prone', formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails));
+    regexReplace('any_other_significant_defects', formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails));
+    regexReplace('proceedings_in_court', formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt));
 
     // Legacy fallback: replace hardcoded literals present in older stored templates
     result = result.split('{{header}}').join('');
