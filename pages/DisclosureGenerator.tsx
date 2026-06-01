@@ -1,8 +1,13 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
+import ImageModule from 'docxtemplater-image-module-free';
+import { FileSignature, Download, Loader2, FileText, Edit3, Eye, AlertTriangle } from 'lucide-react';
+import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
-import { FileSignature, Download, Loader2, FileText, ShieldCheck, Edit3 } from 'lucide-react';
-import { BodyCorporate, Contractor, User as SystemUser } from '../types';
+import { Contractor, TemplateFileRecord } from '../types';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTH_MAP: Record<string, number> = {
@@ -19,7 +24,7 @@ function parseDayMonth(str: string): { day: number; month: number } | null {
     return { day: parseInt(match[1]), month };
 }
 
-function deriveFyDates(startStr: string, endStr: string): { fyStart: string; fyEnd: string; lastFinancialStatement: string } {
+function deriveFyDates(startStr: string, endStr: string) {
     const start = parseDayMonth(startStr);
     const end = parseDayMonth(endStr);
     if (!start || !end) return { fyStart: startStr, fyEnd: endStr, lastFinancialStatement: '[Balance Date]' };
@@ -45,9 +50,46 @@ function deriveLtmpNextRenewal(lastRenewalDateStr: string): string {
     return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+const toArrayBuffer = (base64: string): ArrayBuffer => {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+};
+
+const dataUrlToBuffer = (dataUrl: string): ArrayBuffer => {
+    const base64 = dataUrl.split(',')[1];
+    return toArrayBuffer(base64);
+};
+
+const buildIframeSrcDoc = (html: string) =>
+    `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    @page{margin:0;size:A4}
+    html{background:#525659;padding:20px;}
+    body{background:white;width:210mm;margin:0 auto;padding:25mm 20mm;box-shadow:0 2px 16px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;min-height:297mm;}
+    .pg-sep{position:absolute;left:0;right:0;height:20px;background:#525659;z-index:10;}
+    *{font-family:Calibri,Arial,sans-serif;box-sizing:border-box;}
+    a{color:inherit!important;text-decoration:none!important;}
+    p{margin:0.3em 0;}
+    table{border-collapse:collapse;width:100%;}
+    td,th{vertical-align:top;padding:2px 8px;}
+    img{max-width:100%;}
+    @media print{html{background:white;padding:0;}body{width:100%;margin:0;padding:25mm 20mm;box-shadow:none;}.pg-sep{display:none;}}
+    </style></head><body>${html}<script>(function(){
+    var PX=297*(96/25.4);
+    function run(){
+        var b=document.body;
+        var n=Math.ceil(b.scrollHeight/PX);
+        b.style.minHeight=(n*297)+'mm';
+        document.querySelectorAll('.pg-sep').forEach(function(e){e.remove();});
+        for(var i=1;i<n;i++){var d=document.createElement('div');d.className='pg-sep';d.style.top=(i*PX-10)+'px';b.appendChild(d);}
+    }
+    window.addEventListener('load',function(){setTimeout(run,300);});
+    })();</script></body></html>`;
+
 const DisclosureGenerator: React.FC = () => {
-  const { complexes, contractors, managers, systemSettings } = useData();
-  
+  const { complexes, contractors, managers } = useData();
+
   const [selectedBcId, setSelectedBcId] = useState<string>('');
   const [complexSearch, setComplexSearch] = useState('');
   const [showComplexDropdown, setShowComplexDropdown] = useState(false);
@@ -56,9 +98,9 @@ const DisclosureGenerator: React.FC = () => {
   const [unitLevy, setUnitLevy] = useState<string>('');
   const [ownerName, setOwnerName] = useState<string>('');
   const [ownerAddress, setOwnerAddress] = useState<string>('');
-  
-  const [loading, setLoading] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewing, setPreviewing] = useState(false);
 
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
   const filteredComplexes = complexSearch
@@ -66,337 +108,292 @@ const DisclosureGenerator: React.FC = () => {
     : complexes;
   const broker = contractors.find(c => c.name === selectedComplex?.insuranceBroker);
   const manager = managers.find(m => m.name === selectedComplex?.managerName);
+  const currentTemplate = docxTemplates[docType];
 
-  // Reset per-transaction fields when complex changes
+  useEffect(() => {
+    const keys = ['s146', 's147', 'cpl'];
+    Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
+      const loaded: Partial<Record<string, TemplateFileRecord>> = {};
+      snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });
+      setDocxTemplates(loaded);
+    });
+  }, []);
+
   useEffect(() => {
     setUnitNumber('');
     setUnitLevy('');
     setOwnerName('');
     setOwnerAddress('');
+    setPreviewHtml('');
   }, [selectedBcId]);
 
-  // Handle data mapping for the high-fidelity template
-  const replaceMergeTags = (template: string) => {
-    if (!selectedComplex) return template;
-    
-    const todayStr = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
-    const hasRemediation = selectedComplex.weathertightnessClaimMade || 
-                           selectedComplex.weathertightnessRemediatedWithoutClaim || 
-                           selectedComplex.weathertightnessNotRemediated ||
-                           selectedComplex.remedialWorkDone;
+  const formatStatutory = (isYes?: boolean, details?: string) =>
+    !isYes ? 'No' : (details ? `Yes - ${details}` : 'Yes');
 
-    const remediationText = hasRemediation 
-        ? `You will need to arrange for the statement to be signed before providing it to any interested parties. Therefore, please ensure the document is checked for accuracy prior to signing. Especially with regard to item (1)(a) & disclosing information on the levies & remedial project as per updates provided to owners by the Body Corporate.`
-        : `You will need to arrange for the statement to be signed before providing it to any interested parties. Therefore, please ensure the document is checked for accuracy prior to signing.`;
+  const getInsuranceNoting = (brk?: Contractor) => {
+    if (!brk) return 'TBC';
+    if (brk.notingRequirements?.length) return `${brk.name} (${brk.notingRequirements.map(r => r.detail).join(', ')})`;
+    return `${brk.name} (${brk.email || 'info@prop101.co.nz'})`;
+  };
 
-    const getInsuranceNoting = (brk?: Contractor) => {
-        if (!brk) return "TBC";
-        if (brk.notingRequirements?.length) {
-            return `${brk.name} (${brk.notingRequirements.map(r => r.detail).join(', ')})`;
-        }
-        return `${brk.name} (${brk.email || 'info@prop101.co.nz'})`;
-    };
-
-    const sigHtml = manager?.signatureUrl 
-        ? `<img src="${manager.signatureUrl}" width="200" style="width: 200px; height: auto; display: block; margin-top: 10pt;" />` 
-        : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24pt; color: #555; padding-top: 10pt;">${manager?.name || 'Manager Signature'}</div>`;
-
-    /**
-     * Helper to build "Yes - [Details]" or "No" string based on statutory fields
-     */
-    const formatStatutory = (isYes?: boolean, details?: string) => {
-        if (!isYes) return 'No';
-        return details ? `Yes - ${details}` : 'Yes';
-    };
-
+  const buildMergeData = (): Record<string, string> => {
+    if (!selectedComplex) return {};
     const fyDates = deriveFyDates(selectedComplex.financialYearStart || '1 April', selectedComplex.financialYearEnd || '31 March');
-
-    const tags: Record<string, string> = {
-        '{{bc_name}}': selectedComplex.name,
-        '{{bc_number}}': selectedComplex.bcNumber,
-        '{{address}}': selectedComplex.address,
-        '{{current_date}}': todayStr,
-        '{{unit_number}}': unitNumber || '[Unit]',
-        '{{unit_levy}}': unitLevy || '[Levy Amount]',
-        '{{owner_name}}': ownerName || '[Owner Name]',
-        '{{owners_address}}': ownerAddress || '[Owner Address]',
-        '{{fy_start}}': fyDates.fyStart,
-        '{{fy_end}}': fyDates.fyEnd,
-        '{{insurance_noting}}': getInsuranceNoting(broker),
-        '{{insurance_underwriter}}': selectedComplex.insuranceUnderwriter || 'TBC',
-        '{{insurance_expiry}}': selectedComplex.insuranceExpiry || 'TBC',
-        '{{remediation_text}}': remediationText,
-        '{{manager_name}}': manager?.name || selectedComplex.managerName,
-        '{{manager_title}}': manager?.title || 'Body Corporate Manager',
-        '{{manager_email}}': manager?.email || '',
-        '{{manager_signature}}': sigHtml,
-        '{{weathertightness_claim}}': formatStatutory(selectedComplex.weathertightnessClaimMade, selectedComplex.weathertightnessClaimDetails),
-        '{{weathertightness_remediated}}': formatStatutory(selectedComplex.weathertightnessRemediatedWithoutClaim, selectedComplex.weathertightnessRemediatedDetails),
-        '{{weathertightness_not_remediated}}': formatStatutory(selectedComplex.weathertightnessNotRemediated, selectedComplex.weathertightnessNotRemediatedDetails),
-        '{{earthquake_prone}}': formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails),
-        '{{any_other_significant_defects}}': formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails),
-        '{{proceedings_in_court}}': formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt),
-        '{{last_financial_statement}}': fyDates.lastFinancialStatement,
-        '{{operating_fund_balance}}': selectedComplex.operatingFundBalance || '[Amount]',
-        '{{reserve_fund_balance}}': selectedComplex.reserveFundBalance || '[Amount]',
-        '{{ltmp_last_renewal}}': selectedComplex.ltmpLastRenewalDate ? new Date(selectedComplex.ltmpLastRenewalDate).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '[Date]',
-        '{{ltmp_next_renewal}}': deriveLtmpNextRenewal(selectedComplex.ltmpLastRenewalDate || ''),
-        '{{ltmp_prepared_by}}': selectedComplex.ltmpCompletedBy || '',
-        '{{water_rate}}': selectedComplex.waterRateDescription || '[Rate Details]',
-        '{{water_rate_provider}}': contractors.find(c => c.id === selectedComplex.waterRateContractorId)?.name || '',
-        '{{gst_text}}': selectedComplex.isGstRegistered ? 'inclusive of GST' : ''
+    const hasRemediation = selectedComplex.weathertightnessClaimMade || selectedComplex.weathertightnessRemediatedWithoutClaim || selectedComplex.weathertightnessNotRemediated || selectedComplex.remedialWorkDone;
+    const remediationText = hasRemediation
+      ? 'You will need to arrange for the statement to be signed before providing it to any interested parties. Therefore, please ensure the document is checked for accuracy prior to signing. Especially with regard to item (1)(a) & disclosing information on the levies & remedial project as per updates provided to owners by the Body Corporate.'
+      : 'You will need to arrange for the statement to be signed before providing it to any interested parties. Therefore, please ensure the document is checked for accuracy prior to signing.';
+    return {
+      BC_Name: selectedComplex.name,
+      BC_Number: selectedComplex.bcNumber,
+      BC_Address: selectedComplex.address,
+      Current_Date: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
+      Unit_Number: unitNumber || '[Unit]',
+      Unit_Levy: unitLevy || '[Levy Amount]',
+      Owner_Name: ownerName || '[Owner Name]',
+      Owners_Address: ownerAddress || '[Owner Address]',
+      FY_Start: fyDates.fyStart,
+      FY_End: fyDates.fyEnd,
+      Last_Financial_Statement: fyDates.lastFinancialStatement,
+      Insurance_Noting: getInsuranceNoting(broker),
+      Insurance_Underwriter: selectedComplex.insuranceUnderwriter || 'TBC',
+      Insurance_Expiry: selectedComplex.insuranceExpiry || 'TBC',
+      Remediation_Text: remediationText,
+      Manager_Name: manager?.name || selectedComplex.managerName || '',
+      Manager_Title: manager?.title || 'Body Corporate Manager',
+      Manager_Email: manager?.email || '',
+      Weathertightness_Claim: formatStatutory(selectedComplex.weathertightnessClaimMade, selectedComplex.weathertightnessClaimDetails),
+      Weathertightness_Remediated: formatStatutory(selectedComplex.weathertightnessRemediatedWithoutClaim, selectedComplex.weathertightnessRemediatedDetails),
+      Weathertightness_Not_Remediated: formatStatutory(selectedComplex.weathertightnessNotRemediated, selectedComplex.weathertightnessNotRemediatedDetails),
+      Earthquake_Prone: formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails),
+      Any_Other_Significant_Defects: formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails),
+      Proceedings_In_Court: formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt),
+      Operating_Fund_Balance: selectedComplex.operatingFundBalance || '[Amount]',
+      Reserve_Fund_Balance: selectedComplex.reserveFundBalance || '[Amount]',
+      LTMP_Last_Renewal: selectedComplex.ltmpLastRenewalDate
+        ? new Date(selectedComplex.ltmpLastRenewalDate).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '[Date]',
+      LTMP_Next_Renewal: deriveLtmpNextRenewal(selectedComplex.ltmpLastRenewalDate || ''),
+      LTMP_Prepared_By: selectedComplex.ltmpCompletedBy || '',
+      Water_Rate: selectedComplex.waterRateDescription || '[Rate Details]',
+      Water_Rate_Provider: contractors.find(c => c.id === selectedComplex.waterRateContractorId)?.name || '',
+      Gst_Text: selectedComplex.isGstRegistered ? 'inclusive of GST' : '',
+      Broker_Noting: (broker as any)?.notingInstructions || '',
     };
+  };
 
-    let result = template;
-    Object.entries(tags).forEach(([tag, value]) => {
-        result = result.split(tag).join(value);
-    });
-
-    // Case-insensitive regex pass — catches tag casing mismatches in older stored templates
-    const regexReplace = (tag: string, value: string) => {
-        result = result.replace(new RegExp(`\\{\\{${tag}\\}\\}`, 'gi'), value);
-    };
-    regexReplace('remediation_text', remediationText);
-    regexReplace('weathertightness_claim', formatStatutory(selectedComplex.weathertightnessClaimMade, selectedComplex.weathertightnessClaimDetails));
-    regexReplace('weathertightness_remediated', formatStatutory(selectedComplex.weathertightnessRemediatedWithoutClaim, selectedComplex.weathertightnessRemediatedDetails));
-    regexReplace('weathertightness_not_remediated', formatStatutory(selectedComplex.weathertightnessNotRemediated, selectedComplex.weathertightnessNotRemediatedDetails));
-    regexReplace('earthquake_prone', formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails));
-    regexReplace('any_other_significant_defects', formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails));
-    regexReplace('proceedings_in_court', formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt));
-
-    // Legacy fallback: replace hardcoded literals present in older stored templates
-    result = result.split('{{header}}').join('');
-    const managerEmail = manager?.email || '';
-    const managerTitle = manager?.title || 'Body Corporate Manager';
-    result = result.split('<br/>Director<br/>').join(`<br/>${managerTitle}<br/>`);
-    result = result.split('Email: info@prop101.co.nz<br/>Ph: 09 523 3161').join(`Email: ${managerEmail}`);
-    result = result.split(', Phone: +64 9 523 3161').join('');
-    result = result.split(', Phone: 09 523 3161').join('');
-    result = result.split('Email: info@prop101.co.nz').join(`Email: ${managerEmail}`);
-
-    // Inject remediation text if the stored template predates the {{remediation_text}} tag
-    if (!result.includes(remediationText)) {
-        const yoursLine = '<p>Yours faithfully</p>';
-        if (result.includes(yoursLine)) {
-            result = result.replace(yoursLine, `<p>${remediationText}</p>\n${yoursLine}`);
-        }
+  const handlePreview = async () => {
+    if (!currentTemplate || !selectedComplex) return;
+    setPreviewing(true);
+    try {
+      const mammoth = await import('mammoth');
+      const buffer = toArrayBuffer(currentTemplate.data);
+      const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
+      const data = buildMergeData();
+      let html = result.value;
+      const sigHtml = manager?.signatureUrl
+        ? `<img src="${manager.signatureUrl}" style="width:200px;height:auto;display:block;margin:8px 0;" />`
+        : '';
+      html = html.split('{{%Manager_Signature}}').join(sigHtml);
+      html = html.split('{{Manager_Signature}}').join(sigHtml);
+      html = html.replace(/\{\{[\s\S]*?\}\}/g, m => '{{' + m.slice(2, -2).replace(/<[^>]*>/g, '') + '}}');
+      Object.entries(data).forEach(([k, v]) => { html = html.split(`{{${k}}}`).join(v); });
+      setPreviewHtml(html);
+    } catch {
+      alert('Preview failed. Ensure the uploaded file is a valid .docx.');
     }
-
-    return result;
+    setPreviewing(false);
   };
 
-  const getWordStyles = (spacing: number = 10) => `
-    @page Section1 { 
-        margin: 35mm 20mm 20mm 20mm; 
-        mso-header-margin: 20pt;
-        mso-footer-margin: 36pt;
-        mso-paper-source: 0;
-        mso-header: h1;
-        mso-footer: f1;
+  const handleDownloadDocx = () => {
+    if (!currentTemplate || !selectedComplex) return;
+    try {
+      const sigUrl = manager?.signatureUrl || '';
+      const imageModule = new ImageModule({
+        centered: false,
+        fileType: 'docx',
+        getImage: (tagValue: string) => {
+          if (tagValue && tagValue.startsWith('data:')) return dataUrlToBuffer(tagValue);
+          return new Uint8Array(0).buffer;
+        },
+        getSize: () => [200, 70] as [number, number],
+      });
+      const zip = new PizZip(toArrayBuffer(currentTemplate.data));
+      const docTpl = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        modules: [imageModule],
+        delimiters: { start: '{{', end: '}}' },
+      });
+      docTpl.render({ ...buildMergeData(), Manager_Signature: sigUrl });
+      const out = docTpl.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(out as Blob);
+      a.download = `${docType.toUpperCase()}_Unit_${unitNumber || 'TBC'}_${selectedComplex.name.replace(/\s+/g, '_')}.docx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      alert('Word export failed. Make sure the template uses {{Tag}} placeholders (not Word MERGEFIELD codes).');
     }
-    div.Section1 { page: Section1; }
-    body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; line-height: 120%; color: black; margin: 0; }
-    p, li { margin-top: 0pt; margin-bottom: ${spacing}pt; mso-margin-top-alt: 0pt; mso-margin-bottom-alt: ${spacing}pt; mso-add-space: auto; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 12pt; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-    td { vertical-align: top; padding: 4pt; border: 1px solid #000; font-size: 10pt; }
-    .page-break { page-break-before: always; mso-break-type: section-break; }
-  `;
-
-  /**
-   * Standardizes the editor snippet into a clean native Microsoft Word section break.
-   */
-  const cleanHtmlForWord = (html: string) => {
-    return html.replace(/<div class="page-break"[\s\S]*?<\/div>/g, '<br style="page-break-before: always; clear: both; mso-break-type: section-break;">');
-  };
-
-  const generateFullHtml = (content: string, isForExport: boolean = false) => {
-    const spacing = systemSettings?.paragraphSpacing !== undefined ? systemSettings.paragraphSpacing : 10;
-    const headerImg = systemSettings?.headerImageUrl;
-    const footerImg = systemSettings?.footerImageUrl;
-
-    // 1. Preview Branding: Visible only in the workbench browser preview.
-    // We completely omit these when isForExport is true to prevent leakage to Word's body flow.
-    const previewHeader = (!isForExport && headerImg) 
-        ? `<table width="100%" border="0" cellspacing="0" cellpadding="0" style="border: none; margin-bottom: 25pt;"><tr><td align="center" style="border: none; padding:0;"><img src="${headerImg}" width="600" style="width: 600px;" /></td></tr></table>` 
-        : ``;
-
-    const previewFooter = (!isForExport && footerImg) 
-        ? `<table width="100%" border="0" cellspacing="0" cellpadding="0" style="border: none; margin-top: 30pt;"><tr><td align="center" style="border: none; padding:0;"><img src="${footerImg}" width="600" style="width: 600px;" /></td></tr></table>` 
-        : ``;
-
-    // 2. Word Header/Footer Sources: Hidden in browser (display:none), used by Word for the header object.
-    const wordHeaderSource = (isForExport && headerImg)
-        ? `<div style="mso-element: header; display: none;" id="h1">
-             <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border: none;"><tr><td align="center" style="border: none; padding:0;"><img src="${headerImg}" width="600" style="width: 600px;" /></td></tr></table>
-           </div>`
-        : ``;
-
-    const wordFooterSource = (isForExport && footerImg)
-        ? `<div style="mso-element: footer; display: none;" id="f1">
-             <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border: none;"><tr><td align="center" style="border: none; padding:0;"><img src="${footerImg}" width="600" style="width: 600px;" /></td></tr></table>
-           </div>`
-        : ``;
-
-    let processedContent = content;
-    if (isForExport) processedContent = cleanHtmlForWord(processedContent);
-
-    return `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset="utf-8">
-        <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->
-        <style>${getWordStyles(spacing)}</style>
-      </head>
-      <body>
-          <div class="Section1" style="padding: 20mm;">
-              ${previewHeader}
-              <div class="main-content">${processedContent}</div>
-              ${previewFooter}
-          </div>
-          ${wordHeaderSource}
-          ${wordFooterSource}
-      </body></html>
-    `;
-  };
-
-  const handleGenerate = () => {
-    if (!selectedBcId) { alert("Please select a property first."); return; }
-    setLoading(true);
-    setTimeout(() => { setLoading(false); setShowPreview(true); }, 600);
-  };
-
-  const previewHtml = useMemo(() => {
-    if (!selectedComplex) return '';
-    const template = systemSettings.documentTemplates?.[docType] || '';
-    const content = replaceMergeTags(template);
-    return generateFullHtml(content, false);
-  }, [selectedComplex, docType, unitNumber, unitLevy, ownerName, ownerAddress, systemSettings]);
-
-  const downloadDoc = () => {
-    const template = systemSettings.documentTemplates?.[docType] || '';
-    const content = replaceMergeTags(template);
-    const finalHtml = generateFullHtml(content, true);
-    
-    const blob = new Blob(['\ufeff', finalHtml], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${docType.toUpperCase()}_Unit_${unitNumber || 'TBC'}_${selectedComplex?.name.replace(/\s+/g, '_')}.doc`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <FileSignature className="text-pink-600" /> Disclosure Workbench
-          </h1>
-          <p className="text-slate-500">Statutory S146, S147 and CPL generation engine.</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <FileSignature className="text-pink-600" /> Disclosure Workbench
+        </h1>
+        <p className="text-slate-500">Statutory S146, S147 and CPL generation engine.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Left panel */}
         <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-6">
-                <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">1. Document Type</label>
-                    <div className="grid grid-cols-1 gap-2">
-                        {[
-                            { id: 's146', label: 'PCDS (S146)', color: 'pink' },
-                            { id: 's147', label: 'Pre-Settlement (S147)', color: 'blue' },
-                            { id: 'cpl', label: 'PL Certificate (CPL)', color: 'emerald' }
-                        ].map(type => (
-                            <button 
-                                key={type.id} 
-                                onClick={() => { setDocType(type.id as any); setShowPreview(false); }}
-                                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${docType === type.id ? 'border-pink-600 bg-pink-50 dark:bg-pink-900/10' : 'border-transparent bg-slate-50 dark:bg-slate-800/50 text-slate-500'}`}
-                            >
-                                <div className={`w-2 h-2 rounded-full ${docType === type.id ? 'bg-pink-600' : 'bg-slate-300'}`}></div>
-                                <span className="text-sm font-bold">{type.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-6">
 
-                <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">2. Property Selection</label>
-                    <div className="relative">
-                        <input
-                            type="text"
-                            className="w-full rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-3 text-sm focus:ring-2 focus:ring-pink-500 outline-none"
-                            placeholder="Type to search complex..."
-                            value={complexSearch}
-                            onChange={e => { setComplexSearch(e.target.value); setSelectedBcId(''); setShowPreview(false); setShowComplexDropdown(true); }}
-                            onFocus={() => setShowComplexDropdown(true)}
-                            onBlur={() => setTimeout(() => setShowComplexDropdown(false), 150)}
-                        />
-                        {selectedBcId && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 text-xs font-bold">✓</span>}
-                        {showComplexDropdown && filteredComplexes.length > 0 && (
-                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-                                {filteredComplexes.map(bc => (
-                                    <button
-                                        key={bc.id}
-                                        type="button"
-                                        className="w-full text-left px-3 py-2.5 text-sm hover:bg-pink-50 dark:hover:bg-pink-900/20 dark:text-white border-b dark:border-slate-700 last:border-0"
-                                        onMouseDown={() => { setSelectedBcId(bc.id); setComplexSearch(`${bc.bcNumber} - ${bc.name}`); setShowComplexDropdown(false); setShowPreview(false); }}
-                                    >
-                                        <span className="font-bold text-pink-600 mr-1">{bc.bcNumber}</span>{bc.name}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="space-y-3 pt-4 border-t dark:border-slate-800">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Edit3 size={14} className="text-pink-600" /> 3. Unit Info
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Unit / PU</label><input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 5A" value={unitNumber} onChange={e => setUnitNumber(e.target.value)}/></div>
-                        <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Annual Levy ($)</label><input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 4500" value={unitLevy} onChange={e => setUnitLevy(e.target.value)}/></div>
-                    </div>
-                    <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Current Owner(s)</label><input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. John Doe" value={ownerName} onChange={e => setOwnerName(e.target.value)}/></div>
-                    <div><label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Owner's Address</label><textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. 12 Example St, Auckland 1010" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)}/></div>
-                </div>
-
-                <button onClick={handleGenerate} disabled={loading || !selectedBcId} className="w-full bg-slate-900 dark:bg-pink-700 hover:opacity-90 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg uppercase tracking-widest text-xs">
-                    {loading ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
-                    <span>Assemble Disclosure</span>
-                </button>
+            {/* 1. Document Type */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">1. Document Type</label>
+              <div className="grid grid-cols-1 gap-2">
+                {([
+                  { id: 's146', label: 'PCDS (S146)' },
+                  { id: 's147', label: 'Pre-Settlement (S147)' },
+                  { id: 'cpl',  label: 'PL Certificate (CPL)' },
+                ] as const).map(type => (
+                  <button
+                    key={type.id}
+                    onClick={() => { setDocType(type.id); setPreviewHtml(''); }}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${docType === type.id ? 'border-pink-600 bg-pink-50 dark:bg-pink-900/10' : 'border-transparent bg-slate-50 dark:bg-slate-800/50 text-slate-500'}`}
+                  >
+                    <div className={`w-2 h-2 rounded-full ${docType === type.id ? 'bg-pink-600' : 'bg-slate-300'}`} />
+                    <span className="text-sm font-bold">{type.label}</span>
+                    {!docxTemplates[type.id] && (
+                      <span className="ml-auto text-[9px] text-amber-500 font-bold uppercase">No template</span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* 2. Property Selection */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">2. Property Selection</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="w-full rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-3 text-sm focus:ring-2 focus:ring-pink-500 outline-none"
+                  placeholder="Type to search complex..."
+                  value={complexSearch}
+                  onChange={e => { setComplexSearch(e.target.value); setSelectedBcId(''); setPreviewHtml(''); setShowComplexDropdown(true); }}
+                  onFocus={() => setShowComplexDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowComplexDropdown(false), 150)}
+                />
+                {selectedBcId && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 text-xs font-bold">✓</span>}
+                {showComplexDropdown && filteredComplexes.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                    {filteredComplexes.map(bc => (
+                      <button
+                        key={bc.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2.5 text-sm hover:bg-pink-50 dark:hover:bg-pink-900/20 dark:text-white border-b dark:border-slate-700 last:border-0"
+                        onMouseDown={() => { setSelectedBcId(bc.id); setComplexSearch(`${bc.bcNumber} - ${bc.name}`); setShowComplexDropdown(false); setPreviewHtml(''); }}
+                      >
+                        <span className="font-bold text-pink-600 mr-1">{bc.bcNumber}</span>{bc.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 3. Unit Info */}
+            <div className="space-y-3 pt-4 border-t dark:border-slate-800">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Edit3 size={14} className="text-pink-600" /> 3. Unit Info
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Unit / PU</label>
+                  <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 5A" value={unitNumber} onChange={e => setUnitNumber(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Annual Levy ($)</label>
+                  <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 4500" value={unitLevy} onChange={e => setUnitLevy(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Current Owner(s)</label>
+                <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. John Doe" value={ownerName} onChange={e => setOwnerName(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Owner's Address</label>
+                <textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. 12 Example St, Auckland 1010" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={handlePreview}
+                disabled={previewing || !selectedBcId || !currentTemplate}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-900 dark:bg-slate-700 hover:opacity-90 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-40"
+              >
+                {previewing ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
+                Preview
+              </button>
+              <button
+                onClick={handleDownloadDocx}
+                disabled={!selectedBcId || !currentTemplate}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#2b579a] hover:bg-[#1e3f72] text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-40"
+              >
+                <Download size={16} /> Word
+              </button>
+            </div>
+
+            {selectedBcId && !currentTemplate && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <AlertTriangle size={12} /> No {docType.toUpperCase()} template uploaded yet. Go to Admin Panel → Templates → Disclosure & CPL.
+              </p>
+            )}
+          </div>
         </div>
 
+        {/* Right panel — preview */}
         <div className="lg:col-span-3 bg-slate-200 dark:bg-slate-950 rounded-3xl border border-slate-300 dark:border-slate-800 min-h-[700px] flex flex-col overflow-hidden shadow-inner">
-            {showPreview ? (
-                <div className="flex flex-col h-full">
-                    <div className="p-4 bg-white dark:bg-slate-900 border-b dark:border-slate-800 flex justify-between items-center shadow-sm">
-                        <div className="flex items-center gap-4">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold uppercase text-slate-400">Previewing Package:</span>
-                                <span className="text-sm font-bold text-pink-600 uppercase tracking-widest">{docType.toUpperCase()}</span>
-                            </div>
-                            <div className="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
-                        </div>
-                        <div className="flex gap-2">
-                             <button onClick={downloadDoc} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all uppercase"><Download size={16} /> Export to Word</button>
-                        </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-12 custom-scrollbar flex justify-center bg-slate-300 dark:bg-slate-900">
-                        <div className="origin-top scale-[0.85] shadow-2xl transition-transform">
-                            <iframe title="Disclosure Preview" srcDoc={previewHtml} className="w-[210mm] min-h-[1200mm] border-none bg-white shadow-2xl" />
-                        </div>
-                    </div>
+          {previewHtml ? (
+            <div className="flex flex-col h-full">
+              <div className="p-4 bg-white dark:bg-slate-900 border-b dark:border-slate-800 flex justify-between items-center shadow-sm shrink-0">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold uppercase text-slate-400">Previewing Package:</span>
+                  <span className="text-sm font-bold text-pink-600 uppercase tracking-widest">{docType.toUpperCase()}</span>
                 </div>
-            ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-12 text-center">
-                    <div className="w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6"><FileText size={40} className="opacity-10 text-pink-600" /></div>
-                    <h3 className="text-lg font-bold text-slate-500 uppercase tracking-widest">Preview Engine Ready</h3>
-                    <p className="max-w-xs mt-2 text-sm italic">Assemble the statutory pack by filling the unit details in the sidebar. Branding will repeat on every page of the export.</p>
-                </div>
-            )}
+                <button
+                  onClick={handleDownloadDocx}
+                  className="bg-[#2b579a] hover:bg-[#1e3f72] text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all uppercase"
+                >
+                  <Download size={14} /> Export to Word
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <iframe
+                  title="Disclosure Preview"
+                  srcDoc={buildIframeSrcDoc(previewHtml)}
+                  className="w-full h-full border-0"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-12 text-center">
+              <div className="w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6">
+                <FileText size={40} className="opacity-10 text-pink-600" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-500 uppercase tracking-widest">Preview Engine Ready</h3>
+              <p className="max-w-xs mt-2 text-sm italic">Select a property and click Preview to see the merged document from your uploaded Word template.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
