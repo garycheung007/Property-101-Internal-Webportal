@@ -9,6 +9,9 @@ import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { Contractor, TemplateFileRecord } from '../types';
 
+// Minimal 1×1 transparent GIF used as fallback when no signature is available
+const TRANSPARENT_GIF = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTH_MAP: Record<string, number> = {
     jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,
@@ -143,42 +146,78 @@ const DisclosureGenerator: React.FC = () => {
     const remediationText = hasRemediation
       ? 'You will need to arrange for the statement to be signed before providing it to any interested parties. Therefore, please ensure the document is checked for accuracy prior to signing. Especially with regard to item (1)(a) & disclosing information on the levies & remedial project as per updates provided to owners by the Body Corporate.'
       : 'You will need to arrange for the statement to be signed before providing it to any interested parties. Therefore, please ensure the document is checked for accuracy prior to signing.';
-    return {
-      BC_Name: selectedComplex.name,
-      BC_Number: selectedComplex.bcNumber,
-      BC_Address: selectedComplex.address,
-      Current_Date: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
-      Unit_Number: unitNumber || '[Unit]',
-      Unit_Levy: unitLevy || '[Levy Amount]',
-      Owner_Name: ownerName || '[Owner Name]',
-      Owners_Address: ownerAddress || '[Owner Address]',
-      FY_Start: fyDates.fyStart,
-      FY_End: fyDates.fyEnd,
-      Last_Financial_Statement: fyDates.lastFinancialStatement,
-      Insurance_Noting: getInsuranceNoting(broker),
-      Insurance_Underwriter: selectedComplex.insuranceUnderwriter || 'TBC',
-      Insurance_Expiry: selectedComplex.insuranceExpiry || 'TBC',
-      Remediation_Text: remediationText,
-      Manager_Name: manager?.name || selectedComplex.managerName || '',
-      Manager_Title: manager?.title || 'Body Corporate Manager',
-      Manager_Email: manager?.email || '',
-      Weathertightness_Claim: formatStatutory(selectedComplex.weathertightnessClaimMade, selectedComplex.weathertightnessClaimDetails),
-      Weathertightness_Remediated: formatStatutory(selectedComplex.weathertightnessRemediatedWithoutClaim, selectedComplex.weathertightnessRemediatedDetails),
-      Weathertightness_Not_Remediated: formatStatutory(selectedComplex.weathertightnessNotRemediated, selectedComplex.weathertightnessNotRemediatedDetails),
-      Earthquake_Prone: formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails),
-      Any_Other_Significant_Defects: formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails),
-      Proceedings_In_Court: formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt),
-      Operating_Fund_Balance: selectedComplex.operatingFundBalance || '[Amount]',
-      Reserve_Fund_Balance: selectedComplex.reserveFundBalance || '[Amount]',
-      LTMP_Last_Renewal: selectedComplex.ltmpLastRenewalDate
+    const vals = {
+      bcName:               selectedComplex.name,
+      bcNumber:             selectedComplex.bcNumber,
+      bcAddress:            selectedComplex.address,
+      currentDate:          new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
+      unitNumber:           unitNumber || '[Unit]',
+      unitLevy:             unitLevy || '[Levy Amount]',
+      ownerName:            ownerName || '[Owner Name]',
+      ownersAddress:        ownerAddress || '[Owner Address]',
+      fyStart:              fyDates.fyStart,
+      fyEnd:                fyDates.fyEnd,
+      lastFinancialStatement: fyDates.lastFinancialStatement,
+      insuranceNoting:      getInsuranceNoting(broker),
+      insuranceUnderwriter: selectedComplex.insuranceUnderwriter || 'TBC',
+      insuranceExpiry:      selectedComplex.insuranceExpiry || 'TBC',
+      remediationText,
+      managerName:          manager?.name || selectedComplex.managerName || '',
+      managerTitle:         manager?.title || 'Body Corporate Manager',
+      managerEmail:         manager?.email || '',
+      weathertightnessClaim:         formatStatutory(selectedComplex.weathertightnessClaimMade, selectedComplex.weathertightnessClaimDetails),
+      weathertightnessRemediated:    formatStatutory(selectedComplex.weathertightnessRemediatedWithoutClaim, selectedComplex.weathertightnessRemediatedDetails),
+      weathertightnessNotRemediated: formatStatutory(selectedComplex.weathertightnessNotRemediated, selectedComplex.weathertightnessNotRemediatedDetails),
+      earthquakeProne:               formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails),
+      anyOtherSignificantDefects:    formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails),
+      proceedingsInCourt:            formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt),
+      operatingFundBalance: selectedComplex.operatingFundBalance || '[Amount]',
+      reserveFundBalance:   selectedComplex.reserveFundBalance || '[Amount]',
+      ltmpLastRenewal:      selectedComplex.ltmpLastRenewalDate
         ? new Date(selectedComplex.ltmpLastRenewalDate).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
         : '[Date]',
-      LTMP_Next_Renewal: deriveLtmpNextRenewal(selectedComplex.ltmpLastRenewalDate || ''),
-      LTMP_Prepared_By: selectedComplex.ltmpCompletedBy || '',
-      Water_Rate: selectedComplex.waterRateDescription || '[Rate Details]',
-      Water_Rate_Provider: contractors.find(c => c.id === selectedComplex.waterRateContractorId)?.name || '',
-      Gst_Text: selectedComplex.isGstRegistered ? 'inclusive of GST' : '',
-      Broker_Noting: (broker as any)?.notingInstructions || '',
+      ltmpNextRenewal:      deriveLtmpNextRenewal(selectedComplex.ltmpLastRenewalDate || ''),
+      ltmpPreparedBy:       selectedComplex.ltmpCompletedBy || '',
+      waterRate:            selectedComplex.waterRateDescription || '[Rate Details]',
+      waterRateProvider:    contractors.find(c => c.id === selectedComplex.waterRateContractorId)?.name || '',
+      gstText:              selectedComplex.isGstRegistered ? 'inclusive of GST' : '',
+      brokerNoting:         broker?.notingInstructions || '',
+    };
+    // Provide both TitleCase and lowercase_underscore variants so the template works
+    // regardless of which naming convention was used when designing the Word file.
+    return {
+      // TitleCase
+      BC_Name: vals.bcName, BC_Number: vals.bcNumber, BC_Address: vals.bcAddress,
+      Current_Date: vals.currentDate, Unit_Number: vals.unitNumber, Unit_Levy: vals.unitLevy,
+      Owner_Name: vals.ownerName, Owners_Address: vals.ownersAddress,
+      FY_Start: vals.fyStart, FY_End: vals.fyEnd, Last_Financial_Statement: vals.lastFinancialStatement,
+      Insurance_Noting: vals.insuranceNoting, Insurance_Underwriter: vals.insuranceUnderwriter, Insurance_Expiry: vals.insuranceExpiry,
+      Remediation_Text: vals.remediationText,
+      Manager_Name: vals.managerName, Manager_Title: vals.managerTitle, Manager_Email: vals.managerEmail,
+      Weathertightness_Claim: vals.weathertightnessClaim, Weathertightness_Remediated: vals.weathertightnessRemediated,
+      Weathertightness_Not_Remediated: vals.weathertightnessNotRemediated,
+      Earthquake_Prone: vals.earthquakeProne, Any_Other_Significant_Defects: vals.anyOtherSignificantDefects,
+      Proceedings_In_Court: vals.proceedingsInCourt,
+      Operating_Fund_Balance: vals.operatingFundBalance, Reserve_Fund_Balance: vals.reserveFundBalance,
+      LTMP_Last_Renewal: vals.ltmpLastRenewal, LTMP_Next_Renewal: vals.ltmpNextRenewal, LTMP_Prepared_By: vals.ltmpPreparedBy,
+      Water_Rate: vals.waterRate, Water_Rate_Provider: vals.waterRateProvider,
+      Gst_Text: vals.gstText, Broker_Noting: vals.brokerNoting,
+      // lowercase_underscore (matches old HTML template tag names)
+      bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
+      current_date: vals.currentDate, unit_number: vals.unitNumber, unit_levy: vals.unitLevy,
+      owner_name: vals.ownerName, owners_address: vals.ownersAddress,
+      fy_start: vals.fyStart, fy_end: vals.fyEnd, last_financial_statement: vals.lastFinancialStatement,
+      insurance_noting: vals.insuranceNoting, insurance_underwriter: vals.insuranceUnderwriter, insurance_expiry: vals.insuranceExpiry,
+      remediation_text: vals.remediationText,
+      manager_name: vals.managerName, manager_title: vals.managerTitle, manager_email: vals.managerEmail,
+      weathertightness_claim: vals.weathertightnessClaim, weathertightness_remediated: vals.weathertightnessRemediated,
+      weathertightness_not_remediated: vals.weathertightnessNotRemediated,
+      earthquake_prone: vals.earthquakeProne, any_other_significant_defects: vals.anyOtherSignificantDefects,
+      proceedings_in_court: vals.proceedingsInCourt,
+      operating_fund_balance: vals.operatingFundBalance, reserve_fund_balance: vals.reserveFundBalance,
+      ltmp_last_renewal: vals.ltmpLastRenewal, ltmp_next_renewal: vals.ltmpNextRenewal, ltmp_prepared_by: vals.ltmpPreparedBy,
+      water_rate: vals.waterRate, water_rate_provider: vals.waterRateProvider,
+      gst_text: vals.gstText, broker_noting: vals.brokerNoting,
     };
   };
 
@@ -199,7 +238,8 @@ const DisclosureGenerator: React.FC = () => {
       html = html.replace(/\{\{[\s\S]*?\}\}/g, m => '{{' + m.slice(2, -2).replace(/<[^>]*>/g, '') + '}}');
       Object.entries(data).forEach(([k, v]) => { html = html.split(`{{${k}}}`).join(v); });
       setPreviewHtml(html);
-    } catch {
+    } catch (e) {
+      console.error('Preview error:', e);
       alert('Preview failed. Ensure the uploaded file is a valid .docx.');
     }
     setPreviewing(false);
@@ -208,14 +248,11 @@ const DisclosureGenerator: React.FC = () => {
   const handleDownloadDocx = () => {
     if (!currentTemplate || !selectedComplex) return;
     try {
-      const sigUrl = manager?.signatureUrl || '';
+      const sigUrl = manager?.signatureUrl || TRANSPARENT_GIF;
       const imageModule = new ImageModule({
         centered: false,
         fileType: 'docx',
-        getImage: (tagValue: string) => {
-          if (tagValue && tagValue.startsWith('data:')) return dataUrlToBuffer(tagValue);
-          return new Uint8Array(0).buffer;
-        },
+        getImage: (tagValue: string) => dataUrlToBuffer(tagValue && tagValue.startsWith('data:') ? tagValue : TRANSPARENT_GIF),
         getSize: () => [200, 70] as [number, number],
       });
       const zip = new PizZip(toArrayBuffer(currentTemplate.data));
@@ -225,7 +262,7 @@ const DisclosureGenerator: React.FC = () => {
         modules: [imageModule],
         delimiters: { start: '{{', end: '}}' },
       });
-      docTpl.render({ ...buildMergeData(), Manager_Signature: sigUrl });
+      docTpl.render({ ...buildMergeData(), Manager_Signature: sigUrl, manager_signature: sigUrl });
       const out = docTpl.getZip().generate({
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -235,7 +272,8 @@ const DisclosureGenerator: React.FC = () => {
       a.download = `${docType.toUpperCase()}_Unit_${unitNumber || 'TBC'}_${selectedComplex.name.replace(/\s+/g, '_')}.docx`;
       a.click();
       URL.revokeObjectURL(a.href);
-    } catch {
+    } catch (e) {
+      console.error('Word export error:', e);
       alert('Word export failed. Make sure the template uses {{Tag}} placeholders (not Word MERGEFIELD codes).');
     }
   };
