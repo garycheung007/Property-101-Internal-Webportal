@@ -182,6 +182,7 @@ const DisclosureGenerator: React.FC = () => {
       waterRateProvider:    contractors.find(c => c.id === selectedComplex.waterRateContractorId)?.name || '',
       gstText:              selectedComplex.isGstRegistered ? 'inclusive of GST' : '',
       brokerNoting:         broker?.notingInstructions || '',
+      brokerName:           broker?.name || '',
     };
     // Provide both TitleCase and lowercase_underscore variants so the template works
     // regardless of which naming convention was used when designing the Word file.
@@ -203,7 +204,7 @@ const DisclosureGenerator: React.FC = () => {
       LTMP_Next_Renewal: vals.ltmpNextRenewal, LTMP_Next_Renewal_Date: vals.ltmpNextRenewal,
       LTMP_Prepared_By: vals.ltmpPreparedBy,
       Water_Rate: vals.waterRate, Water_Rate_Provider: vals.waterRateProvider,
-      Gst_Text: vals.gstText, Broker_Noting: vals.brokerNoting, Broker: vals.brokerNoting,
+      Gst_Text: vals.gstText, Broker_Noting: vals.brokerNoting, Broker: vals.brokerName, Broker_Name: vals.brokerName,
       // lowercase_underscore (matches old HTML template tag names)
       bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
       current_date: vals.currentDate, unit_number: vals.unitNumber, unit_levy: vals.unitLevy,
@@ -221,7 +222,7 @@ const DisclosureGenerator: React.FC = () => {
       ltmp_next_renewal: vals.ltmpNextRenewal, ltmp_next_renewal_date: vals.ltmpNextRenewal,
       ltmp_prepared_by: vals.ltmpPreparedBy,
       water_rate: vals.waterRate, water_rate_provider: vals.waterRateProvider,
-      gst_text: vals.gstText, broker_noting: vals.brokerNoting, broker: vals.brokerNoting,
+      gst_text: vals.gstText, broker_noting: vals.brokerNoting, broker: vals.brokerName, broker_name: vals.brokerName,
     };
   };
 
