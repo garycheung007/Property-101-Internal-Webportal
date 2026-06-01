@@ -12,6 +12,13 @@ import { Contractor, TemplateFileRecord } from '../types';
 // Minimal 1×1 transparent GIF used as fallback when no signature is available
 const TRANSPARENT_GIF = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
+const formatNZD = (val: string | undefined, placeholder = '[Amount]'): string => {
+  if (!val) return placeholder;
+  const num = parseFloat(val.replace(/[^0-9.-]/g, ''));
+  if (isNaN(num)) return val;
+  return `$${num.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTH_MAP: Record<string, number> = {
     jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,
@@ -152,7 +159,7 @@ const DisclosureGenerator: React.FC = () => {
       bcAddress:            selectedComplex.address,
       currentDate:          new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
       unitNumber:           unitNumber || '[Unit]',
-      unitLevy:             unitLevy || '[Levy Amount]',
+      unitLevy:             formatNZD(unitLevy, '[Levy Amount]'),
       ownerName:            ownerName || '[Owner Name]',
       ownersAddress:        ownerAddress || '[Owner Address]',
       fyStart:              fyDates.fyStart,
@@ -171,8 +178,8 @@ const DisclosureGenerator: React.FC = () => {
       earthquakeProne:               formatStatutory(selectedComplex.earthquakeProneIssues, selectedComplex.earthquakeProneDetails),
       anyOtherSignificantDefects:    formatStatutory(selectedComplex.anyOtherSignificantDefects, selectedComplex.anyOtherSignificantDefectsDetails),
       proceedingsInCourt:            formatStatutory(selectedComplex.involvedInProceedings, selectedComplex.proceedingsInCourt),
-      operatingFundBalance: selectedComplex.operatingFundBalance || '[Amount]',
-      reserveFundBalance:   selectedComplex.reserveFundBalance || '[Amount]',
+      operatingFundBalance: formatNZD(selectedComplex.operatingFundBalance),
+      reserveFundBalance:   formatNZD(selectedComplex.reserveFundBalance),
       ltmpLastRenewal:      selectedComplex.ltmpLastRenewalDate
         ? new Date(selectedComplex.ltmpLastRenewalDate).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
         : '[Date]',
