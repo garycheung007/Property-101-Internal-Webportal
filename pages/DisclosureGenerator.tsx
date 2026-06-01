@@ -285,7 +285,8 @@ const DisclosureGenerator: React.FC = () => {
       });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(out as Blob);
-      a.download = `${docType.toUpperCase()}_Unit_${unitNumber || 'TBC'}_${selectedComplex.name.replace(/\s+/g, '_')}.docx`;
+      const bcNum = (selectedComplex.bcNumber || '').replace(/\s+/g, '');
+      a.download = `${bcNum} ${selectedComplex.name} – ${docType.toUpperCase()} Unit ${unitNumber || 'TBC'}.docx`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
