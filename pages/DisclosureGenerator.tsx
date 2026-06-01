@@ -199,9 +199,11 @@ const DisclosureGenerator: React.FC = () => {
       Earthquake_Prone: vals.earthquakeProne, Any_Other_Significant_Defects: vals.anyOtherSignificantDefects,
       Proceedings_In_Court: vals.proceedingsInCourt,
       Operating_Fund_Balance: vals.operatingFundBalance, Reserve_Fund_Balance: vals.reserveFundBalance,
-      LTMP_Last_Renewal: vals.ltmpLastRenewal, LTMP_Next_Renewal: vals.ltmpNextRenewal, LTMP_Prepared_By: vals.ltmpPreparedBy,
+      LTMP_Last_Renewal: vals.ltmpLastRenewal, LTMP_Last_Renewal_Date: vals.ltmpLastRenewal,
+      LTMP_Next_Renewal: vals.ltmpNextRenewal, LTMP_Next_Renewal_Date: vals.ltmpNextRenewal,
+      LTMP_Prepared_By: vals.ltmpPreparedBy,
       Water_Rate: vals.waterRate, Water_Rate_Provider: vals.waterRateProvider,
-      Gst_Text: vals.gstText, Broker_Noting: vals.brokerNoting,
+      Gst_Text: vals.gstText, Broker_Noting: vals.brokerNoting, Broker: vals.brokerNoting,
       // lowercase_underscore (matches old HTML template tag names)
       bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
       current_date: vals.currentDate, unit_number: vals.unitNumber, unit_levy: vals.unitLevy,
@@ -215,9 +217,11 @@ const DisclosureGenerator: React.FC = () => {
       earthquake_prone: vals.earthquakeProne, any_other_significant_defects: vals.anyOtherSignificantDefects,
       proceedings_in_court: vals.proceedingsInCourt,
       operating_fund_balance: vals.operatingFundBalance, reserve_fund_balance: vals.reserveFundBalance,
-      ltmp_last_renewal: vals.ltmpLastRenewal, ltmp_next_renewal: vals.ltmpNextRenewal, ltmp_prepared_by: vals.ltmpPreparedBy,
+      ltmp_last_renewal: vals.ltmpLastRenewal, ltmp_last_renewal_date: vals.ltmpLastRenewal,
+      ltmp_next_renewal: vals.ltmpNextRenewal, ltmp_next_renewal_date: vals.ltmpNextRenewal,
+      ltmp_prepared_by: vals.ltmpPreparedBy,
       water_rate: vals.waterRate, water_rate_provider: vals.waterRateProvider,
-      gst_text: vals.gstText, broker_noting: vals.brokerNoting,
+      gst_text: vals.gstText, broker_noting: vals.brokerNoting, broker: vals.brokerNoting,
     };
   };
 
