@@ -30,7 +30,7 @@ export const DEFAULT_INSURANCE_SETTINGS: InsuranceSettings = {
   workflowSteps: DEFAULT_WORKFLOW
 };
 
-export const DEFAULT_MEETING_CHECKLIST: { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; COMPLETE: MeetingChecklistItem[] } = {
+export const DEFAULT_MEETING_CHECKLIST: { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; PRIOR_TO_MEETING: MeetingChecklistItem[]; AFTER_MEETING: MeetingChecklistItem[] } = {
   NOI: [
     { id: 'noi_1', label: 'Review previous minutes' },
     { id: 'noi_2', label: 'Verify financial year end records' },
@@ -41,10 +41,15 @@ export const DEFAULT_MEETING_CHECKLIST: { NOI: MeetingChecklistItem[]; NOM: Meet
     { id: 'nom_2', label: 'Include insurance policy summary' },
     { id: 'nom_3', label: 'Check for statutory disclosure requirements' }
   ],
-  COMPLETE: [
-    { id: 'c_1', label: 'Draft post-meeting minutes' },
-    { id: 'c_2', label: 'Update levy schedules' },
-    { id: 'c_3', label: 'Issue meeting summary to all owners' }
+  PRIOR_TO_MEETING: [
+    { id: 'pre_1', label: 'Confirm venue and Zoom link' },
+    { id: 'pre_2', label: 'Send meeting pack to attendees' },
+    { id: 'pre_3', label: 'Confirm quorum requirements' }
+  ],
+  AFTER_MEETING: [
+    { id: 'post_1', label: 'Draft post-meeting minutes' },
+    { id: 'post_2', label: 'Update levy schedules' },
+    { id: 'post_3', label: 'Issue meeting summary to all owners' }
   ]
 };
 

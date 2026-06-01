@@ -66,7 +66,7 @@ const AdminPanel: React.FC = () => {
     // Local configuration states for granular tabs
     const [localInsurance, setLocalInsurance] = useState<InsuranceSettings>(systemSettings.insuranceSettings || { valuationValidityYears: 2, workflowSteps: [] });
     const [localCategories, setLocalCategories] = useState<string[]>(systemSettings.contractorCategories || []);
-    const [localChecklists, setLocalChecklists] = useState(systemSettings.meetingChecklistTemplates || { NOI: [], NOM: [], COMPLETE: [] });
+    const [localChecklists, setLocalChecklists] = useState(systemSettings.meetingChecklistTemplates || { NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [] });
     const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
     const [newVenueInput, setNewVenueInput] = useState('');
     const [localStandardParagraph, setLocalStandardParagraph] = useState(systemSettings.disclosureStandardParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing.');
@@ -593,16 +593,18 @@ const AdminPanel: React.FC = () => {
                                     <ClipboardCheck size={18} className="text-pink-600" /> Master Meeting Checklists
                                 </h2>
                                 
-                                {(['NOI', 'NOM', 'COMPLETE'] as const).map(stage => (
+                                {(['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).map(stage => {
+                                    const stageLabel = { NOI: 'NOI', NOM: 'NOM', PRIOR_TO_MEETING: 'Prior to Meeting', AFTER_MEETING: 'After Meeting' }[stage];
+                                    return (
                                     <div key={stage} className="space-y-4">
                                         <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center justify-between">
-                                            <span>Stage: {stage}</span>
+                                            <span>Stage: {stageLabel}</span>
                                         </h3>
                                         <div className="space-y-2">
                                             {localChecklists[stage].map((item, idx) => (
                                                 <div key={item.id} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border dark:border-slate-700 group">
-                                                    <input 
-                                                        type="text" 
+                                                    <input
+                                                        type="text"
                                                         className="flex-1 bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-lg p-2 text-sm"
                                                         value={item.label}
                                                         onChange={(e) => {
@@ -611,7 +613,7 @@ const AdminPanel: React.FC = () => {
                                                             setLocalChecklists(next);
                                                         }}
                                                     />
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             const next = {...localChecklists};
                                                             next[stage] = next[stage].filter((_, i) => i !== idx);
@@ -623,7 +625,7 @@ const AdminPanel: React.FC = () => {
                                                     </button>
                                                 </div>
                                             ))}
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     const next = {...localChecklists};
                                                     next[stage] = [...next[stage], { id: `${stage.toLowerCase()}_${Date.now()}`, label: 'New Requirement' }];
@@ -631,11 +633,12 @@ const AdminPanel: React.FC = () => {
                                                 }}
                                                 className="w-full py-2 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-pink-600 transition-all font-bold uppercase text-[10px]"
                                             >
-                                                <PlusCircle size={14} className="inline mr-1" /> Add requirement to {stage}
+                                                <PlusCircle size={14} className="inline mr-1" /> Add requirement to {stageLabel}
                                             </button>
                                         </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                             <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-t dark:border-slate-800 py-4 flex justify-end gap-3 -mx-6 px-6 mt-6 rounded-b-xl">
                                 <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500 flex items-center gap-1.5 flex-1"><AlertCircle size={13} /> Remember to save your meeting configuration changes.</p>

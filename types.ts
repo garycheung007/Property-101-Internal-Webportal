@@ -201,7 +201,8 @@ export interface SystemSettings {
   meetingChecklistTemplates?: {
     NOI: MeetingChecklistItem[];
     NOM: MeetingChecklistItem[];
-    COMPLETE: MeetingChecklistItem[];
+    PRIOR_TO_MEETING: MeetingChecklistItem[];
+    AFTER_MEETING: MeetingChecklistItem[];
   };
   meetingVenues?: string[];
   disclosureStandardParagraph?: string;

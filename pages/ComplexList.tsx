@@ -216,7 +216,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
     useEffect(() => { setForm(complex); }, [complex]);
 
-    const checkStageComplete = (stage: 'NOI' | 'NOM' | 'COMPLETE', currentMeeting: Partial<Meeting>) => {
+    const checkStageComplete = (stage: 'NOI' | 'NOM' | 'PRIOR_TO_MEETING' | 'AFTER_MEETING', currentMeeting: Partial<Meeting>) => {
         const templates = systemSettings.meetingChecklistTemplates?.[stage] || [];
         if (templates.length === 0) return false;
         const progress = currentMeeting.checklistProgress || {};
@@ -227,8 +227,8 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
      * Finds the most recent completed AGM date based on meeting data
      */
     const getCalculatedLastAgmDate = () => {
-        const agmMeetings = (form.meetings || []).filter(m => 
-            (m.type === 'AGM' || m.type === 'SGM') && m.date && checkStageComplete('COMPLETE', m)
+        const agmMeetings = (form.meetings || []).filter(m =>
+            (m.type === 'AGM' || m.type === 'SGM') && m.date && checkStageComplete('AFTER_MEETING', m)
         );
         if (agmMeetings.length === 0) return null;
         
@@ -255,13 +255,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         }
     }, [selectedMeetingId]);
 
-    const handleToggleChecklistItem = (itemId: string, stage: 'NOI' | 'NOM' | 'COMPLETE') => {
+    const handleToggleChecklistItem = (itemId: string, stage: 'NOI' | 'NOM' | 'PRIOR_TO_MEETING' | 'AFTER_MEETING') => {
         const currentProgress = meetingForm.checklistProgress || {};
         const updatedProgress = { ...currentProgress, [itemId]: !currentProgress[itemId] };
         const updatedMeeting = { ...meetingForm, checklistProgress: updatedProgress };
         updatedMeeting.noiIssued = checkStageComplete('NOI', updatedMeeting);
         updatedMeeting.nomIssued = checkStageComplete('NOM', updatedMeeting);
-        updatedMeeting.minutesIssued = checkStageComplete('COMPLETE', updatedMeeting);
+        updatedMeeting.minutesIssued = checkStageComplete('AFTER_MEETING', updatedMeeting);
         setMeetingForm(updatedMeeting);
     };
 
@@ -820,12 +820,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                     <h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Compliance Checklist</h3>
                                                 </div>
                                                 <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                                    {(['NOI', 'NOM', 'COMPLETE'] as const).map(stage => {
+                                                    {(['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).map(stage => {
+                                                        const stageLabel = { NOI: 'NOI', NOM: 'NOM', PRIOR_TO_MEETING: 'Prior to Meeting', AFTER_MEETING: 'After Meeting' }[stage];
                                                         const items = systemSettings.meetingChecklistTemplates?.[stage] || [];
                                                         const progress = meetingForm.checklistProgress || {};
                                                         return (
                                                             <div key={stage} className="space-y-2 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700 transition-colors">
-                                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stage}</span>
+                                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stageLabel}</span>
                                                                 <div className="space-y-1">
                                                                     {items.map(item => (
                                                                         <label key={item.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors group">
