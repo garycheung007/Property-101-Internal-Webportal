@@ -1089,19 +1089,28 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         <option key={i} value={opt}>{opt}</option>
                                     ))}
                                 </select>
-                                {(form.waterRateDescription || '').toLowerCase().includes('third party') && (
-                                    <div className="mt-3">
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Third Party Provider</label>
+                                {(['third party', 'utility agent'].some(kw => (form.waterRateDescription || '').toLowerCase().includes(kw))) && (
+                                    <div className="mt-3 space-y-2">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Utility Agent</label>
                                         <select
                                             className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500"
                                             value={form.waterRateContractorId || ''}
                                             onChange={e => setForm(f => ({ ...f, waterRateContractorId: e.target.value }))}
                                         >
-                                            <option value="">— Select contractor —</option>
+                                            <option value="">— Select utility agent —</option>
                                             {contractors.filter(c => c.category === 'Utility').map(c => (
                                                 <option key={c.id} value={c.id}>{c.name}</option>
                                             ))}
                                         </select>
+                                        {form.waterRateContractorId && (() => {
+                                            const agent = contractors.find(c => c.id === form.waterRateContractorId);
+                                            return agent ? (
+                                                <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-2 space-y-0.5">
+                                                    {agent.phone && <div>Phone: {agent.phone}</div>}
+                                                    {agent.email && <div>Email: {agent.email}</div>}
+                                                </div>
+                                            ) : null;
+                                        })()}
                                     </div>
                                 )}
                             </div>
