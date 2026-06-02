@@ -84,7 +84,7 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.bwofConfirmationMessage) setBwofMessage(systemSettings.bwofConfirmationMessage);
         if (systemSettings.insuranceSettings) setLocalInsurance(systemSettings.insuranceSettings);
         if (systemSettings.contractorCategories) setLocalCategories(systemSettings.contractorCategories);
-        if (systemSettings.meetingChecklistTemplates) setLocalChecklists(systemSettings.meetingChecklistTemplates);
+        if (systemSettings.meetingChecklistTemplates) setLocalChecklists({ NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [], ...systemSettings.meetingChecklistTemplates });
         if (systemSettings.meetingVenues) setLocalVenues(systemSettings.meetingVenues);
         if (systemSettings.waterRateOptions) setLocalWaterRateOptions(systemSettings.waterRateOptions);
     }, [systemSettings]);
