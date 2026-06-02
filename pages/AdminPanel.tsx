@@ -66,7 +66,7 @@ const AdminPanel: React.FC = () => {
     // Local configuration states for granular tabs
     const [localInsurance, setLocalInsurance] = useState<InsuranceSettings>(systemSettings.insuranceSettings || { valuationValidityYears: 2, workflowSteps: [] });
     const [localCategories, setLocalCategories] = useState<string[]>(systemSettings.contractorCategories || []);
-    const [localChecklists, setLocalChecklists] = useState(systemSettings.meetingChecklistTemplates || { NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [] });
+    const [localChecklists, setLocalChecklists] = useState({ NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [], ...systemSettings.meetingChecklistTemplates });
     const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
     const [newVenueInput, setNewVenueInput] = useState('');
     const [localStandardParagraph, setLocalStandardParagraph] = useState(systemSettings.disclosureStandardParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing.');
