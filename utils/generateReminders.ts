@@ -1,6 +1,17 @@
 import { BodyCorporate, Reminder, ReminderType, InsuranceSettings } from '../types';
 import { DEFAULT_INSURANCE_SETTINGS, DEFAULT_WORKFLOW } from '../constants/defaults';
 
+const subtractWorkingDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  let remaining = days;
+  while (remaining > 0) {
+    result.setDate(result.getDate() - 1);
+    const dow = result.getDay();
+    if (dow !== 0 && dow !== 6) remaining--;
+  }
+  return result;
+};
+
 export function generateReminders(complexes: BodyCorporate[], settings: InsuranceSettings = DEFAULT_INSURANCE_SETTINGS): Reminder[] {
   const reminders: Reminder[] = [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -95,6 +106,22 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
         processMeetingTask('NOI', noiPref, noiDead, false, false);
       } else if (!meeting.nomIssued) {
         processMeetingTask('NOM', nomPref, nomDead, false, false);
+      } else if (!meeting.minutesIssued) {
+        const priorDue = subtractWorkingDays(mtgDate, 2);
+        const warnTrigger = new Date(priorDue);
+        warnTrigger.setDate(warnTrigger.getDate() - 7);
+        if (today >= warnTrigger) {
+          const isOverdue = today >= priorDue;
+          reminders.push({
+            id: `prior-mtg-${bc.id}-${meeting.id}`,
+            bcId: bc.id,
+            bcName: bc.name,
+            type: isOverdue ? ReminderType.AGM : ReminderType.UPCOMING_ACTION,
+            dueDate: priorDue.toISOString().split('T')[0],
+            message: `${isOverdue ? 'OVERDUE' : 'ACTION'}: Complete Prior to Meeting checklist for ${meeting.type} (Mtg: ${meeting.date}). Due: ${priorDue.toLocaleDateString('en-NZ')}`,
+            severity: isOverdue ? 'high' : 'medium'
+          });
+        }
       }
     });
   });

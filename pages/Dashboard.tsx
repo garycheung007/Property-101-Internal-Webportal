@@ -6,6 +6,17 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, BellOff } from 'lucide-react';
 import { Reminder, ReminderType } from '../types';
 
+const subtractWorkingDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  let remaining = days;
+  while (remaining > 0) {
+    result.setDate(result.getDate() - 1);
+    const dow = result.getDay();
+    if (dow !== 0 && dow !== 6) remaining--;
+  }
+  return result;
+};
+
 const Dashboard: React.FC = () => {
   const { complexes, reminders, actionComments, addActionComment, removeActionComment, snoozedAlerts, snoozeAlert, unsnoozeAlert, managers, updateComplex, updateMeeting } = useData();
   const { user } = useAuth();
@@ -68,7 +79,8 @@ const Dashboard: React.FC = () => {
                 noiDueDate: nextMtg.noiDueDate,
                 complexType: c.type,
                 nomDaysPrior: c.isocNomDaysPrior,
-                noiNotApplicable: nextMtg.noiNotApplicable
+                noiNotApplicable: nextMtg.noiNotApplicable,
+                minutesIssued: nextMtg.minutesIssued
             }
         }
         return null;
@@ -145,6 +157,20 @@ const Dashboard: React.FC = () => {
             pref: s.prefStr, 
             deadline: s.deadStr, 
             status: s.isUrgent ? 'urgent' : (s.isWarning ? 'warning' : 'good') 
+          };
+      }
+
+      if (!meeting.minutesIssued) {
+          const priorDue = subtractWorkingDays(mDate, 2);
+          const warnDate = new Date(priorDue);
+          warnDate.setDate(warnDate.getDate() - 7);
+          const isUrgent = today >= priorDue;
+          const isWarning = today >= warnDate;
+          return {
+              label: 'Prior to Meeting',
+              pref: priorDue.toISOString().split('T')[0],
+              deadline: priorDue.toISOString().split('T')[0],
+              status: isUrgent ? 'urgent' : (isWarning ? 'warning' : 'good')
           };
       }
 
@@ -430,14 +456,23 @@ const Dashboard: React.FC = () => {
                                         </div>
                                         {!isNoticeSent && (
                                             <div className="flex flex-col gap-0.5 mt-1 border-t border-current/10 pt-1.5">
-                                                <div className="flex justify-between">
-                                                    <span className="opacity-70">Statutory Deadline:</span>
-                                                    <span className="font-bold">{new Date(docStatus.deadline!).toLocaleDateString('en-NZ')}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="opacity-70">Preferred Action Date:</span>
-                                                    <span className="font-medium italic">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
-                                                </div>
+                                                {docStatus.label === 'Prior to Meeting' ? (
+                                                    <div className="flex justify-between">
+                                                        <span className="opacity-70">Due (2 working days prior):</span>
+                                                        <span className="font-bold">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="flex justify-between">
+                                                            <span className="opacity-70">Statutory Deadline:</span>
+                                                            <span className="font-bold">{new Date(docStatus.deadline!).toLocaleDateString('en-NZ')}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="opacity-70">Preferred Action Date:</span>
+                                                            <span className="font-medium italic">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </div>
