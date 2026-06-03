@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, BellOff } from 'lucide-react';
 import { Reminder, ReminderType } from '../types';
+import { DEFAULT_MEETING_CHECKLIST } from '../constants/defaults';
 
 const subtractWorkingDays = (date: Date, days: number): Date => {
   const result = new Date(date);
@@ -18,7 +19,7 @@ const subtractWorkingDays = (date: Date, days: number): Date => {
 };
 
 const Dashboard: React.FC = () => {
-  const { complexes, reminders, actionComments, addActionComment, removeActionComment, snoozedAlerts, snoozeAlert, unsnoozeAlert, managers, updateComplex, updateMeeting } = useData();
+  const { complexes, reminders, actionComments, addActionComment, removeActionComment, snoozedAlerts, snoozeAlert, unsnoozeAlert, managers, updateComplex, updateMeeting, systemSettings } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const upcomingActionsRef = useRef<HTMLDivElement>(null);
@@ -90,6 +91,48 @@ const Dashboard: React.FC = () => {
     .slice(0, 10);
 
   const totalUnits = filteredComplexes.reduce((sum, c) => sum + c.units, 0);
+
+  const meetingChecklistTemplates = systemSettings.meetingChecklistTemplates || DEFAULT_MEETING_CHECKLIST;
+
+  const meetingChecklistItems = filteredComplexes.flatMap(c =>
+    (c.meetings || []).flatMap(meeting => {
+      const mtgDate = new Date(meeting.date);
+      if (isNaN(mtgDate.getTime())) return [];
+      const isFuture = mtgDate >= today;
+      const noiDone = meeting.noiIssued || meeting.noiNotApplicable;
+      const progress = meeting.checklistProgress || {};
+      const items: any[] = [];
+
+      if (isFuture && noiDone && meeting.nomIssued && !meeting.minutesIssued) {
+        const priorDue = subtractWorkingDays(mtgDate, 2);
+        (meetingChecklistTemplates.PRIOR_TO_MEETING || [])
+          .filter(item => !progress[item.id])
+          .forEach(item => items.push({
+            key: `ptm-${meeting.id}-${item.id}`,
+            bcId: c.id, bcName: c.name,
+            meetingId: meeting.id, meetingDate: meeting.date, meetingType: meeting.type,
+            stage: 'PRIOR_TO_MEETING',
+            item,
+            dueDate: priorDue.toISOString().split('T')[0]
+          }));
+      }
+
+      if (!isFuture && !meeting.minutesIssued) {
+        (meetingChecklistTemplates.AFTER_MEETING || [])
+          .filter(item => !progress[item.id])
+          .forEach(item => items.push({
+            key: `am-${meeting.id}-${item.id}`,
+            bcId: c.id, bcName: c.name,
+            meetingId: meeting.id, meetingDate: meeting.date, meetingType: meeting.type,
+            stage: 'AFTER_MEETING',
+            item,
+            dueDate: meeting.date
+          }));
+      }
+
+      return items;
+    })
+  );
 
   const getNextDocumentStatus = (meeting: any) => {
       const mDate = new Date(meeting.date);
@@ -226,7 +269,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: 'Active Complexes', val: filteredComplexes.length, icon: <FileCheck />, color: 'pink', onClick: () => navigate('/complexes') },
-          { label: 'Upcoming Actions', val: upcomingActions.length, icon: <ClipboardList />, color: 'pink', onClick: () => upcomingActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
+          { label: 'Upcoming Actions', val: upcomingActions.length + meetingChecklistItems.length, icon: <ClipboardList />, color: 'pink', onClick: () => upcomingActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
           { label: 'Critical Alerts', val: criticalAlerts.length, icon: <AlertTriangle />, color: 'amber', onClick: () => criticalAlertsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
         ].map((stat, i) => (
           <div key={i} onClick={stat.onClick} className="cursor-pointer hover:shadow-md bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all text-left group">
@@ -258,13 +301,14 @@ const Dashboard: React.FC = () => {
           <p className="text-xs text-slate-400 mb-4">Task issuance for portolios</p>
 
           <div className="overflow-y-auto max-h-[420px] space-y-3 pr-2 custom-scrollbar">
-            {upcomingActions.length === 0 ? (
+            {upcomingActions.length === 0 && meetingChecklistItems.length === 0 ? (
                 <div className="text-slate-400 text-center py-10 flex flex-col items-center">
                     <CheckCircle2 size={32} className="mb-2 opacity-50 text-emerald-500" />
                     <span>All actions complete.</span>
                 </div>
             ) : (
-                upcomingActions.map(rem => {
+                <>
+                {upcomingActions.map(rem => {
                     const isOverdue = new Date(rem.dueDate) < new Date();
                     const isMeetingRelated = rem.message.includes('Notice') || rem.message.includes('NOI') || rem.message.includes('NOM');
                     const isInsuranceRelated = rem.message.includes('insurance') || rem.message.includes('valuation');
@@ -298,7 +342,35 @@ const Dashboard: React.FC = () => {
                             </div>
                         </div>
                     );
-                })
+                })}
+                {meetingChecklistItems.map(ci => {
+                    const ciDueDate = new Date(ci.dueDate);
+                    const ciIsOverdue = ciDueDate < today;
+                    const stageLabel = ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
+                    return (
+                        <div key={ci.key} className={`p-4 rounded-xl border-l-4 group transition-all hover:translate-x-1 cursor-pointer hover:shadow-md ${
+                            ciIsOverdue ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-slate-50 border-slate-300 dark:bg-slate-800/50 dark:border-slate-700'
+                        }`}
+                        onClick={() => navigate(`/complexes?id=${ci.bcId}&tab=meetings&from=dashboard`)}
+                        >
+                            <div className="flex justify-between items-start mb-1">
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${ciIsOverdue ? 'text-red-600' : 'text-slate-400'}`}>
+                                        {ciIsOverdue ? 'Overdue' : 'Scheduled'}
+                                    </span>
+                                    <span className="text-[10px] bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 px-1.5 py-0.5 rounded font-bold uppercase">Meeting Task</span>
+                                </div>
+                                <span className="text-[10px] font-mono text-slate-500">{ciDueDate.toLocaleDateString('en-NZ')}</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center justify-between">
+                                {ci.bcName}
+                                <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{stageLabel}: {ci.item.label}</p>
+                        </div>
+                    );
+                })}
+                </>
             )}
           </div>
         </div>
@@ -421,6 +493,7 @@ const Dashboard: React.FC = () => {
                           const isUrgent = docStatus.status === 'urgent';
                           const isComplete = docStatus.status === 'good';
                           const isNoticeSent = docStatus.label === 'Notices Sent';
+                          const priorItems = meetingChecklistItems.filter(ci => ci.meetingId === m.id && ci.stage === 'PRIOR_TO_MEETING');
                           
                           return (
                             <div key={`${m.bcId}-${m.id}`} className="py-4 first:pt-0 group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 -mx-2 transition-all"
@@ -457,10 +530,22 @@ const Dashboard: React.FC = () => {
                                         {!isNoticeSent && (
                                             <div className="flex flex-col gap-0.5 mt-1 border-t border-current/10 pt-1.5">
                                                 {docStatus.label === 'Prior to Meeting' ? (
-                                                    <div className="flex justify-between">
-                                                        <span className="opacity-70">Due (2 working days prior):</span>
-                                                        <span className="font-bold">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
-                                                    </div>
+                                                    <>
+                                                        <div className="flex justify-between">
+                                                            <span className="opacity-70">Due (2 working days prior):</span>
+                                                            <span className="font-bold">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
+                                                        </div>
+                                                        {priorItems.length > 0 && (
+                                                            <div className="mt-1.5 flex flex-col gap-1 border-t border-current/10 pt-1.5">
+                                                                {priorItems.map(ci => (
+                                                                    <div key={ci.key} className="flex items-start gap-1.5">
+                                                                        <div className="w-2.5 h-2.5 rounded border border-current/40 shrink-0 mt-px" />
+                                                                        <span className="opacity-80 leading-tight">{ci.item.label}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 ) : (
                                                     <>
                                                         <div className="flex justify-between">
