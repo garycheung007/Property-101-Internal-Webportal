@@ -206,6 +206,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [ltmpEditing, setLtmpEditing] = useState(false);
     const [venueOther, setVenueOther] = useState(false);
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
+    const [adminUnlocked, setAdminUnlocked] = useState(false);
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
     const valuers = contractors.filter(c => c.category === 'Insurance Valuer');
@@ -253,6 +254,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         } else {
             setVenueOther(false);
         }
+        setAdminUnlocked(false);
     }, [selectedMeetingId]);
 
     const handleToggleChecklistItem = (itemId: string, stage: 'NOI' | 'NOM' | 'PRIOR_TO_MEETING' | 'AFTER_MEETING') => {
@@ -295,6 +297,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         setMeetingForm({});
         setMeetingDeleteConfirm(null);
     };
+
+    const allChecklistItems = (['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const)
+        .flatMap(stage => systemSettings.meetingChecklistTemplates?.[stage] || []);
+    const checklistProgress = meetingForm.checklistProgress || {};
+    const isMeetingLocked = allChecklistItems.length > 0 && allChecklistItems.every(item => checklistProgress[item.id]);
+    const effectiveLocked = isMeetingLocked && !adminUnlocked;
 
     const workflowSteps = systemSettings.insuranceSettings?.workflowSteps || [];
     const insuranceProgress: Record<string, InsuranceStepStatus> = form.insuranceWorkflowProgress || {};
@@ -773,12 +781,15 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         <div className="flex justify-between items-center border-b dark:border-slate-800 pb-3">
                                             <div className="flex items-center gap-3">
                                                 <h3 className="font-bold text-xs uppercase dark:text-white tracking-widest text-slate-400">{selectedMeetingId === 'new' ? 'Schedule New Meeting' : 'Meeting Details'}</h3>
-                                                {meetingForm.date && isMeetingPassed(meetingForm.date) && <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded uppercase flex items-center gap-1"><Lock size={10} /> Locked</span>}
+                                                {effectiveLocked && <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded uppercase flex items-center gap-1"><Lock size={10} /> Locked</span>}
+                                                {isMeetingLocked && !adminUnlocked && currentUser?.role === 'admin' && (
+                                                    <button onClick={() => setAdminUnlocked(true)} className="text-[9px] font-bold text-pink-600 hover:text-pink-700 px-2 py-0.5 rounded border border-pink-200 hover:border-pink-300 uppercase transition-colors">Unlock</button>
+                                                )}
                                             </div>
                                             <button onClick={() => { setSelectedMeetingId(null); setMeetingForm({}); setMeetingDeleteConfirm(null); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <fieldset className="space-y-4" disabled={meetingForm.date ? isMeetingPassed(meetingForm.date) : false}>
+                                            <fieldset className="space-y-4" disabled={effectiveLocked}>
                                                 <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.date || ''} onChange={e => { const newDate = e.target.value; setMeetingForm({ ...meetingForm, date: newDate, noiResponseDueDate: calculateDefaultResponseDueDate(newDate) }); }} /></div>
@@ -830,7 +841,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                 <div className="space-y-1">
                                                                     {items.map(item => (
                                                                         <label key={item.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors group">
-                                                                            <input type="checkbox" className="rounded text-pink-600 focus:ring-pink-500 w-4 h-4" checked={progress[item.id] || false} onChange={() => handleToggleChecklistItem(item.id, stage)} disabled={meetingForm.date ? isMeetingPassed(meetingForm.date) : false} />
+                                                                            <input type="checkbox" className="rounded text-pink-600 focus:ring-pink-500 w-4 h-4" checked={progress[item.id] || false} onChange={() => handleToggleChecklistItem(item.id, stage)} disabled={effectiveLocked} />
                                                                             <span className={`text-xs ${progress[item.id] ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
                                                                         </label>
                                                                     ))}
@@ -902,10 +913,10 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 </div>
                                             )}
                                             <div className="flex gap-3">
-                                                {selectedMeetingId !== 'new' && !isMeetingPassed(meetingForm.date!) && (
+                                                {selectedMeetingId !== 'new' && !effectiveLocked && (
                                                     <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId!)} className="p-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 transition-colors"><Trash2 size={18}/></button>
                                                 )}
-                                                {!isMeetingPassed(meetingForm.date || '') && (
+                                                {!effectiveLocked && (
                                                     <button onClick={handleSaveMeetingForm} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"><Save size={18} /> Save Meeting</button>
                                                 )}
                                             </div>
