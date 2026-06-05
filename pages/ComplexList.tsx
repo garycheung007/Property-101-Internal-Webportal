@@ -12,9 +12,7 @@ import {
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
     FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2
 } from 'lucide-react';
-import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry, TemplateFileRecord } from '../types';
-import { getDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry } from '../types';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -439,21 +437,49 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         if (selectedConflictId === id) { setSelectedConflictId(null); setConflictForm({}); }
     };
 
-    const downloadConflictRegister = async () => {
-        const snap = await getDoc(doc(db, 'templates_v2', 'conflictRegister'));
-        if (!snap.exists()) {
-            alert('No Conflict Register template uploaded yet. Please upload one in Admin Panel → Templates → Conflict Register.');
-            return;
+    const downloadConflictRegister = () => {
+        const entries = form.conflictRegister || [];
+        const rows = entries.length > 0
+            ? entries.map(e => `<tr>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.memberName}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.matter}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.conflictNature}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.dateDisclosed ? new Date(e.dateDisclosed).toLocaleDateString('en-NZ') : ''}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;text-align:center;">${e.breachOccurred}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.breachOccurred === 'YES' && e.breachNotifiedDate ? new Date(e.breachNotifiedDate).toLocaleDateString('en-NZ') : ''}</td>
+            </tr>`).join('')
+            : `<tr><td colspan="6" style="border:1px solid #000;padding:5pt;text-align:center;color:#666;font-style:italic;">No entries recorded.</td></tr>`;
+        const html = `
+            <p style="font-weight:bold;font-size:14pt;margin-bottom:6pt;">${form.name} (BC${form.bcNumber})</p>
+            <h2 style="font-size:13pt;font-weight:bold;margin-bottom:12pt;">Register of interests – Committee members</h2>
+            <p style="font-size:10pt;font-weight:bold;margin-bottom:16pt;">The Committee member/s with a financial conflict of interest may complete columns 1 to 4 (or the Committee may wish to). The Committee completes columns 5 and 6.</p>
+            <p style="font-size:9pt;color:#555;margin-bottom:16pt;">Generated: ${new Date().toLocaleDateString('en-NZ')}</p>
+            <table style="border-collapse:collapse;width:100%;font-size:9pt;">
+                <thead>
+                    <tr style="background-color:#cccccc;">
+                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:4%;">1</th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:20%;">2</th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:25%;">3</th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:10%;">4</th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:20%;">5</th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:21%;">6</th>
+                    </tr>
+                    <tr style="background-color:#cccccc;">
+                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;"><strong>Name</strong> of Committee member</th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;"><strong>Body Corporate matter</strong> being considered by the Committee that triggers the Committee member’s financial conflict of interest – <em>“matter” as defined in section 114C(5) Unit Titles Act 2010</em></th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;">Nature and extent of the <strong>Committee members’ financial conflict of interest</strong> – <em>as defined in sections 114C(3) and (4) Unit Titles Act 2010</em></th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;"><strong>Date</strong> financial conflict of interest disclosed by the Committee member to the Committee</th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;">Has there been a breach of <em>section 114C</em> (disclosure of the conflict), or <em>section 114D</em> (voting on the matter) <em>Unit Titles Act 2010</em>?<br/><strong>YES or NO</strong></th>
+                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;"><strong>If YES – Date</strong> the Committee notified the breach to the Body Corporate under <em>section 114E Unit Titles Act 2010</em></th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        const win = window.open('', '_blank');
+        if (win) {
+            win.document.write(`<!DOCTYPE html><html><head><title>Conflict Register - ${form.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}@media print{body{margin:20mm;}}</style></head><body>${html}</body></html>`);
+            win.document.close();
         }
-        const record = snap.data() as TemplateFileRecord;
-        const bytes = Uint8Array.from(atob(record.data), c => c.charCodeAt(0));
-        const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Conflict Register - ${form.name || form.bcNumber}.docx`;
-        a.click();
-        URL.revokeObjectURL(url);
     };
 
     const handleSaveWithLogs = async () => {
