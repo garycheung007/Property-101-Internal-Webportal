@@ -83,6 +83,13 @@ const AdminPanel: React.FC = () => {
     const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
     const [uploadingDocx, setUploadingDocx] = useState<string | null>(null);
     const docxInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+    const conflictTemplateInputRef = useRef<HTMLInputElement | null>(null);
+
+    const handleConflictTemplateUpload = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => setLocalConflictRegisterTemplate(e.target?.result as string);
+        reader.readAsText(file);
+    };
 
     useEffect(() => {
         if (systemSettings.bwofConfirmationMessage) setBwofMessage(systemSettings.bwofConfirmationMessage);
@@ -541,12 +548,27 @@ const AdminPanel: React.FC = () => {
                                             onChange={e => setLocalConflictRegisterTemplate(e.target.value)}
                                         />
                                         <div className="flex justify-between items-center pt-2">
-                                            <button
-                                                onClick={() => setLocalConflictRegisterTemplate(DEFAULT_CONFLICT_REGISTER_TEMPLATE)}
-                                                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline transition-colors"
-                                            >
-                                                Reset to default
-                                            </button>
+                                            <div className="flex items-center gap-4">
+                                                <button
+                                                    onClick={() => setLocalConflictRegisterTemplate(DEFAULT_CONFLICT_REGISTER_TEMPLATE)}
+                                                    className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline transition-colors"
+                                                >
+                                                    Reset to default
+                                                </button>
+                                                <input
+                                                    ref={conflictTemplateInputRef}
+                                                    type="file"
+                                                    accept=".html"
+                                                    className="hidden"
+                                                    onChange={e => { if (e.target.files?.[0]) handleConflictTemplateUpload(e.target.files[0]); e.target.value = ''; }}
+                                                />
+                                                <button
+                                                    onClick={() => conflictTemplateInputRef.current?.click()}
+                                                    className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-pink-600 dark:text-slate-400 dark:hover:text-pink-400 transition-colors"
+                                                >
+                                                    <Upload size={13} /> Upload HTML File
+                                                </button>
+                                            </div>
                                             <button
                                                 onClick={handleSaveSettings}
                                                 className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"
