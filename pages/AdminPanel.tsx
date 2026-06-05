@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -75,21 +74,10 @@ const AdminPanel: React.FC = () => {
     const [localWaterRateOptions, setLocalWaterRateOptions] = useState<string[]>(
         systemSettings.waterRateOptions ?? ['Water rate not included in levy — unit has its own meter']
     );
-    const [localConflictRegisterTemplate, setLocalConflictRegisterTemplate] = useState<string>(
-        systemSettings.conflictRegisterTemplate ?? DEFAULT_CONFLICT_REGISTER_TEMPLATE
-    );
-
     // Docx template management
     const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
     const [uploadingDocx, setUploadingDocx] = useState<string | null>(null);
     const docxInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-    const conflictTemplateInputRef = useRef<HTMLInputElement | null>(null);
-
-    const handleConflictTemplateUpload = (file: File) => {
-        const reader = new FileReader();
-        reader.onload = (e) => setLocalConflictRegisterTemplate(e.target?.result as string);
-        reader.readAsText(file);
-    };
 
     useEffect(() => {
         if (systemSettings.bwofConfirmationMessage) setBwofMessage(systemSettings.bwofConfirmationMessage);
@@ -98,11 +86,10 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.meetingChecklistTemplates) setLocalChecklists({ NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [], ...systemSettings.meetingChecklistTemplates });
         if (systemSettings.meetingVenues) setLocalVenues(systemSettings.meetingVenues);
         if (systemSettings.waterRateOptions) setLocalWaterRateOptions(systemSettings.waterRateOptions);
-        if (systemSettings.conflictRegisterTemplate) setLocalConflictRegisterTemplate(systemSettings.conflictRegisterTemplate);
     }, [systemSettings]);
 
     useEffect(() => {
-        const keys = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 's146', 's147', 'cpl'];
+        const keys = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 's146', 's147', 'cpl', 'conflictRegister'];
         Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
             const loaded: Partial<Record<string, TemplateFileRecord>> = {};
             snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });
@@ -177,7 +164,6 @@ const AdminPanel: React.FC = () => {
             disclosureStandardParagraph: localStandardParagraph,
             disclosureRemediationParagraph: localRemediationParagraph,
             waterRateOptions: localWaterRateOptions,
-            conflictRegisterTemplate: localConflictRegisterTemplate
         });
         alert("System settings updated successfully.");
     };
@@ -532,51 +518,8 @@ const AdminPanel: React.FC = () => {
                             )}
 
                             {templateSubTab === 'conflict' && (
-                                <div className="space-y-4 animate-in fade-in duration-300">
-                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-4">
-                                        <div className="flex items-start gap-3 border-b dark:border-slate-800 pb-4">
-                                            <FileText size={20} className="text-pink-600 mt-0.5 shrink-0" />
-                                            <div>
-                                                <h3 className="font-bold text-sm dark:text-white">Conflict Register HTML Template</h3>
-                                                <p className="text-xs text-slate-400 mt-1">This HTML template is used when downloading the Conflict Register from a complex. Use <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{BC_NAME}}'}</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{BC_NUMBER}}'}</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{GENERATED_DATE}}'}</code>, and <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{CONFLICT_REGISTER_ROWS}}'}</code> merge tags.</p>
-                                            </div>
-                                        </div>
-                                        <textarea
-                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-xs font-mono resize-y outline-none focus:ring-2 focus:ring-pink-500"
-                                            rows={20}
-                                            value={localConflictRegisterTemplate}
-                                            onChange={e => setLocalConflictRegisterTemplate(e.target.value)}
-                                        />
-                                        <div className="flex justify-between items-center pt-2">
-                                            <div className="flex items-center gap-4">
-                                                <button
-                                                    onClick={() => setLocalConflictRegisterTemplate(DEFAULT_CONFLICT_REGISTER_TEMPLATE)}
-                                                    className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline transition-colors"
-                                                >
-                                                    Reset to default
-                                                </button>
-                                                <input
-                                                    ref={conflictTemplateInputRef}
-                                                    type="file"
-                                                    accept=".html"
-                                                    className="hidden"
-                                                    onChange={e => { if (e.target.files?.[0]) handleConflictTemplateUpload(e.target.files[0]); e.target.value = ''; }}
-                                                />
-                                                <button
-                                                    onClick={() => conflictTemplateInputRef.current?.click()}
-                                                    className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-pink-600 dark:text-slate-400 dark:hover:text-pink-400 transition-colors"
-                                                >
-                                                    <Upload size={13} /> Upload HTML File
-                                                </button>
-                                            </div>
-                                            <button
-                                                onClick={handleSaveSettings}
-                                                className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"
-                                            >
-                                                <Save size={16} /> Save Template
-                                            </button>
-                                        </div>
-                                    </div>
+                                <div className="space-y-2 animate-in fade-in duration-300">
+                                    {renderDocxCard('conflictRegister', 'Conflict Register')}
                                 </div>
                             )}
                         </div>

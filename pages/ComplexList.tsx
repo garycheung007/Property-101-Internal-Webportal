@@ -12,8 +12,9 @@ import {
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
     FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2
 } from 'lucide-react';
-import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry } from '../types';
-import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
+import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry, TemplateFileRecord } from '../types';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -438,29 +439,21 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         if (selectedConflictId === id) { setSelectedConflictId(null); setConflictForm({}); }
     };
 
-    const downloadConflictRegister = () => {
-        const template = systemSettings.conflictRegisterTemplate || DEFAULT_CONFLICT_REGISTER_TEMPLATE;
-        const entries = form.conflictRegister || [];
-        const rows = entries.length > 0
-            ? entries.map(e => `<tr>
-                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.memberName}</td>
-                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.matter}</td>
-                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.conflictNature}</td>
-                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.dateDisclosed ? new Date(e.dateDisclosed).toLocaleDateString('en-NZ') : ''}</td>
-                <td style="border:1px solid #000;padding:5pt;vertical-align:top;text-align:center;">${e.breachOccurred}</td>
-                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.breachOccurred === 'YES' && e.breachNotifiedDate ? new Date(e.breachNotifiedDate).toLocaleDateString('en-NZ') : ''}</td>
-            </tr>`).join('')
-            : `<tr><td colspan="6" style="border:1px solid #000;padding:5pt;text-align:center;color:#666;font-style:italic;">No entries recorded.</td></tr>`;
-        const html = template
-            .replace(/\{\{BC_NAME\}\}/g, form.name || '')
-            .replace(/\{\{BC_NUMBER\}\}/g, form.bcNumber || '')
-            .replace(/\{\{GENERATED_DATE\}\}/g, new Date().toLocaleDateString('en-NZ'))
-            .replace(/\{\{CONFLICT_REGISTER_ROWS\}\}/g, rows);
-        const win = window.open('', '_blank');
-        if (win) {
-            win.document.write(`<!DOCTYPE html><html><head><title>Conflict Register - ${form.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}@media print{body{margin:20mm;}}</style></head><body>${html}</body></html>`);
-            win.document.close();
+    const downloadConflictRegister = async () => {
+        const snap = await getDoc(doc(db, 'templates_v2', 'conflictRegister'));
+        if (!snap.exists()) {
+            alert('No Conflict Register template uploaded yet. Please upload one in Admin Panel → Templates → Conflict Register.');
+            return;
         }
+        const record = snap.data() as TemplateFileRecord;
+        const bytes = Uint8Array.from(atob(record.data), c => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Conflict Register - ${form.name || form.bcNumber}.docx`;
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     const handleSaveWithLogs = async () => {

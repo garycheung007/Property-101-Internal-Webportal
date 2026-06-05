@@ -14,7 +14,7 @@ import {
   DEFAULT_CATEGORIES, DEFAULT_INSURANCE_SETTINGS,
   DEFAULT_MEETING_CHECKLIST, DEFAULT_BWOF_MESSAGE
 } from '../constants/defaults';
-import { DEFAULT_TEMPLATES, DEFAULT_CONFLICT_REGISTER_TEMPLATE, CHAIRPERSON_TABLE_HTML, COMMITTEE_TABLE_HTML } from '../constants/defaultTemplates';
+import { DEFAULT_TEMPLATES, CHAIRPERSON_TABLE_HTML, COMMITTEE_TABLE_HTML } from '../constants/defaultTemplates';
 import { generateReminders } from '../utils/generateReminders';
 
 interface DataContextType {
@@ -73,8 +73,7 @@ const migrateSettings = (data: SystemSettings): SystemSettings => {
   if (!data.meetingChecklistTemplates) data.meetingChecklistTemplates = DEFAULT_MEETING_CHECKLIST;
   if (!data.bwofConfirmationMessage) data.bwofConfirmationMessage = DEFAULT_BWOF_MESSAGE;
   if (!data.documentTemplates) data.documentTemplates = DEFAULT_TEMPLATES;
-  if (!data.conflictRegisterTemplate) data.conflictRegisterTemplate = DEFAULT_CONFLICT_REGISTER_TEMPLATE;
-  if (data.paragraphSpacing === undefined) data.paragraphSpacing = 10;
+if (data.paragraphSpacing === undefined) data.paragraphSpacing = 10;
 
   if (data.documentTemplates) {
     const templateKeys = ['noiLetter', 'responseForm', 'noiLetterBC', 'responseFormBC', 'noiLetterISOC', 'responseFormISOC', 's146', 's147', 'cpl'];
