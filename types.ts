@@ -219,6 +219,7 @@ export interface SystemSettings {
   disclosureStandardParagraph?: string;
   disclosureRemediationParagraph?: string;
   waterRateOptions?: string[];
+  conflictRegisterTemplate?: string;
 }
 
 export type ContractorCategory = string;

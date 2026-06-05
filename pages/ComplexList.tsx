@@ -13,6 +13,7 @@ import {
     FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2
 } from 'lucide-react';
 import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry } from '../types';
+import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -438,6 +439,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     };
 
     const downloadConflictRegister = () => {
+        const template = systemSettings.conflictRegisterTemplate || DEFAULT_CONFLICT_REGISTER_TEMPLATE;
         const entries = form.conflictRegister || [];
         const rows = entries.length > 0
             ? entries.map(e => `<tr>
@@ -449,32 +451,11 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                 <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.breachOccurred === 'YES' && e.breachNotifiedDate ? new Date(e.breachNotifiedDate).toLocaleDateString('en-NZ') : ''}</td>
             </tr>`).join('')
             : `<tr><td colspan="6" style="border:1px solid #000;padding:5pt;text-align:center;color:#666;font-style:italic;">No entries recorded.</td></tr>`;
-        const html = `
-            <p style="font-weight:bold;font-size:14pt;margin-bottom:6pt;">${form.name} (BC${form.bcNumber})</p>
-            <h2 style="font-size:13pt;font-weight:bold;margin-bottom:12pt;">Register of interests – Committee members</h2>
-            <p style="font-size:10pt;font-weight:bold;margin-bottom:16pt;">The Committee member/s with a financial conflict of interest may complete columns 1 to 4 (or the Committee may wish to). The Committee completes columns 5 and 6.</p>
-            <p style="font-size:9pt;color:#555;margin-bottom:16pt;">Generated: ${new Date().toLocaleDateString('en-NZ')}</p>
-            <table style="border-collapse:collapse;width:100%;font-size:9pt;">
-                <thead>
-                    <tr style="background-color:#cccccc;">
-                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:4%;">1</th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:20%;">2</th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:25%;">3</th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:10%;">4</th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:20%;">5</th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:center;width:21%;">6</th>
-                    </tr>
-                    <tr style="background-color:#cccccc;">
-                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;"><strong>Name</strong> of Committee member</th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;"><strong>Body Corporate matter</strong> being considered by the Committee that triggers the Committee member’s financial conflict of interest – <em>“matter” as defined in section 114C(5) Unit Titles Act 2010</em></th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;">Nature and extent of the <strong>Committee members’ financial conflict of interest</strong> – <em>as defined in sections 114C(3) and (4) Unit Titles Act 2010</em></th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;"><strong>Date</strong> financial conflict of interest disclosed by the Committee member to the Committee</th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;">Has there been a breach of <em>section 114C</em> (disclosure of the conflict), or <em>section 114D</em> (voting on the matter) <em>Unit Titles Act 2010</em>?<br/><strong>YES or NO</strong></th>
-                        <th style="border:1px solid #000;padding:5pt;text-align:left;vertical-align:top;"><strong>If YES – Date</strong> the Committee notified the breach to the Body Corporate under <em>section 114E Unit Titles Act 2010</em></th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>`;
+        const html = template
+            .replace(/\{\{BC_NAME\}\}/g, form.name || '')
+            .replace(/\{\{BC_NUMBER\}\}/g, form.bcNumber || '')
+            .replace(/\{\{GENERATED_DATE\}\}/g, new Date().toLocaleDateString('en-NZ'))
+            .replace(/\{\{CONFLICT_REGISTER_ROWS\}\}/g, rows);
         const win = window.open('', '_blank');
         if (win) {
             win.document.write(`<!DOCTYPE html><html><head><title>Conflict Register - ${form.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}@media print{body{margin:20mm;}}</style></head><body>${html}</body></html>`);
