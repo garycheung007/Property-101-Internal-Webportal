@@ -3,16 +3,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
+import {
     Search, ShieldCheck, ShieldAlert, X, Calendar, RefreshCw, Save,
     CheckCircle2, DollarSign, Clock, MapPin, History, Plus, Trash2,
     Database, Lock, ListFilter, MessageSquareMore, ToggleRight,
     ToggleLeft, ArrowRightCircle, Check, AlertCircle, MapPinHouse,
     User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
-    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets
+    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2
 } from 'lucide-react';
-import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem } from '../types';
+import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry } from '../types';
+import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -90,7 +91,7 @@ const ComplexList: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const hasInitializedFilter = useRef(false);
   const [selectedComplexId, setSelectedComplexId] = useState<string | null>(null);
-  const [initialModalTab, setInitialModalTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' >('details');
+  const [initialModalTab, setInitialModalTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>('details');
 
   const selectedComplex = complexes.find(c => c.id === selectedComplexId) || null;
 
@@ -107,7 +108,7 @@ const ComplexList: React.FC = () => {
     const tabParam = searchParams.get('tab');
     if (idParam) {
         setSelectedComplexId(idParam);
-        if (tabParam && ['details', 'insurance', 'meetings', 'disclosure', 'logs'].includes(tabParam)) setInitialModalTab(tabParam as any);
+        if (tabParam && ['details', 'insurance', 'meetings', 'disclosure', 'logs', 'conflict'].includes(tabParam)) setInitialModalTab(tabParam as any);
     }
   }, [searchParams]);
 
@@ -191,12 +192,14 @@ const ComplexList: React.FC = () => {
   );
 };
 
-const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; onSave: (bc: BodyCorporate) => void; initialTab?: 'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' }> = ({ complex, onClose, onSave, initialTab = 'details' }) => {
+const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; onSave: (bc: BodyCorporate) => void; initialTab?: 'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict' }> = ({ complex, onClose, onSave, initialTab = 'details' }) => {
     const { contractors, actionComments, addActionComment, systemSettings, managers } = useData();
     const { user: currentUser } = useAuth();
     const [form, setForm] = useState<BodyCorporate>(complex);
     const [hasBuildingManager, setHasBuildingManager] = useState<boolean>(!!complex.buildingManagerName);
-    const [activeTab, setActiveTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>(initialTab);
+    const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
+    const [conflictForm, setConflictForm] = useState<Partial<ConflictEntry>>({});
     const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
     const [meetingForm, setMeetingForm] = useState<Partial<Meeting>>({});
     const [renewalPrompt, setRenewalPrompt] = useState<{ show: boolean, nextExpiry: string }>({ show: false, nextExpiry: '' });
@@ -411,6 +414,55 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
+    const handleSaveConflictEntry = () => {
+        const entry: ConflictEntry = {
+            id: selectedConflictId === 'new' ? `conflict_${Date.now()}` : selectedConflictId!,
+            memberName: conflictForm.memberName || '',
+            matter: conflictForm.matter || '',
+            conflictNature: conflictForm.conflictNature || '',
+            dateDisclosed: conflictForm.dateDisclosed || '',
+            breachOccurred: conflictForm.breachOccurred || '',
+            breachNotifiedDate: conflictForm.breachNotifiedDate || '',
+        };
+        const current = form.conflictRegister || [];
+        const updated = selectedConflictId === 'new'
+            ? [...current, entry]
+            : current.map(e => e.id === selectedConflictId ? entry : e);
+        setForm({ ...form, conflictRegister: updated });
+        setSelectedConflictId(null);
+        setConflictForm({});
+    };
+
+    const handleDeleteConflictEntry = (id: string) => {
+        setForm({ ...form, conflictRegister: (form.conflictRegister || []).filter(e => e.id !== id) });
+        if (selectedConflictId === id) { setSelectedConflictId(null); setConflictForm({}); }
+    };
+
+    const downloadConflictRegister = () => {
+        const template = systemSettings.conflictRegisterTemplate || DEFAULT_CONFLICT_REGISTER_TEMPLATE;
+        const entries = form.conflictRegister || [];
+        const rows = entries.length > 0
+            ? entries.map(e => `<tr>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.memberName}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.matter}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.conflictNature}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.dateDisclosed ? new Date(e.dateDisclosed).toLocaleDateString('en-NZ') : ''}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;text-align:center;">${e.breachOccurred}</td>
+                <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.breachOccurred === 'YES' && e.breachNotifiedDate ? new Date(e.breachNotifiedDate).toLocaleDateString('en-NZ') : ''}</td>
+            </tr>`).join('')
+            : `<tr><td colspan="6" style="border:1px solid #000;padding:5pt;text-align:center;color:#666;font-style:italic;">No entries recorded.</td></tr>`;
+        const html = template
+            .replace(/\{\{BC_NAME\}\}/g, form.name || '')
+            .replace(/\{\{BC_NUMBER\}\}/g, form.bcNumber || '')
+            .replace(/\{\{GENERATED_DATE\}\}/g, new Date().toLocaleDateString('en-NZ'))
+            .replace(/\{\{CONFLICT_REGISTER_ROWS\}\}/g, rows);
+        const win = window.open('', '_blank');
+        if (win) {
+            win.document.write(`<!DOCTYPE html><html><head><title>Conflict Register - ${form.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}@media print{body{margin:20mm;}}</style></head><body>${html}</body></html>`);
+            win.document.close();
+        }
+    };
+
     const handleSaveWithLogs = async () => {
         if (!currentUser) { onSave(form); return; }
         const changes: string[] = [];
@@ -446,6 +498,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                         { id: 'details', label: 'Details', icon: Building },
                         { id: 'insurance', label: 'Insurance', icon: ShieldCheck },
                         { id: 'meetings', label: 'Meetings', icon: Calendar },
+                        { id: 'conflict', label: 'Conflict Register', icon: ClipboardCheck },
                         { id: 'disclosure', label: 'Disclosure', icon: FileSignature },
                         { id: 'logs', label: 'History', icon: History }
                     ].map(tab => {
@@ -954,6 +1007,99 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         );
                                     })}
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'conflict' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[500px] animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <div className="lg:col-span-3">
+                                {selectedConflictId ? (
+                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-xl space-y-5">
+                                        <div className="flex justify-between items-center border-b dark:border-slate-800 pb-3">
+                                            <h3 className="font-bold text-xs uppercase dark:text-white tracking-widest text-slate-400">
+                                                {selectedConflictId === 'new' ? 'New Entry' : 'Edit Entry'}
+                                            </h3>
+                                            <button onClick={() => { setSelectedConflictId(null); setConflictForm({}); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Col 1 — Name of Committee Member</label>
+                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={conflictForm.memberName || ''} onChange={e => setConflictForm({...conflictForm, memberName: e.target.value})} placeholder="Full name" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Col 2 — Body Corporate Matter</label>
+                                                <textarea rows={2} className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 resize-none" value={conflictForm.matter || ''} onChange={e => setConflictForm({...conflictForm, matter: e.target.value})} placeholder="Matter being considered by the Committee" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Col 3 — Nature & Extent of Financial Conflict</label>
+                                                <textarea rows={3} className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 resize-none" value={conflictForm.conflictNature || ''} onChange={e => setConflictForm({...conflictForm, conflictNature: e.target.value})} placeholder="Nature and extent of the conflict of interest" />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Col 4 — Date Disclosed</label>
+                                                    <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={conflictForm.dateDisclosed || ''} onChange={e => setConflictForm({...conflictForm, dateDisclosed: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Col 5 — Breach? (s114C / s114D)</label>
+                                                    <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={conflictForm.breachOccurred || ''} onChange={e => setConflictForm({...conflictForm, breachOccurred: e.target.value as any})}>
+                                                        <option value="">-- Select --</option>
+                                                        <option value="NO">NO</option>
+                                                        <option value="YES">YES</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            {conflictForm.breachOccurred === 'YES' && (
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Col 6 — Date Committee Notified Body Corporate (s114E)</label>
+                                                    <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={conflictForm.breachNotifiedDate || ''} onChange={e => setConflictForm({...conflictForm, breachNotifiedDate: e.target.value})} />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex gap-3 pt-2 border-t dark:border-slate-800">
+                                            {selectedConflictId !== 'new' && (
+                                                <button onClick={() => handleDeleteConflictEntry(selectedConflictId!)} className="p-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 transition-colors"><Trash2 size={18}/></button>
+                                            )}
+                                            <button onClick={handleSaveConflictEntry} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"><Save size={18} /> Save Entry</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-400 border-2 border-dashed dark:border-slate-800 rounded-3xl p-10 bg-white/40 dark:bg-slate-900/40">
+                                        <ClipboardCheck size={48} className="opacity-20 mb-4 text-pink-500"/>
+                                        <h4 className="font-bold text-slate-500 mb-1">Conflict of Interest Register</h4>
+                                        <p className="text-xs italic text-center max-w-[240px]">Select an entry to edit, or add a new committee member conflict disclosure.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="lg:col-span-1 bg-slate-100 dark:bg-slate-800/40 rounded-3xl p-5 border dark:border-slate-700/50 flex flex-col shadow-inner overflow-hidden">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Entries</h3>
+                                    <button onClick={() => { setConflictForm({}); setSelectedConflictId('new'); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm">
+                                        <Plus size={13} /> Add
+                                    </button>
+                                </div>
+                                <div className="flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar mb-4">
+                                    {(form.conflictRegister || []).length === 0 ? (
+                                        <p className="text-[10px] text-slate-400 italic text-center py-4">No entries yet.</p>
+                                    ) : (form.conflictRegister || []).map(entry => (
+                                        <div key={entry.id} onClick={() => { setConflictForm({...entry}); setSelectedConflictId(entry.id); }} className={`p-3 bg-white dark:bg-slate-900 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${selectedConflictId === entry.id ? 'border-pink-500' : 'border-transparent dark:border-slate-800 hover:border-pink-200'}`}>
+                                            <p className="text-xs font-bold dark:text-white truncate">{entry.memberName || 'Unnamed'}</p>
+                                            <p className="text-[10px] text-slate-400 truncate mt-0.5">{entry.matter || '—'}</p>
+                                            <div className="flex items-center justify-between mt-1.5">
+                                                <span className="text-[8px] font-mono text-slate-400">{entry.dateDisclosed ? formatDateNZ(entry.dateDisclosed) : 'No date'}</span>
+                                                {entry.breachOccurred && (
+                                                    <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${entry.breachOccurred === 'YES' ? 'bg-red-100 dark:bg-red-900/30 text-red-600' : 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600'}`}>{entry.breachOccurred}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={downloadConflictRegister} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
+                                    <Download size={14} /> Download Register
+                                </button>
                             </div>
                         </div>
                     )}

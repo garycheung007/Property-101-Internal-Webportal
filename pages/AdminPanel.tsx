@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -56,7 +57,7 @@ const AdminPanel: React.FC = () => {
     } = useData();
     
     const [activeTab, setActiveTab] = useState<'properties' | 'contractors' | 'users' | 'settings' | 'meetings' | 'templates' | 'diagnostics'>('properties');
-    const [templateSubTab, setTemplateSubTab] = useState<'bc' | 'isoc' | 'disclosure'>('bc');
+    const [templateSubTab, setTemplateSubTab] = useState<'bc' | 'isoc' | 'disclosure' | 'conflict'>('bc');
     const [searchTerm, setSearchTerm] = useState('');
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -74,6 +75,9 @@ const AdminPanel: React.FC = () => {
     const [localWaterRateOptions, setLocalWaterRateOptions] = useState<string[]>(
         systemSettings.waterRateOptions ?? ['Water rate not included in levy — unit has its own meter']
     );
+    const [localConflictRegisterTemplate, setLocalConflictRegisterTemplate] = useState<string>(
+        systemSettings.conflictRegisterTemplate ?? DEFAULT_CONFLICT_REGISTER_TEMPLATE
+    );
 
     // Docx template management
     const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
@@ -87,6 +91,7 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.meetingChecklistTemplates) setLocalChecklists({ NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [], ...systemSettings.meetingChecklistTemplates });
         if (systemSettings.meetingVenues) setLocalVenues(systemSettings.meetingVenues);
         if (systemSettings.waterRateOptions) setLocalWaterRateOptions(systemSettings.waterRateOptions);
+        if (systemSettings.conflictRegisterTemplate) setLocalConflictRegisterTemplate(systemSettings.conflictRegisterTemplate);
     }, [systemSettings]);
 
     useEffect(() => {
@@ -164,7 +169,8 @@ const AdminPanel: React.FC = () => {
             meetingVenues: localVenues,
             disclosureStandardParagraph: localStandardParagraph,
             disclosureRemediationParagraph: localRemediationParagraph,
-            waterRateOptions: localWaterRateOptions
+            waterRateOptions: localWaterRateOptions,
+            conflictRegisterTemplate: localConflictRegisterTemplate
         });
         alert("System settings updated successfully.");
     };
@@ -489,6 +495,7 @@ const AdminPanel: React.FC = () => {
                                     <button onClick={() => setTemplateSubTab('bc')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'bc' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Body Corporate</button>
                                     <button onClick={() => setTemplateSubTab('isoc')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'isoc' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Inc Society</button>
                                     <button onClick={() => setTemplateSubTab('disclosure')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'disclosure' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Disclosure & CPL</button>
+                                    <button onClick={() => setTemplateSubTab('conflict')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'conflict' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Conflict Register</button>
                                 </div>
                             </div>
 
@@ -514,6 +521,40 @@ const AdminPanel: React.FC = () => {
                                     {renderDocxCard('s146', 'S146 Disclosure')}
                                     {renderDocxCard('s147', 'S147 Disclosure')}
                                     {renderDocxCard('cpl', 'CPL Template')}
+                                </div>
+                            )}
+
+                            {templateSubTab === 'conflict' && (
+                                <div className="space-y-4 animate-in fade-in duration-300">
+                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-4">
+                                        <div className="flex items-start gap-3 border-b dark:border-slate-800 pb-4">
+                                            <FileText size={20} className="text-pink-600 mt-0.5 shrink-0" />
+                                            <div>
+                                                <h3 className="font-bold text-sm dark:text-white">Conflict Register HTML Template</h3>
+                                                <p className="text-xs text-slate-400 mt-1">This HTML template is used when downloading the Conflict Register from a complex. Use <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{BC_NAME}}'}</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{BC_NUMBER}}'}</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{GENERATED_DATE}}'}</code>, and <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{CONFLICT_REGISTER_ROWS}}'}</code> merge tags.</p>
+                                            </div>
+                                        </div>
+                                        <textarea
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-xs font-mono resize-y outline-none focus:ring-2 focus:ring-pink-500"
+                                            rows={20}
+                                            value={localConflictRegisterTemplate}
+                                            onChange={e => setLocalConflictRegisterTemplate(e.target.value)}
+                                        />
+                                        <div className="flex justify-between items-center pt-2">
+                                            <button
+                                                onClick={() => setLocalConflictRegisterTemplate(DEFAULT_CONFLICT_REGISTER_TEMPLATE)}
+                                                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline transition-colors"
+                                            >
+                                                Reset to default
+                                            </button>
+                                            <button
+                                                onClick={handleSaveSettings}
+                                                className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"
+                                            >
+                                                <Save size={16} /> Save Template
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>

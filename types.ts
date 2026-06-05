@@ -4,6 +4,16 @@ export interface MeetingChecklistItem {
   label: string;
 }
 
+export interface ConflictEntry {
+  id: string;
+  memberName: string;
+  matter: string;
+  conflictNature: string;
+  dateDisclosed: string;
+  breachOccurred: 'YES' | 'NO' | '';
+  breachNotifiedDate: string;
+}
+
 export interface Meeting {
   id: string;
   type: 'AGM' | 'EGM' | 'SGM' | 'Committee';
@@ -89,6 +99,7 @@ export interface BodyCorporate {
   numberOfCommitteeMeetings?: number; 
 
   meetings: Meeting[];
+  conflictRegister?: ConflictEntry[];
 
   previousAgmDate?: string;
   nextAgmDate?: string;
@@ -208,6 +219,7 @@ export interface SystemSettings {
   disclosureStandardParagraph?: string;
   disclosureRemediationParagraph?: string;
   waterRateOptions?: string[];
+  conflictRegisterTemplate?: string;
 }
 
 export type ContractorCategory = string;
