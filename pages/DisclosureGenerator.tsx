@@ -114,6 +114,8 @@ const DisclosureGenerator: React.FC = () => {
   const [instalmentAmount, setInstalmentAmount] = useState<string>('');
   const [levyOutstanding, setLevyOutstanding] = useState<string>('');
   const [legalProceedings, setLegalProceedings] = useState<boolean>(false);
+  const [ruleChangeAfterS146, setRuleChangeAfterS146] = useState(false);
+  const [pcdsPreparationDate, setPcdsPreparationDate] = useState('');
   const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewing, setPreviewing] = useState(false);
@@ -146,6 +148,8 @@ const DisclosureGenerator: React.FC = () => {
     setInstalmentAmount('');
     setLevyOutstanding('');
     setLegalProceedings(false);
+    setRuleChangeAfterS146(false);
+    setPcdsPreparationDate('');
     setPreviewHtml('');
   }, [selectedBcId]);
 
@@ -218,6 +222,14 @@ const DisclosureGenerator: React.FC = () => {
       instalmentAmount:     formatNZD(instalmentAmount, '[Instalment Amount]'),
       levyOutstanding:      formatNZD(levyOutstanding, '[Outstanding Amount]'),
       legalProceedings:     legalProceedings ? 'has been' : 'has not been',
+      ruleChangeAfterS146:  ruleChangeAfterS146 ? 'have' : 'have not',
+      pcdsPreparationDate:  (() => {
+        if (!pcdsPreparationDate) return '[PCDS Date]';
+        const d = new Date(pcdsPreparationDate + 'T00:00:00');
+        const day = d.getDate().toString().padStart(2, '0');
+        const month = d.toLocaleString('en-NZ', { month: 'short' });
+        return `${day}/${month}/${d.getFullYear()}`;
+      })(),
     };
     // Provide both TitleCase and lowercase_underscore variants so the template works
     // regardless of which naming convention was used when designing the Word file.
@@ -250,6 +262,9 @@ const DisclosureGenerator: React.FC = () => {
       Levy_Instalments: vals.levyInstalments, Levy_Due_Dates: vals.levyDueDates,
       Instalment_Amount: vals.instalmentAmount, Levy_Outstanding: vals.levyOutstanding,
       Legal_Proceedings: vals.legalProceedings,
+      Rule_change_after_S146_issued: vals.ruleChangeAfterS146,
+      PCDS_Preparation_Date: vals.pcdsPreparationDate,
+      Insurance_Company: vals.insuranceUnderwriter,
       // lowercase_underscore (matches old HTML template tag names)
       bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
       current_date: vals.currentDate, unit_number: vals.unitNumber, unit_levy: vals.unitLevy,
@@ -278,6 +293,9 @@ const DisclosureGenerator: React.FC = () => {
       levy_instalments: vals.levyInstalments, levy_due_dates: vals.levyDueDates,
       instalment_amount: vals.instalmentAmount, levy_outstanding: vals.levyOutstanding,
       legal_proceedings: vals.legalProceedings,
+      rule_change_after_s146_issued: vals.ruleChangeAfterS146,
+      pcds_preparation_date: vals.pcdsPreparationDate,
+      insurance_company: vals.insuranceUnderwriter,
     };
   };
 
@@ -435,6 +453,23 @@ const DisclosureGenerator: React.FC = () => {
               )}
               {docType === 's147' && (
                 <>
+                  <div className="pt-3 border-t dark:border-slate-800 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Rule Change After S146 Issued?</label>
+                      <select
+                        className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500"
+                        value={ruleChangeAfterS146 ? 'yes' : 'no'}
+                        onChange={e => setRuleChangeAfterS146(e.target.value === 'yes')}
+                      >
+                        <option value="no">No — have not</option>
+                        <option value="yes">Yes — have</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">PCDS Preparation Date</label>
+                      <input type="date" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500" value={pcdsPreparationDate} onChange={e => setPcdsPreparationDate(e.target.value)} />
+                    </div>
+                  </div>
                   <div className="pt-3 border-t dark:border-slate-800">
                     <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Lawyer Name</label>
                     <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. Jane Smith" value={lawyerName} onChange={e => setLawyerName(e.target.value)} />
