@@ -108,6 +108,9 @@ const DisclosureGenerator: React.FC = () => {
   const [unitLevy, setUnitLevy] = useState<string>('');
   const [ownerName, setOwnerName] = useState<string>('');
   const [ownerAddress, setOwnerAddress] = useState<string>('');
+  const [lawyerName, setLawyerName] = useState<string>('');
+  const [lawyerAddress, setLawyerAddress] = useState<string>('');
+  const [lawyerEmail, setLawyerEmail] = useState<string>('');
   const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewing, setPreviewing] = useState(false);
@@ -134,6 +137,9 @@ const DisclosureGenerator: React.FC = () => {
     setUnitLevy('');
     setOwnerName('');
     setOwnerAddress('');
+    setLawyerName('');
+    setLawyerAddress('');
+    setLawyerEmail('');
     setPreviewHtml('');
   }, [selectedBcId]);
 
@@ -192,6 +198,11 @@ const DisclosureGenerator: React.FC = () => {
       gstText:              selectedComplex.isGstRegistered ? 'inclusive of GST' : '',
       brokerNoting:         broker?.notingInstructions || '',
       brokerName:           broker?.name || '',
+      lawyerName:           lawyerName || '[Lawyer Name]',
+      lawyerAddress:        lawyerAddress || '[Lawyer Address]',
+      lawyerEmail:          lawyerEmail || '[Lawyer Email]',
+      bcAccountName:        selectedComplex.bcAccountName || '[Account Name]',
+      bcAccountNumber:      selectedComplex.bcAccountNumber || '[Account Number]',
     };
     // Provide both TitleCase and lowercase_underscore variants so the template works
     // regardless of which naming convention was used when designing the Word file.
@@ -215,6 +226,8 @@ const DisclosureGenerator: React.FC = () => {
       Water_Rate: vals.waterRate, Water_Rate_Provider: vals.waterRateProvider,
       Water_Rate_Provider_Phone: vals.waterRateProviderPhone, Water_Rate_Provider_Email: vals.waterRateProviderEmail,
       Gst_Text: vals.gstText, Broker_Noting: vals.brokerNoting, Broker: vals.brokerName, Broker_Name: vals.brokerName,
+      Lawyer_Name: vals.lawyerName, Lawyer_Address: vals.lawyerAddress, Lawyer_Email: vals.lawyerEmail,
+      BC_Account_Name: vals.bcAccountName, BC_Account_Number: vals.bcAccountNumber,
       // lowercase_underscore (matches old HTML template tag names)
       bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
       current_date: vals.currentDate, unit_number: vals.unitNumber, unit_levy: vals.unitLevy,
@@ -234,6 +247,8 @@ const DisclosureGenerator: React.FC = () => {
       water_rate: vals.waterRate, water_rate_provider: vals.waterRateProvider,
       water_rate_provider_phone: vals.waterRateProviderPhone, water_rate_provider_email: vals.waterRateProviderEmail,
       gst_text: vals.gstText, broker_noting: vals.brokerNoting, broker: vals.brokerName, broker_name: vals.brokerName,
+      lawyer_name: vals.lawyerName, lawyer_address: vals.lawyerAddress, lawyer_email: vals.lawyerEmail,
+      bc_account_name: vals.bcAccountName, bc_account_number: vals.bcAccountNumber,
     };
   };
 
@@ -387,6 +402,22 @@ const DisclosureGenerator: React.FC = () => {
                 <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Owner's Address</label>
                 <textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. 12 Example St, Auckland 1010" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)} />
               </div>
+              {docType === 's147' && (
+                <>
+                  <div className="pt-3 border-t dark:border-slate-800">
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Lawyer Name</label>
+                    <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. Jane Smith" value={lawyerName} onChange={e => setLawyerName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Lawyer Address (C/-)</label>
+                    <textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. Smith & Co, 1 Law St, Auckland" value={lawyerAddress} onChange={e => setLawyerAddress(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Lawyer Email</label>
+                    <input type="email" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. jane@smithco.co.nz" value={lawyerEmail} onChange={e => setLawyerEmail(e.target.value)} />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Action buttons */}

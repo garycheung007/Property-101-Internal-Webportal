@@ -184,6 +184,9 @@ export interface BodyCorporate {
   ltmpLastRenewalDate?: string;
   ltmpNextRenewalDate?: string;
 
+  bcAccountName?: string;
+  bcAccountNumber?: string;
+
   notes?: string;
 }
 

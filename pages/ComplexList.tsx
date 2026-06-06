@@ -206,6 +206,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [bwofRenewalPrompt, setBwofRenewalPrompt] = useState<{ show: boolean, pendingDate: string }>({ show: false, pendingDate: '' });
     const [feeEditing, setFeeEditing] = useState(false);
     const [balanceEditing, setBalanceEditing] = useState(false);
+    const [bankEditing, setBankEditing] = useState(false);
     const [ltmpEditing, setLtmpEditing] = useState(false);
     const [venueOther, setVenueOther] = useState(false);
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
@@ -1164,6 +1165,48 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.reserveFundBalance || ''} onChange={e => setForm(f => ({ ...f, reserveFundBalance: e.target.value }))} placeholder="e.g. $45,678.90" />
                                         ) : (
                                             <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.reserveFundBalance || '—'}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* BNZ Trust Account */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
+                                <div className="flex items-center justify-between mb-6 border-b dark:border-slate-800 pb-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
+                                            <DollarSign size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg dark:text-white">BNZ Trust Account</h3>
+                                            <p className="text-xs text-slate-500">Bank account details used in S147 pre-settlement disclosure.</p>
+                                        </div>
+                                    </div>
+                                    {!bankEditing ? (
+                                        <button onClick={() => setBankEditing(true)} className="flex items-center gap-1.5 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors">
+                                            <Pencil size={12} /> Edit
+                                        </button>
+                                    ) : (
+                                        <button onClick={() => setBankEditing(false)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors">
+                                            <Check size={12} /> Done
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Account Name</label>
+                                        {bankEditing ? (
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcAccountName || ''} onChange={e => setForm(f => ({ ...f, bcAccountName: e.target.value }))} placeholder="e.g. BC 12345 Sunset Apartments" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bcAccountName || '—'}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Account Number</label>
+                                        {bankEditing ? (
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcAccountNumber || ''} onChange={e => setForm(f => ({ ...f, bcAccountNumber: e.target.value }))} placeholder="e.g. 02-0108-0123456-000" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bcAccountNumber || '—'}</p>
                                         )}
                                     </div>
                                 </div>
