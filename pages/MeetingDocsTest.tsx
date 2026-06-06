@@ -9,6 +9,7 @@ import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, Meeting, TemplateFileRecord } from '../types';
+import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 
 type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'debtCollectionFlowchart' | 'noticeOfDelegation' | 'noiCoverLetterIsoc' | 'responseFormIsoc' | 'debtCollectionFlowchartIsoc';
 
@@ -108,7 +109,7 @@ const buildIframeSrcDoc = (html: string) =>
   })();</script></body></html>`;
 
 const MeetingDocsTest: React.FC = () => {
-  const { complexes, managers } = useData();
+  const { complexes, managers, systemSettings } = useData();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -151,7 +152,9 @@ const MeetingDocsTest: React.FC = () => {
   const selectedMeeting = selectedComplex?.meetings.find(m => m.id === selectedMeetingId) || null;
   const assignedManager = selectedComplex ? managers.find(m => m.name === selectedComplex.managerName) : undefined;
   const isIsoc = selectedComplex?.type === 'Incorporated Society';
-  const activeKeys: TemplateKey[] = isIsoc ? IS_KEYS : BC_KEYS;
+  const activeKeys: TemplateKey[] = (isIsoc ? IS_KEYS : BC_KEYS).filter(
+    k => isAdmin || (k !== 'debtCollectionFlowchart' && k !== 'debtCollectionFlowchartIsoc')
+  );
 
   const handlePreview = async (key: TemplateKey) => {
     const tpl = templates[key];
@@ -234,6 +237,50 @@ const MeetingDocsTest: React.FC = () => {
     win.document.close();
     win.focus();
     setTimeout(() => win.print(), 400);
+  };
+
+  const buildConflictRegisterHtml = () => {
+    if (!selectedComplex) return '';
+    const template = systemSettings.conflictRegisterTemplate || DEFAULT_CONFLICT_REGISTER_TEMPLATE;
+    const entries = selectedComplex.conflictRegister || [];
+    const rows = entries.length > 0
+      ? entries.map(e => `<tr>
+          <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.memberName}</td>
+          <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.matter}</td>
+          <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.conflictNature}</td>
+          <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.dateDisclosed ? new Date(e.dateDisclosed).toLocaleDateString('en-NZ') : ''}</td>
+          <td style="border:1px solid #000;padding:5pt;vertical-align:top;text-align:center;">${e.breachOccurred}</td>
+          <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.breachOccurred === 'YES' && e.breachNotifiedDate ? new Date(e.breachNotifiedDate).toLocaleDateString('en-NZ') : ''}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="6" style="border:1px solid #000;padding:5pt;text-align:center;color:#666;font-style:italic;">No entries recorded.</td></tr>`;
+    return template
+      .replace(/\{\{BC_NAME\}\}/g, selectedComplex.name || '')
+      .replace(/\{\{BC_NUMBER\}\}/g, selectedComplex.bcNumber || '')
+      .replace(/\{\{GENERATED_DATE\}\}/g, new Date().toLocaleDateString('en-NZ'))
+      .replace(/\{\{CONFLICT_REGISTER_ROWS\}\}/g, rows);
+  };
+
+  const downloadConflictRegisterWord = () => {
+    const html = buildConflictRegisterHtml();
+    const wordHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Conflict Register - ${selectedComplex?.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}table{border-collapse:collapse;width:100%;}@page{size:A4 landscape;margin:20mm;}</style></head><body>${html}</body></html>`;
+    const blob = new Blob(['﻿', wordHtml], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Conflict-Register-${selectedComplex?.name || selectedComplex?.bcNumber}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadConflictRegisterPdf = () => {
+    const html = buildConflictRegisterHtml();
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(`<!DOCTYPE html><html><head><title>Conflict Register - ${selectedComplex?.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}@page{size:A4 landscape;margin:20mm;}@media print{body{margin:0;}}</style></head><body>${html}</body></html>`);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 500);
+    }
   };
 
   const renderActionButtons = (key: TemplateKey) => (
@@ -384,6 +431,23 @@ const MeetingDocsTest: React.FC = () => {
                   {isIsoc ? 'Incorporated Society' : 'Body Corporate'} Templates
                 </p>
                 {activeKeys.map(renderActionButtons)}
+                <div className="pt-3 border-t dark:border-slate-700 space-y-1.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Conflict Register</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={downloadConflictRegisterWord}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-700 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition-colors"
+                    >
+                      <Download size={12} /> Word
+                    </button>
+                    <button
+                      onClick={downloadConflictRegisterPdf}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg transition-colors"
+                    >
+                      <Download size={12} /> PDF
+                    </button>
+                  </div>
+                </div>
                 <p className="text-[10px] text-slate-400 italic">PDF opens a print dialog — select "Save as PDF".</p>
               </div>
             )}
