@@ -12,7 +12,7 @@ import {
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
     Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets
 } from 'lucide-react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'];
 
@@ -50,6 +50,7 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
 };
 
 const AdminPanel: React.FC = () => {
+    const navigate = useNavigate();
     const { user: currentUser } = useAuth();
     const { 
         complexes, managers, users, contractors, systemSettings, loading: dataLoading,
@@ -245,6 +246,9 @@ const AdminPanel: React.FC = () => {
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
+                                                        <button onClick={() => navigate(`/complexes?id=${bc.id}`)} className="p-1.5 hover:text-pink-600 transition-colors" title="Edit complex">
+                                                            <Edit2 size={18} />
+                                                        </button>
                                                         <button onClick={() => toggleArchiveComplex(bc.id)} className="p-1.5 hover:text-pink-600 transition-colors" title={bc.isArchived ? 'Restore' : 'Archive'}>
                                                             {bc.isArchived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
                                                         </button>
