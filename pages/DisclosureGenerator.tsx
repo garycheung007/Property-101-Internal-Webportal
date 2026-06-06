@@ -415,10 +415,12 @@ const DisclosureGenerator: React.FC = () => {
                 <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Current Owner(s)</label>
                 <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. John Doe" value={ownerName} onChange={e => setOwnerName(e.target.value)} />
               </div>
-              <div>
-                <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Owner's Address</label>
-                <textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. 12 Example St, Auckland 1010" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)} />
-              </div>
+              {docType !== 's147' && (
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Owner's Address</label>
+                  <textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. 12 Example St, Auckland 1010" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)} />
+                </div>
+              )}
               {docType === 's147' && (
                 <>
                   <div className="pt-3 border-t dark:border-slate-800">
