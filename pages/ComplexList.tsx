@@ -704,17 +704,28 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                         </div>
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
-                                <DollarSign size={16} className="text-pink-600" /> BNZ Trust Account &amp; Levy Schedule
+                                <DollarSign size={16} className="text-pink-600" /> Body Corporate Bank Account &amp; Levy
+                                {currentUser?.role !== 'admin' && <Lock size={12} className="text-slate-400 ml-auto" />}
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Account Name</label>
-                                    <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcAccountName || ''} onChange={e => setForm({...form, bcAccountName: e.target.value})} placeholder="e.g. BC 12345 Sunset Apartments" />
+                                    {currentUser?.role === 'admin' ? (
+                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcAccountName || ''} onChange={e => setForm({...form, bcAccountName: e.target.value})} placeholder="e.g. BC 12345 Sunset Apartments" />
+                                    ) : (
+                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bcAccountName || 'N/A'}</p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Account Number</label>
-                                    <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcAccountNumber || ''} onChange={e => setForm({...form, bcAccountNumber: e.target.value})} placeholder="e.g. 02-0108-0123456-000" />
+                                    {currentUser?.role === 'admin' ? (
+                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcAccountNumber || ''} onChange={e => setForm({...form, bcAccountNumber: e.target.value})} placeholder="e.g. 02-0108-0123456-000" />
+                                    ) : (
+                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bcAccountNumber || 'N/A'}</p>
+                                    )}
                                 </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t dark:border-slate-800">
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Levy Instalments (per year)</label>
                                     <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.levyInstalments || ''} onChange={e => setForm({...form, levyInstalments: e.target.value})} placeholder="e.g. 4" />
