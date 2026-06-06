@@ -173,6 +173,10 @@ export interface BodyCorporate {
   anyOtherSignificantDefectsDetails?: string;
   involvedInProceedings?: boolean;
   proceedingsInCourt?: string;
+  proceedingsPendingAgainst?: boolean;
+  proceedingsInitiatedBy?: boolean;
+  proceedingsIntendedToInitiate?: boolean;
+  writtenClaimByBC?: boolean;
   waterRateDescription?: string;
   waterRateContractorId?: string;
   operatingFundBalance?: string;

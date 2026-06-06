@@ -1385,7 +1385,11 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             {[
                                                 { field: 'earthquakeProneIssues', detailField: 'earthquakeProneDetails', label: 'Earthquake-prone issues' },
                                                 { field: 'anyOtherSignificantDefects', detailField: 'anyOtherSignificantDefectsDetails', label: 'Other significant land/building defects' },
-                                                { field: 'involvedInProceedings', detailField: 'proceedingsInCourt', label: 'Involved in active court/tribunal proceedings' }
+                                                { field: 'involvedInProceedings', detailField: 'proceedingsInCourt', label: 'Involved in active court/tribunal proceedings' },
+                                                { field: 'proceedingsPendingAgainst', label: 'Proceedings pending against the body corporate in any court or tribunal' },
+                                                { field: 'proceedingsInitiatedBy', label: 'Proceedings initiated by the body corporate pending in any court or tribunal' },
+                                                { field: 'proceedingsIntendedToInitiate', label: 'Proceedings intended to be initiated by the body corporate in any court or tribunal' },
+                                                { field: 'writtenClaimByBC', label: 'Written claim by the body corporate against a third party yet to be resolved' },
                                             ].map(item => (
                                                 <div key={item.field} className="space-y-2">
                                                     <div className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 hover:bg-white dark:hover:bg-slate-900 transition-all cursor-pointer group" onClick={() => toggleStatutoryField(item.field as any)}>
@@ -1394,7 +1398,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                             <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form[item.field as keyof BodyCorporate] ? 'translate-x-6' : 'translate-x-0'}`}></div>
                                                         </div>
                                                     </div>
-                                                    {form[item.field as keyof BodyCorporate] && (
+                                                    {'detailField' in item && item.detailField && form[item.field as keyof BodyCorporate] && (
                                                         <div className="animate-in slide-in-from-top-2 duration-200">
                                                             <textarea
                                                                 placeholder={`Provide details for: ${item.label}...`}
