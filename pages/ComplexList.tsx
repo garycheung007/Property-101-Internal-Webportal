@@ -474,7 +474,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         const html = buildConflictRegisterHtml();
         const win = window.open('', '_blank');
         if (win) {
-            win.document.write(`<!DOCTYPE html><html><head><title>Conflict Register - ${form.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}@media print{body{margin:20mm;}}</style></head><body>${html}</body></html>`);
+            win.document.write(`<!DOCTYPE html><html><head><title>Conflict Register - ${form.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}@page{size:A4 landscape;margin:20mm;}@media print{body{margin:0;}}</style></head><body>${html}</body></html>`);
             win.document.close();
             win.focus();
             setTimeout(() => win.print(), 500);
