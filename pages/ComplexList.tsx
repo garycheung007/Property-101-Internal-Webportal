@@ -1209,6 +1209,22 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bcAccountNumber || '—'}</p>
                                         )}
                                     </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Levy Instalments (per year)</label>
+                                        {bankEditing ? (
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.levyInstalments || ''} onChange={e => setForm(f => ({ ...f, levyInstalments: e.target.value }))} placeholder="e.g. 4" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.levyInstalments || '—'}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Levy Due Dates</label>
+                                        {bankEditing ? (
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.levyDueDates || ''} onChange={e => setForm(f => ({ ...f, levyDueDates: e.target.value }))} placeholder="e.g. 1 Jan, 1 Apr, 1 Jul, 1 Oct" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.levyDueDates || '—'}</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 

@@ -186,6 +186,8 @@ export interface BodyCorporate {
 
   bcAccountName?: string;
   bcAccountNumber?: string;
+  levyInstalments?: string;
+  levyDueDates?: string;
 
   notes?: string;
 }

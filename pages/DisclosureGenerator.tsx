@@ -111,6 +111,9 @@ const DisclosureGenerator: React.FC = () => {
   const [lawyerName, setLawyerName] = useState<string>('');
   const [lawyerAddress, setLawyerAddress] = useState<string>('');
   const [lawyerEmail, setLawyerEmail] = useState<string>('');
+  const [instalmentAmount, setInstalmentAmount] = useState<string>('');
+  const [levyOutstanding, setLevyOutstanding] = useState<string>('');
+  const [legalProceedings, setLegalProceedings] = useState<boolean>(false);
   const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewing, setPreviewing] = useState(false);
@@ -140,6 +143,9 @@ const DisclosureGenerator: React.FC = () => {
     setLawyerName('');
     setLawyerAddress('');
     setLawyerEmail('');
+    setInstalmentAmount('');
+    setLevyOutstanding('');
+    setLegalProceedings(false);
     setPreviewHtml('');
   }, [selectedBcId]);
 
@@ -203,6 +209,11 @@ const DisclosureGenerator: React.FC = () => {
       lawyerEmail:          lawyerEmail || '[Lawyer Email]',
       bcAccountName:        selectedComplex.bcAccountName || '[Account Name]',
       bcAccountNumber:      selectedComplex.bcAccountNumber || '[Account Number]',
+      levyInstalments:      selectedComplex.levyInstalments || '[Number]',
+      levyDueDates:         selectedComplex.levyDueDates || '[Due Dates]',
+      instalmentAmount:     formatNZD(instalmentAmount, '[Instalment Amount]'),
+      levyOutstanding:      formatNZD(levyOutstanding, '[Outstanding Amount]'),
+      legalProceedings:     legalProceedings ? 'has been' : 'has not been',
     };
     // Provide both TitleCase and lowercase_underscore variants so the template works
     // regardless of which naming convention was used when designing the Word file.
@@ -228,6 +239,9 @@ const DisclosureGenerator: React.FC = () => {
       Gst_Text: vals.gstText, Broker_Noting: vals.brokerNoting, Broker: vals.brokerName, Broker_Name: vals.brokerName,
       Lawyer_Name: vals.lawyerName, Lawyer_Address: vals.lawyerAddress, Lawyer_Email: vals.lawyerEmail,
       BC_Account_Name: vals.bcAccountName, BC_Account_Number: vals.bcAccountNumber,
+      Levy_Instalments: vals.levyInstalments, Levy_Due_Dates: vals.levyDueDates,
+      Instalment_Amount: vals.instalmentAmount, Levy_Outstanding: vals.levyOutstanding,
+      Legal_Proceedings: vals.legalProceedings,
       // lowercase_underscore (matches old HTML template tag names)
       bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
       current_date: vals.currentDate, unit_number: vals.unitNumber, unit_levy: vals.unitLevy,
@@ -249,6 +263,9 @@ const DisclosureGenerator: React.FC = () => {
       gst_text: vals.gstText, broker_noting: vals.brokerNoting, broker: vals.brokerName, broker_name: vals.brokerName,
       lawyer_name: vals.lawyerName, lawyer_address: vals.lawyerAddress, lawyer_email: vals.lawyerEmail,
       bc_account_name: vals.bcAccountName, bc_account_number: vals.bcAccountNumber,
+      levy_instalments: vals.levyInstalments, levy_due_dates: vals.levyDueDates,
+      instalment_amount: vals.instalmentAmount, levy_outstanding: vals.levyOutstanding,
+      legal_proceedings: vals.legalProceedings,
     };
   };
 
@@ -415,6 +432,27 @@ const DisclosureGenerator: React.FC = () => {
                   <div>
                     <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Lawyer Email</label>
                     <input type="email" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. jane@smithco.co.nz" value={lawyerEmail} onChange={e => setLawyerEmail(e.target.value)} />
+                  </div>
+                  <div className="pt-3 border-t dark:border-slate-800">
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Instalment Amount ($)</label>
+                    <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 1125" value={instalmentAmount} onChange={e => setInstalmentAmount(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Levy Outstanding as at Date of Preparation ($)</label>
+                    <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 0" value={levyOutstanding} onChange={e => setLevyOutstanding(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Legal Proceedings?</label>
+                    <button
+                      type="button"
+                      onClick={() => setLegalProceedings(p => !p)}
+                      className={`flex items-center gap-3 w-full p-2.5 rounded-lg border text-sm font-bold transition-all ${legalProceedings ? 'border-red-400 bg-red-50 dark:bg-red-900/20 text-red-600' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500'}`}
+                    >
+                      <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${legalProceedings ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                        <div className={`w-3 h-3 bg-white rounded-full transition-transform ${legalProceedings ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </div>
+                      {legalProceedings ? 'Yes — has been' : 'No — has not been'}
+                    </button>
                   </div>
                 </>
               )}
