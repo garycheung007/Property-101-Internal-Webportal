@@ -438,7 +438,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         if (selectedConflictId === id) { setSelectedConflictId(null); setConflictForm({}); }
     };
 
-    const downloadConflictRegister = () => {
+    const buildConflictRegisterHtml = () => {
         const template = systemSettings.conflictRegisterTemplate || DEFAULT_CONFLICT_REGISTER_TEMPLATE;
         const entries = form.conflictRegister || [];
         const rows = entries.length > 0
@@ -451,15 +451,33 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                 <td style="border:1px solid #000;padding:5pt;vertical-align:top;">${e.breachOccurred === 'YES' && e.breachNotifiedDate ? new Date(e.breachNotifiedDate).toLocaleDateString('en-NZ') : ''}</td>
             </tr>`).join('')
             : `<tr><td colspan="6" style="border:1px solid #000;padding:5pt;text-align:center;color:#666;font-style:italic;">No entries recorded.</td></tr>`;
-        const html = template
+        return template
             .replace(/\{\{BC_NAME\}\}/g, form.name || '')
             .replace(/\{\{BC_NUMBER\}\}/g, form.bcNumber || '')
             .replace(/\{\{GENERATED_DATE\}\}/g, new Date().toLocaleDateString('en-NZ'))
             .replace(/\{\{CONFLICT_REGISTER_ROWS\}\}/g, rows);
+    };
+
+    const downloadConflictRegisterWord = () => {
+        const html = buildConflictRegisterHtml();
+        const wordHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Conflict Register - ${form.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}table{border-collapse:collapse;width:100%;}@page{size:A4 landscape;margin:20mm;}</style></head><body>${html}</body></html>`;
+        const blob = new Blob(['﻿', wordHtml], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Conflict-Register-${form.name || form.bcNumber}.doc`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const downloadConflictRegisterPdf = () => {
+        const html = buildConflictRegisterHtml();
         const win = window.open('', '_blank');
         if (win) {
             win.document.write(`<!DOCTYPE html><html><head><title>Conflict Register - ${form.name}</title><style>body{font-family:Arial,sans-serif;margin:40px;}@media print{body{margin:20mm;}}</style></head><body>${html}</body></html>`);
             win.document.close();
+            win.focus();
+            setTimeout(() => win.print(), 500);
         }
     };
 
@@ -1131,9 +1149,14 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         </div>
                                     ))}
                                 </div>
-                                <button onClick={downloadConflictRegister} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
-                                    <Download size={14} /> Download Register
-                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={downloadConflictRegisterWord} className="flex-1 flex items-center justify-center gap-2 px-3 py-3 bg-slate-700 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
+                                        <Download size={14} /> Word
+                                    </button>
+                                    <button onClick={downloadConflictRegisterPdf} className="flex-1 flex items-center justify-center gap-2 px-3 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
+                                        <Download size={14} /> PDF
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
