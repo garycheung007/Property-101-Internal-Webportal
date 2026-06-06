@@ -116,11 +116,16 @@ const DisclosureGenerator: React.FC = () => {
   const [legalProceedings, setLegalProceedings] = useState<boolean>(false);
   const [ruleChangeAfterS146, setRuleChangeAfterS146] = useState(false);
   const [pcdsPreparationDate, setPcdsPreparationDate] = useState('');
+  const [waterReadingDate, setWaterReadingDate] = useState('');
+  const [waterAmountOutstanding, setWaterAmountOutstanding] = useState('');
   const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewing, setPreviewing] = useState(false);
 
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
+  const _wdesc = (selectedComplex?.waterRateDescription || '').toLowerCase();
+  const isBcOnCharged = (_wdesc.includes('on-charged') || _wdesc.includes('on charged')) &&
+    !_wdesc.includes('utility agent') && !_wdesc.includes('third party');
   const filteredComplexes = complexSearch
     ? complexes.filter(c => c.name.toLowerCase().includes(complexSearch.toLowerCase()) || c.bcNumber.toLowerCase().includes(complexSearch.toLowerCase()))
     : complexes;
@@ -150,6 +155,8 @@ const DisclosureGenerator: React.FC = () => {
     setLegalProceedings(false);
     setRuleChangeAfterS146(false);
     setPcdsPreparationDate('');
+    setWaterReadingDate('');
+    setWaterAmountOutstanding('');
     setPreviewHtml('');
   }, [selectedBcId]);
 
@@ -223,6 +230,15 @@ const DisclosureGenerator: React.FC = () => {
       levyOutstanding:      formatNZD(levyOutstanding, '[Outstanding Amount]'),
       legalProceedings:     legalProceedings ? 'has been' : 'has not been',
       ruleChangeAfterS146:  ruleChangeAfterS146 ? 'have' : 'have not',
+      meteredCharges:       isBcOnCharged ? 'are' : 'are not',
+      waterReadingDate:     (() => {
+        if (!waterReadingDate) return '[Reading Date]';
+        const d = new Date(waterReadingDate + 'T00:00:00');
+        const day = d.getDate().toString().padStart(2, '0');
+        const month = d.toLocaleString('en-NZ', { month: 'short' });
+        return `${day}/${month}/${d.getFullYear()}`;
+      })(),
+      waterAmountOutstanding: formatNZD(waterAmountOutstanding, '[Amount]'),
       pcdsPreparationDate:  (() => {
         if (!pcdsPreparationDate) return '[PCDS Date]';
         const d = new Date(pcdsPreparationDate + 'T00:00:00');
@@ -265,6 +281,9 @@ const DisclosureGenerator: React.FC = () => {
       Rule_change_after_S146_issued: vals.ruleChangeAfterS146,
       PCDS_Preparation_Date: vals.pcdsPreparationDate,
       Insurance_Company: vals.insuranceUnderwriter,
+      Metered_Charges: vals.meteredCharges,
+      Water_Reading_Date: vals.waterReadingDate,
+      Water_Amount_Outstanding: vals.waterAmountOutstanding,
       // lowercase_underscore (matches old HTML template tag names)
       bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
       current_date: vals.currentDate, unit_number: vals.unitNumber, unit_levy: vals.unitLevy,
@@ -296,6 +315,9 @@ const DisclosureGenerator: React.FC = () => {
       rule_change_after_s146_issued: vals.ruleChangeAfterS146,
       pcds_preparation_date: vals.pcdsPreparationDate,
       insurance_company: vals.insuranceUnderwriter,
+      metered_charges: vals.meteredCharges,
+      water_reading_date: vals.waterReadingDate,
+      water_amount_outstanding: vals.waterAmountOutstanding,
     };
   };
 
@@ -490,6 +512,18 @@ const DisclosureGenerator: React.FC = () => {
                     <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Levy Outstanding as at Date of Preparation ($)</label>
                     <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 0" value={levyOutstanding} onChange={e => setLevyOutstanding(e.target.value)} />
                   </div>
+                  {isBcOnCharged && (
+                    <div className="pt-3 border-t dark:border-slate-800 grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Last Water Reading Date</label>
+                        <input type="date" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500" value={waterReadingDate} onChange={e => setWaterReadingDate(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Water Amount Outstanding ($)</label>
+                        <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 0" value={waterAmountOutstanding} onChange={e => setWaterAmountOutstanding(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Legal Proceedings?</label>
                     <button
