@@ -361,6 +361,7 @@ const DisclosureGenerator: React.FC = () => {
         linebreaks: true,
         modules: [imageModule],
         delimiters: { start: '{{', end: '}}' },
+        nullGetter: () => '',
       });
       docTpl.render({ ...buildMergeData(), Manager_Signature: sigUrl, manager_signature: sigUrl });
       const out = docTpl.getZip().generate({

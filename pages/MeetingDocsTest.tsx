@@ -202,6 +202,7 @@ const MeetingDocsTest: React.FC = () => {
         linebreaks: true,
         modules: [imageModule],
         delimiters: { start: '{{', end: '}}' },
+        nullGetter: () => '',
       });
       docTpl.render({ ...buildMergeData(selectedComplex, selectedMeeting, assignedManager), Manager_Signature: sigUrl });
       const out = docTpl.getZip().generate({
