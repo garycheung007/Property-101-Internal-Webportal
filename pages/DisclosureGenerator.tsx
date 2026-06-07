@@ -235,16 +235,16 @@ const DisclosureGenerator: React.FC = () => {
         if (!waterReadingDate) return '[Reading Date]';
         const d = new Date(waterReadingDate + 'T00:00:00');
         const day = d.getDate().toString().padStart(2, '0');
-        const month = d.toLocaleString('en-NZ', { month: 'short' });
-        return `${day}/${month}/${d.getFullYear()}`;
+        const month = d.toLocaleString('en-NZ', { month: 'long' });
+        return `${day} ${month} ${d.getFullYear()}`;
       })(),
       waterAmountOutstanding: formatNZD(waterAmountOutstanding, '[Amount]'),
       pcdsPreparationDate:  (() => {
         if (!pcdsPreparationDate) return '[PCDS Date]';
         const d = new Date(pcdsPreparationDate + 'T00:00:00');
         const day = d.getDate().toString().padStart(2, '0');
-        const month = d.toLocaleString('en-NZ', { month: 'short' });
-        return `${day}/${month}/${d.getFullYear()}`;
+        const month = d.toLocaleString('en-NZ', { month: 'long' });
+        return `${day} ${month} ${d.getFullYear()}`;
       })(),
     };
     // Provide both TitleCase and lowercase_underscore variants so the template works
