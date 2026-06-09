@@ -10,7 +10,7 @@ import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
@@ -49,15 +49,117 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
     );
 };
 
+// ── CSV Import/Export ──────────────────────────────────────────────────────
+
+interface CsvColumnDef { key: keyof BodyCorporate; header: string; type?: 'number' | 'boolean' | 'date'; }
+interface CsvChange { field: string; oldValue: string; newValue: string; }
+interface CsvPreviewRow { id: string; bcNumber: string; name: string; changes: CsvChange[]; updates: Partial<BodyCorporate>; }
+
+const CSV_COLUMNS: CsvColumnDef[] = [
+    { key: 'bcNumber',                   header: 'BC Number' },
+    { key: 'name',                       header: 'Name' },
+    { key: 'address',                    header: 'Address' },
+    { key: 'units',                      header: 'Units',                        type: 'number' },
+    { key: 'type',                       header: 'Type' },
+    { key: 'managerName',                header: 'Manager Name' },
+    { key: 'managementFee',              header: 'Management Fee',               type: 'number' },
+    { key: 'managementStartDate',        header: 'Management Start Date',        type: 'date' },
+    { key: 'onboardingType',             header: 'Onboarding Type' },
+    { key: 'financialYearStart',         header: 'FY Start' },
+    { key: 'financialYearEnd',           header: 'FY End' },
+    { key: 'isGstRegistered',            header: 'GST Registered',               type: 'boolean' },
+    { key: 'insuranceExpiry',            header: 'Insurance Expiry',             type: 'date' },
+    { key: 'insuranceBroker',            header: 'Insurance Broker' },
+    { key: 'insuranceUnderwriter',       header: 'Insurance Underwriter' },
+    { key: 'lastInsuranceValuationDate', header: 'Last Valuation Date',          type: 'date' },
+    { key: 'lastInsuranceValuer',        header: 'Last Valuer' },
+    { key: 'hasBwof',                    header: 'Has BWOF',                     type: 'boolean' },
+    { key: 'bwofExpiry',                 header: 'BWOF Expiry',                  type: 'date' },
+    { key: 'bwofLastCompletionDate',     header: 'BWOF Last Completion',         type: 'date' },
+    { key: 'bwofNextRenewalDate',        header: 'BWOF Next Renewal',            type: 'date' },
+    { key: 'complianceCompany',          header: 'BWOF Compliance Company' },
+    { key: 'complianceContactEmail',     header: 'BWOF Compliance Email' },
+    { key: 'hasLtmp',                    header: 'Has LTMP',                     type: 'boolean' },
+    { key: 'ltmpCompletedDate',          header: 'LTMP Completed Date',          type: 'date' },
+    { key: 'ltmpLastRenewalDate',        header: 'LTMP Last Renewal',            type: 'date' },
+    { key: 'ltmpNextRenewalDate',        header: 'LTMP Next Renewal',            type: 'date' },
+    { key: 'hasHsReport',               header: 'Has H&S Report',               type: 'boolean' },
+    { key: 'hsReportDate',              header: 'H&S Report Date',              type: 'date' },
+    { key: 'hasBuildingManager',         header: 'Has Building Manager',         type: 'boolean' },
+    { key: 'buildingManagerCompany',     header: 'BM Company' },
+    { key: 'buildingManagerName',        header: 'BM Name' },
+    { key: 'buildingManagerPhone',       header: 'BM Phone' },
+    { key: 'buildingManagerEmail',       header: 'BM Email' },
+    { key: 'bcAccountName',              header: 'BC Account Name' },
+    { key: 'bcAccountNumber',            header: 'BC Account Number' },
+    { key: 'levyInstalments',            header: 'Levy Instalments Per Year' },
+    { key: 'levyDueDates',              header: 'Levy Due Dates' },
+    { key: 'waterRateDescription',       header: 'Water Rate Description' },
+    { key: 'operatingFundBalance',       header: 'Operating Fund Balance' },
+    { key: 'reserveFundBalance',         header: 'Reserve Fund Balance' },
+    { key: 'numberOfCommitteeMeetings',  header: 'Committee Meetings Per Year',  type: 'number' },
+    { key: 'notes',                      header: 'Notes' },
+];
+
+const parseCsvLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+            else inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
+        else current += ch;
+    }
+    result.push(current);
+    return result;
+};
+
+const escapeCsvValue = (val: string): string => {
+    if (val.includes(',') || val.includes('"') || val.includes('\n')) return `"${val.replace(/"/g, '""')}"`;
+    return val;
+};
+
+const formatDateForCsv = (dateStr: string): string => {
+    const parts = dateStr.split('-');
+    if (parts.length === 3 && parts[0].length === 4) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    return dateStr;
+};
+
+const parseDateFromCsv = (val: string): string => {
+    const parts = val.split('/');
+    if (parts.length === 3 && parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    return val;
+};
+
+const formatValueForCsv = (value: any, type?: string): string => {
+    if (value === undefined || value === null || value === '') return '';
+    if (type === 'boolean') return value ? 'Yes' : 'No';
+    if (type === 'date') return formatDateForCsv(String(value));
+    return String(value);
+};
+
+const parseValueFromCsv = (val: string, type?: string): any => {
+    if (type === 'boolean') return val.toLowerCase() === 'yes' || val.toLowerCase() === 'true';
+    if (type === 'date') return parseDateFromCsv(val);
+    if (type === 'number') { const n = Number(val); return isNaN(n) ? val : n; }
+    return val;
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 const AdminPanel: React.FC = () => {
     const navigate = useNavigate();
     const { user: currentUser } = useAuth();
-    const { 
+    const {
         complexes, managers, users, contractors, systemSettings, loading: dataLoading,
-        addUser, updateUser, updateSystemSettings, initializeDummyData, toggleArchiveComplex, updateComplex
+        addUser, updateUser, updateSystemSettings, initializeDummyData, toggleArchiveComplex, updateComplex,
+        restoreData, bulkUpdateComplexes
     } = useData();
     
-    const [activeTab, setActiveTab] = useState<'properties' | 'contractors' | 'users' | 'settings' | 'meetings' | 'templates' | 'diagnostics'>('properties');
+    const [activeTab, setActiveTab] = useState<'properties' | 'contractors' | 'users' | 'settings' | 'meetings' | 'templates' | 'diagnostics' | 'data'>('properties');
     const [templateSubTab, setTemplateSubTab] = useState<'bc' | 'isoc' | 'disclosure' | 'conflict'>('bc');
     const [searchTerm, setSearchTerm] = useState('');
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -79,6 +181,18 @@ const AdminPanel: React.FC = () => {
     const [localConflictRegisterTemplate, setLocalConflictRegisterTemplate] = useState<string>(
         systemSettings.conflictRegisterTemplate ?? DEFAULT_CONFLICT_REGISTER_TEMPLATE
     );
+
+    // Data tab — CSV
+    const [csvPreview, setCsvPreview] = useState<CsvPreviewRow[] | null>(null);
+    const [csvErrors, setCsvErrors] = useState<string[]>([]);
+    const [csvImporting, setCsvImporting] = useState(false);
+    const [csvSuccess, setCsvSuccess] = useState('');
+    // Data tab — JSON backup
+    const [jsonPreview, setJsonPreview] = useState<{ complexes: number; users: number; contractors: number; hasSettings: boolean; exportedAt: string } | null>(null);
+    const [jsonParsed, setJsonParsed] = useState<any>(null);
+    const [jsonRestoring, setJsonRestoring] = useState(false);
+    const [jsonError, setJsonError] = useState('');
+    const [jsonSuccess, setJsonSuccess] = useState('');
 
     // Docx template management
     const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
@@ -158,6 +272,142 @@ const AdminPanel: React.FC = () => {
         );
     };
 
+    // ── CSV handlers ────────────────────────────────────────────────────────
+    const handleCsvExport = () => {
+        const headers = CSV_COLUMNS.map(c => c.header);
+        const rows = complexes.map(bc =>
+            CSV_COLUMNS.map(col => escapeCsvValue(formatValueForCsv((bc as any)[col.key], col.type)))
+        );
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `complexes-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleCsvImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        setCsvPreview(null); setCsvErrors([]); setCsvSuccess('');
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const raw = ev.target?.result as string;
+            const text = raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            if (lines.length < 2) { setCsvErrors(['CSV has no data rows.']); return; }
+            const headers = parseCsvLine(lines[0]);
+            const errors: string[] = [];
+            const preview: CsvPreviewRow[] = [];
+            for (let i = 1; i < lines.length; i++) {
+                const vals = parseCsvLine(lines[i]);
+                const row: Record<string, string> = {};
+                headers.forEach((h, idx) => { row[h] = vals[idx] ?? ''; });
+                const bcNum = row['BC Number']?.trim();
+                if (!bcNum) continue;
+                const existing = complexes.find(c => c.bcNumber === bcNum);
+                if (!existing) { errors.push(`Row ${i + 1}: BC Number "${bcNum}" not found.`); continue; }
+                const changes: CsvChange[] = [];
+                const updates: Partial<BodyCorporate> = {};
+                for (const col of CSV_COLUMNS) {
+                    if (col.key === 'bcNumber') continue;
+                    const csvVal = row[col.header]?.trim();
+                    if (!csvVal) continue;
+                    const currentDisplay = formatValueForCsv((existing as any)[col.key], col.type);
+                    if (csvVal === currentDisplay) continue;
+                    const newVal = parseValueFromCsv(csvVal, col.type);
+                    (updates as any)[col.key] = newVal;
+                    changes.push({ field: col.header, oldValue: currentDisplay || '(blank)', newValue: csvVal });
+                }
+                if (changes.length > 0) preview.push({ id: existing.id, bcNumber: bcNum, name: existing.name, changes, updates });
+            }
+            setCsvErrors(errors);
+            setCsvPreview(preview);
+        };
+        reader.readAsText(file, 'utf-8');
+    };
+
+    const handleApplyCsvChanges = async () => {
+        if (!csvPreview || csvPreview.length === 0) return;
+        if (!window.confirm(`Apply changes to ${csvPreview.length} complex${csvPreview.length !== 1 ? 'es' : ''}?`)) return;
+        setCsvImporting(true);
+        try {
+            await bulkUpdateComplexes(csvPreview.map(row => ({ id: row.id, ...row.updates })));
+            setCsvSuccess(`Updated ${csvPreview.length} complex${csvPreview.length !== 1 ? 'es' : ''} successfully.`);
+            setCsvPreview(null);
+        } catch {
+            setCsvErrors(['Failed to apply changes. Please try again.']);
+        } finally {
+            setCsvImporting(false);
+        }
+    };
+
+    // ── JSON backup handlers ─────────────────────────────────────────────────
+    const handleJsonExport = () => {
+        const backup = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            note: 'Meeting history is stored in Firestore subcollections and is not included.',
+            complexes: complexes.map(({ meetings: _, ...rest }) => rest),
+            users,
+            contractors,
+            systemSettings,
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `property101-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleJsonRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        setJsonPreview(null); setJsonParsed(null); setJsonError(''); setJsonSuccess('');
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target?.result as string);
+                if (!data.complexes && !data.users && !data.systemSettings) {
+                    setJsonError('Invalid backup file — no recognised data found.'); return;
+                }
+                setJsonParsed(data);
+                setJsonPreview({
+                    complexes: data.complexes?.length ?? 0,
+                    users: data.users?.length ?? 0,
+                    contractors: data.contractors?.length ?? 0,
+                    hasSettings: !!data.systemSettings,
+                    exportedAt: data.exportedAt || 'Unknown',
+                });
+            } catch {
+                setJsonError('Invalid JSON file. Please upload a valid backup file.');
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleConfirmJsonRestore = async () => {
+        if (!jsonParsed) return;
+        if (!window.confirm('Restore from backup? This will merge backup data into Firestore, overwriting matching records. This cannot be undone.')) return;
+        setJsonRestoring(true);
+        try {
+            await restoreData(jsonParsed);
+            setJsonSuccess('Backup restored successfully.');
+            setJsonPreview(null); setJsonParsed(null);
+        } catch {
+            setJsonError('Restore failed. Please try again.');
+        } finally {
+            setJsonRestoring(false);
+        }
+    };
+    // ────────────────────────────────────────────────────────────────────────
+
     if (currentUser?.role !== 'admin') return <Navigate to="/" replace />;
 
     const handleSaveSettings = async () => {
@@ -200,7 +450,8 @@ const AdminPanel: React.FC = () => {
                     { id: 'settings', label: 'Compliance', icon: <Settings size={16}/> },
                     { id: 'templates', label: 'Templates', icon: <FileText size={16}/> },
                     { id: 'meetings', label: 'Meetings', icon: <ClipboardCheck size={16}/> },
-                    { id: 'diagnostics', label: 'Diagnostics', icon: <Terminal size={16}/> }
+                    { id: 'diagnostics', label: 'Diagnostics', icon: <Terminal size={16}/> },
+                    { id: 'data', label: 'Data', icon: <Database size={16}/> }
                 ].map((tab) => (
                     <button 
                         key={tab.id} 
@@ -735,6 +986,141 @@ const AdminPanel: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    )}
+                    {activeTab === 'data' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                            {/* CSV */}
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-5">
+                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <FileText size={18} className="text-pink-600" /> Complex Data — CSV
+                                </h2>
+                                <p className="text-xs text-slate-500">Export all complex details to a spreadsheet. Edit values, then re-upload to update multiple records at once. Matched by BC Number — cannot create new complexes via CSV.</p>
+
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Export</p>
+                                    <button onClick={handleCsvExport} className="flex items-center gap-2 px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl transition-colors">
+                                        <Download size={14} /> Download Complexes CSV
+                                    </button>
+                                    <p className="text-[10px] text-slate-400 mt-1.5">{complexes.length} complexes · {CSV_COLUMNS.length} columns</p>
+                                </div>
+
+                                <div className="border-t dark:border-slate-800 pt-5 space-y-3">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Import / Update</p>
+                                    <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 transition-all">
+                                        <Upload size={15} className="text-slate-400" />
+                                        <span className="text-xs font-bold text-slate-500 uppercase">Choose CSV File</span>
+                                        <input type="file" accept=".csv" className="hidden" onChange={handleCsvImportFile} />
+                                    </label>
+
+                                    {csvErrors.length > 0 && (
+                                        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl space-y-1">
+                                            {csvErrors.map((err, i) => <p key={i} className="text-xs text-red-600 dark:text-red-400">{err}</p>)}
+                                        </div>
+                                    )}
+                                    {csvSuccess && (
+                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-xl">
+                                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">{csvSuccess}</p>
+                                        </div>
+                                    )}
+                                    {csvPreview !== null && csvPreview.length === 0 && !csvErrors.length && (
+                                        <p className="text-xs text-slate-400 italic">No changes detected in uploaded CSV.</p>
+                                    )}
+                                    {csvPreview && csvPreview.length > 0 && (
+                                        <div className="space-y-3">
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                {csvPreview.length} complex{csvPreview.length !== 1 ? 'es' : ''} will be updated &nbsp;·&nbsp; {csvPreview.reduce((a, r) => a + r.changes.length, 0)} field change{csvPreview.reduce((a, r) => a + r.changes.length, 0) !== 1 ? 's' : ''}
+                                            </p>
+                                            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                                                {csvPreview.map(row => (
+                                                    <div key={row.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
+                                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.name} <span className="font-normal text-slate-400">BC {row.bcNumber}</span></p>
+                                                        <div className="mt-1.5 space-y-1">
+                                                            {row.changes.map(ch => (
+                                                                <div key={ch.field} className="flex items-baseline gap-1.5 text-[11px]">
+                                                                    <span className="text-slate-400 shrink-0 w-36 truncate">{ch.field}</span>
+                                                                    <span className="text-red-500 line-through shrink-0">{ch.oldValue}</span>
+                                                                    <span className="text-slate-400 shrink-0">→</span>
+                                                                    <span className="text-emerald-600 dark:text-emerald-400">{ch.newValue}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <button onClick={handleApplyCsvChanges} disabled={csvImporting} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors">
+                                                {csvImporting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                                Apply Changes
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* JSON Backup */}
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-5">
+                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <Database size={18} className="text-pink-600" /> Full System Backup — JSON
+                                </h2>
+                                <p className="text-xs text-slate-500">Download a complete backup of all complexes, users, contractors, and system settings. Use for disaster recovery or data migration.</p>
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-lg p-2.5">
+                                    Note: Meeting history is stored in Firestore subcollections and is not included in this backup.
+                                </p>
+
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Backup</p>
+                                    <button onClick={handleJsonExport} className="flex items-center gap-2 px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl transition-colors">
+                                        <Download size={14} /> Download Full Backup
+                                    </button>
+                                    <p className="text-[10px] text-slate-400 mt-1.5">{complexes.length} complexes · {users.length} users · {contractors.length} contractors</p>
+                                </div>
+
+                                <div className="border-t dark:border-slate-800 pt-5 space-y-3">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Restore</p>
+                                    <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl">
+                                        <p className="text-xs font-bold text-amber-700 dark:text-amber-400">Warning</p>
+                                        <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">Restoring merges backup data into Firestore. Existing records with the same IDs will be overwritten. This cannot be undone.</p>
+                                    </div>
+                                    <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 transition-all">
+                                        <Upload size={15} className="text-slate-400" />
+                                        <span className="text-xs font-bold text-slate-500 uppercase">Upload Backup JSON</span>
+                                        <input type="file" accept=".json" className="hidden" onChange={handleJsonRestoreFile} />
+                                    </label>
+
+                                    {jsonError && (
+                                        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl">
+                                            <p className="text-xs text-red-600 dark:text-red-400">{jsonError}</p>
+                                        </div>
+                                    )}
+                                    {jsonSuccess && (
+                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-xl">
+                                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">{jsonSuccess}</p>
+                                        </div>
+                                    )}
+                                    {jsonPreview && (
+                                        <div className="space-y-3">
+                                            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 space-y-2">
+                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Backup Contents</p>
+                                                {jsonPreview.exportedAt !== 'Unknown' && (
+                                                    <p className="text-[10px] text-slate-400">Exported {new Date(jsonPreview.exportedAt).toLocaleString('en-NZ')}</p>
+                                                )}
+                                                <div className="flex flex-wrap gap-4 mt-1">
+                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{jsonPreview.complexes} <span className="text-xs font-normal text-slate-400">complexes</span></span>
+                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{jsonPreview.users} <span className="text-xs font-normal text-slate-400">users</span></span>
+                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{jsonPreview.contractors} <span className="text-xs font-normal text-slate-400">contractors</span></span>
+                                                    {jsonPreview.hasSettings && <span className="text-xs font-bold text-emerald-600">✓ settings</span>}
+                                                </div>
+                                            </div>
+                                            <button onClick={handleConfirmJsonRestore} disabled={jsonRestoring} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors">
+                                                {jsonRestoring ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                                Restore from Backup
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                         </div>
                     )}
                 </div>

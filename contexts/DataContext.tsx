@@ -51,6 +51,7 @@ interface DataContextType {
   removeActionComment: (commentId: string) => Promise<void>;
   updateSystemSettings: (settings: SystemSettings) => Promise<void>;
   restoreData: (data: any) => Promise<void>;
+  bulkUpdateComplexes: (updates: Array<{ id: string } & Partial<BodyCorporate>>) => Promise<void>;
   initializeDummyData: () => Promise<void>;
 }
 
@@ -253,6 +254,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateSystemSettings = async (settings: SystemSettings) =>
     setDoc(doc(db, 'settings', 'global'), cleanData(settings), { merge: true });
 
+  const bulkUpdateComplexes = async (updates: Array<{ id: string } & Partial<BodyCorporate>>) => {
+    const BATCH_SIZE = 400;
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      updates.slice(i, i + BATCH_SIZE).forEach(({ id, ...fields }) => {
+        batch.set(doc(db, 'complexes', id), cleanData(fields), { merge: true });
+      });
+      await batch.commit();
+    }
+  };
+
   const restoreData = async (data: any) => {
     const batch = writeBatch(db);
     if (data.complexes)      data.complexes.forEach((bc: any)   => batch.set(doc(db, 'complexes',   bc.id), cleanData(bc),  { merge: true }));
@@ -290,7 +302,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addComplex, addComplexes, updateComplex, toggleArchiveComplex, getComplex, assignManagerToComplex,
       addUser, updateUser, deleteUser, updateUserRole, addMeeting, updateMeeting, deleteMeeting,
       addContractor, addContractors, updateContractor, deleteContractor,
-      addActionComment, removeActionComment, snoozeAlert, unsnoozeAlert, updateSystemSettings, restoreData, initializeDummyData
+      addActionComment, removeActionComment, snoozeAlert, unsnoozeAlert, updateSystemSettings, restoreData, bulkUpdateComplexes, initializeDummyData
     }}>{children}</DataContext.Provider>
   );
 };
