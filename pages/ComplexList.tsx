@@ -231,11 +231,11 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
      * Finds the most recent completed AGM date based on meeting data
      */
     const getCalculatedLastAgmDate = () => {
+        const today = new Date().toISOString().split('T')[0];
         const agmMeetings = (form.meetings || []).filter(m =>
-            (m.type === 'AGM' || m.type === 'SGM') && m.date && checkStageComplete('AFTER_MEETING', m)
+            m.type === 'AGM' && m.date && m.date < today
         );
         if (agmMeetings.length === 0) return null;
-        
         const sorted = [...agmMeetings].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         return sorted[0].date;
     };
@@ -630,7 +630,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                             <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.previousAgmDate || ''} onChange={e => setForm({...form, previousAgmDate: e.target.value})} />
                                         </div>
-                                        <p className="text-[9px] text-slate-400 mt-1 italic leading-tight">Syncs automatically when a meeting is marked 'Complete'. Manual entry allowed.</p>
+                                        <p className="text-[9px] text-slate-400 mt-1 italic leading-tight">Auto-fills from the most recent past AGM in scheduled meetings. Manual entry allowed.</p>
                                     </div>
                                 </div>
                             </div>
@@ -1021,9 +1021,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 {selectedMeetingId !== 'new' && !effectiveLocked && (
                                                     <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId!)} className="p-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 transition-colors"><Trash2 size={18}/></button>
                                                 )}
-                                                {!effectiveLocked && (
-                                                    <button onClick={handleSaveMeetingForm} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"><Save size={18} /> Save Meeting</button>
-                                                )}
+                                                <button onClick={handleSaveMeetingForm} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"><Save size={18} /> Save Meeting</button>
                                             </div>
                                         </div>
                                     </div>

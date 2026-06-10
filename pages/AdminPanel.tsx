@@ -184,6 +184,7 @@ const AdminPanel: React.FC = () => {
 
     // Data tab — CSV
     const [csvPreview, setCsvPreview] = useState<CsvPreviewRow[] | null>(null);
+    const [csvSelectedIds, setCsvSelectedIds] = useState<Set<string>>(new Set());
     const [csvErrors, setCsvErrors] = useState<string[]>([]);
     const [csvImporting, setCsvImporting] = useState(false);
     const [csvSuccess, setCsvSuccess] = useState('');
@@ -292,7 +293,7 @@ const AdminPanel: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file) return;
         e.target.value = '';
-        setCsvPreview(null); setCsvErrors([]); setCsvSuccess('');
+        setCsvPreview(null); setCsvErrors([]); setCsvSuccess(''); setCsvSelectedIds(new Set());
         const reader = new FileReader();
         reader.onload = (ev) => {
             const raw = ev.target?.result as string;
@@ -326,18 +327,22 @@ const AdminPanel: React.FC = () => {
             }
             setCsvErrors(errors);
             setCsvPreview(preview);
+            setCsvSelectedIds(new Set(preview.map(r => r.id)));
         };
         reader.readAsText(file, 'utf-8');
     };
 
     const handleApplyCsvChanges = async () => {
         if (!csvPreview || csvPreview.length === 0) return;
-        if (!window.confirm(`Apply changes to ${csvPreview.length} complex${csvPreview.length !== 1 ? 'es' : ''}?`)) return;
+        const toApply = csvPreview.filter(row => csvSelectedIds.has(row.id));
+        if (toApply.length === 0) return;
+        if (!window.confirm(`Apply changes to ${toApply.length} complex${toApply.length !== 1 ? 'es' : ''}?`)) return;
         setCsvImporting(true);
         try {
-            await bulkUpdateComplexes(csvPreview.map(row => ({ id: row.id, ...row.updates })));
-            setCsvSuccess(`Updated ${csvPreview.length} complex${csvPreview.length !== 1 ? 'es' : ''} successfully.`);
+            await bulkUpdateComplexes(toApply.map(row => ({ id: row.id, ...row.updates })));
+            setCsvSuccess(`Updated ${toApply.length} complex${toApply.length !== 1 ? 'es' : ''} successfully.`);
             setCsvPreview(null);
+            setCsvSelectedIds(new Set());
         } catch {
             setCsvErrors(['Failed to apply changes. Please try again.']);
         } finally {
@@ -1029,29 +1034,54 @@ const AdminPanel: React.FC = () => {
                                     )}
                                     {csvPreview && csvPreview.length > 0 && (
                                         <div className="space-y-3">
-                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                                {csvPreview.length} complex{csvPreview.length !== 1 ? 'es' : ''} will be updated &nbsp;·&nbsp; {csvPreview.reduce((a, r) => a + r.changes.length, 0)} field change{csvPreview.reduce((a, r) => a + r.changes.length, 0) !== 1 ? 's' : ''}
-                                            </p>
-                                            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-                                                {csvPreview.map(row => (
-                                                    <div key={row.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
-                                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.name} <span className="font-normal text-slate-400">BC {row.bcNumber}</span></p>
-                                                        <div className="mt-1.5 space-y-1">
-                                                            {row.changes.map(ch => (
-                                                                <div key={ch.field} className="flex items-baseline gap-1.5 text-[11px]">
-                                                                    <span className="text-slate-400 shrink-0 w-36 truncate">{ch.field}</span>
-                                                                    <span className="text-red-500 line-through shrink-0">{ch.oldValue}</span>
-                                                                    <span className="text-slate-400 shrink-0">→</span>
-                                                                    <span className="text-emerald-600 dark:text-emerald-400">{ch.newValue}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                    {csvSelectedIds.size} of {csvPreview.length} selected &nbsp;·&nbsp; {csvPreview.filter(r => csvSelectedIds.has(r.id)).reduce((a, r) => a + r.changes.length, 0)} field change{csvPreview.filter(r => csvSelectedIds.has(r.id)).reduce((a, r) => a + r.changes.length, 0) !== 1 ? 's' : ''}
+                                                </p>
+                                                <button
+                                                    onClick={() => setCsvSelectedIds(csvSelectedIds.size === csvPreview.length ? new Set() : new Set(csvPreview.map(r => r.id)))}
+                                                    className="text-[10px] font-bold text-pink-600 hover:underline uppercase shrink-0"
+                                                >
+                                                    {csvSelectedIds.size === csvPreview.length ? 'Deselect All' : 'Select All'}
+                                                </button>
                                             </div>
-                                            <button onClick={handleApplyCsvChanges} disabled={csvImporting} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors">
+                                            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                                                {csvPreview.map(row => {
+                                                    const isSelected = csvSelectedIds.has(row.id);
+                                                    return (
+                                                        <div key={row.id} className={`rounded-xl p-3 border transition-all ${isSelected ? 'bg-slate-50 dark:bg-slate-800 border-transparent' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 opacity-50'}`}>
+                                                            <label className="flex items-start gap-2.5 cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isSelected}
+                                                                    onChange={(e) => {
+                                                                        const next = new Set(csvSelectedIds);
+                                                                        if (e.target.checked) next.add(row.id); else next.delete(row.id);
+                                                                        setCsvSelectedIds(next);
+                                                                    }}
+                                                                    className="mt-0.5 accent-pink-600 shrink-0"
+                                                                />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.name} <span className="font-normal text-slate-400">BC {row.bcNumber}</span></p>
+                                                                    <div className="mt-1.5 space-y-1">
+                                                                        {row.changes.map(ch => (
+                                                                            <div key={ch.field} className="flex items-baseline gap-1.5 text-[11px]">
+                                                                                <span className="text-slate-400 shrink-0 w-36 truncate">{ch.field}</span>
+                                                                                <span className="text-red-500 line-through shrink-0">{ch.oldValue}</span>
+                                                                                <span className="text-slate-400 shrink-0">→</span>
+                                                                                <span className="text-emerald-600 dark:text-emerald-400">{ch.newValue}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </label>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <button onClick={handleApplyCsvChanges} disabled={csvImporting || csvSelectedIds.size === 0} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors">
                                                 {csvImporting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                                Apply Changes
+                                                Apply {csvSelectedIds.size} Change{csvSelectedIds.size !== 1 ? 's' : ''}
                                             </button>
                                         </div>
                                     )}
