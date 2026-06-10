@@ -10,7 +10,7 @@ import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
@@ -171,6 +171,7 @@ const AdminPanel: React.FC = () => {
     const [localInsurance, setLocalInsurance] = useState<InsuranceSettings>(systemSettings.insuranceSettings || { valuationValidityYears: 2, workflowSteps: [] });
     const [localCategories, setLocalCategories] = useState<string[]>(systemSettings.contractorCategories || []);
     const [localChecklists, setLocalChecklists] = useState({ NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [], ...systemSettings.meetingChecklistTemplates });
+    const [checklistDrag, setChecklistDrag] = useState<{ stage: string; fromIdx: number; overIdx: number } | null>(null);
     const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
     const [newVenueInput, setNewVenueInput] = useState('');
     const [localStandardParagraph, setLocalStandardParagraph] = useState(systemSettings.disclosureStandardParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing.');
@@ -903,12 +904,40 @@ const AdminPanel: React.FC = () => {
                                         </h3>
                                         <div className="space-y-2">
                                             <div className="flex items-center gap-3 px-3 pb-1">
+                                                <span className="w-4 shrink-0" />
                                                 <span className="flex-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Task Label</span>
                                                 <span className="w-20 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center shrink-0">Days Before Mtg</span>
                                                 <span className="w-8 shrink-0" />
                                             </div>
-                                            {localChecklists[stage].map((item, idx) => (
-                                                <div key={item.id} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border dark:border-slate-700 group">
+                                            {localChecklists[stage].map((item, idx) => {
+                                                const isDragOver = checklistDrag?.stage === stage && checklistDrag.overIdx === idx && checklistDrag.fromIdx !== idx;
+                                                const isDragging = checklistDrag?.stage === stage && checklistDrag.fromIdx === idx;
+                                                return (
+                                                <div
+                                                    key={item.id}
+                                                    draggable
+                                                    onDragStart={() => setChecklistDrag({ stage, fromIdx: idx, overIdx: idx })}
+                                                    onDragOver={(e) => { e.preventDefault(); setChecklistDrag(prev => prev ? { ...prev, overIdx: idx } : null); }}
+                                                    onDrop={() => {
+                                                        if (!checklistDrag || checklistDrag.stage !== stage) return;
+                                                        const { fromIdx, overIdx } = checklistDrag;
+                                                        if (fromIdx === overIdx) { setChecklistDrag(null); return; }
+                                                        const next = { ...localChecklists };
+                                                        const items = [...next[stage]];
+                                                        const [moved] = items.splice(fromIdx, 1);
+                                                        items.splice(overIdx, 0, moved);
+                                                        next[stage] = items;
+                                                        setLocalChecklists(next);
+                                                        setChecklistDrag(null);
+                                                    }}
+                                                    onDragEnd={() => setChecklistDrag(null)}
+                                                    className={`flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border dark:border-slate-700 group transition-all
+                                                        ${isDragging ? 'opacity-40' : ''}
+                                                        ${isDragOver ? 'border-pink-400 dark:border-pink-500 ring-1 ring-pink-300' : ''}`}
+                                                >
+                                                    <span className="cursor-grab text-slate-300 dark:text-slate-600 hover:text-slate-400 shrink-0 active:cursor-grabbing">
+                                                        <GripVertical size={16} />
+                                                    </span>
                                                     <input
                                                         type="text"
                                                         className="flex-1 bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-lg p-2 text-sm"
@@ -943,7 +972,8 @@ const AdminPanel: React.FC = () => {
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                             <button
                                                 onClick={() => {
                                                     const next = {...localChecklists};
