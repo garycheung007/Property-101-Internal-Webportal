@@ -902,6 +902,11 @@ const AdminPanel: React.FC = () => {
                                             <span>Stage: {stageLabel}</span>
                                         </h3>
                                         <div className="space-y-2">
+                                            <div className="flex items-center gap-3 px-3 pb-1">
+                                                <span className="flex-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Task Label</span>
+                                                <span className="w-20 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center shrink-0">Days Before Mtg</span>
+                                                <span className="w-8 shrink-0" />
+                                            </div>
                                             {localChecklists[stage].map((item, idx) => (
                                                 <div key={item.id} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border dark:border-slate-700 group">
                                                     <input
@@ -911,6 +916,19 @@ const AdminPanel: React.FC = () => {
                                                         onChange={(e) => {
                                                             const next = {...localChecklists};
                                                             next[stage][idx].label = e.target.value;
+                                                            setLocalChecklists(next);
+                                                        }}
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        placeholder="—"
+                                                        title="Days before meeting date — item appears in Upcoming Actions (7 days prior) and Critical Alerts (1 day prior)"
+                                                        className="w-20 shrink-0 bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-lg p-2 text-sm text-center"
+                                                        value={item.dueDaysBeforeMeeting ?? ''}
+                                                        onChange={(e) => {
+                                                            const next = {...localChecklists};
+                                                            next[stage][idx] = { ...next[stage][idx], dueDaysBeforeMeeting: e.target.value ? parseInt(e.target.value) : undefined };
                                                             setLocalChecklists(next);
                                                         }}
                                                     />

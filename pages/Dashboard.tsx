@@ -106,7 +106,7 @@ const Dashboard: React.FC = () => {
       if (isFuture && noiDone && meeting.nomIssued && !meeting.minutesIssued) {
         const priorDue = subtractWorkingDays(mtgDate, 2);
         (meetingChecklistTemplates.PRIOR_TO_MEETING || [])
-          .filter(item => !progress[item.id])
+          .filter(item => !progress[item.id] && !item.dueDaysBeforeMeeting)
           .forEach(item => items.push({
             key: `ptm-${meeting.id}-${item.id}`,
             bcId: c.id, bcName: c.name,
@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
 
       if (!isFuture && !meeting.minutesIssued) {
         (meetingChecklistTemplates.AFTER_MEETING || [])
-          .filter(item => !progress[item.id])
+          .filter(item => !progress[item.id] && !item.dueDaysBeforeMeeting)
           .forEach(item => items.push({
             key: `am-${meeting.id}-${item.id}`,
             bcId: c.id, bcName: c.name,

@@ -2,6 +2,7 @@
 export interface MeetingChecklistItem {
   id: string;
   label: string;
+  dueDaysBeforeMeeting?: number;
 }
 
 export interface ConflictEntry {

@@ -188,7 +188,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [isAuthenticated]);
 
   const reminders = useMemo(() => (
-    generateReminders(complexes, systemSettings.insuranceSettings || DEFAULT_INSURANCE_SETTINGS)
+    generateReminders(complexes, systemSettings.insuranceSettings || DEFAULT_INSURANCE_SETTINGS, systemSettings.meetingChecklistTemplates)
   ), [complexes, systemSettings]);
 
   const managers = users.filter(u => u.role === 'admin' || u.role === 'account_manager');

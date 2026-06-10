@@ -933,7 +933,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-2 border-b dark:border-slate-800 pb-2">
                                                     <ClipboardCheck size={16} className="text-pink-600" />
-                                                    <h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Compliance Checklist</h3>
+                                                    <h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Meeting Checklist</h3>
                                                 </div>
                                                 <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                                     {(['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).map(stage => {
@@ -944,12 +944,24 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                             <div key={stage} className="space-y-2 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700 transition-colors">
                                                                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stageLabel}</span>
                                                                 <div className="space-y-1">
-                                                                    {items.map(item => (
-                                                                        <label key={item.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors group">
-                                                                            <input type="checkbox" className="rounded text-pink-600 focus:ring-pink-500 w-4 h-4" checked={progress[item.id] || false} onChange={() => handleToggleChecklistItem(item.id, stage)} disabled={effectiveLocked} />
-                                                                            <span className={`text-xs ${progress[item.id] ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
-                                                                        </label>
-                                                                    ))}
+                                                                    {items.map(item => {
+                                                                        const isDone = progress[item.id] || false;
+                                                                        let dueBadge: React.ReactNode = null;
+                                                                        if (item.dueDaysBeforeMeeting && meetingForm.date && !isDone) {
+                                                                            const d = new Date(meetingForm.date);
+                                                                            d.setDate(d.getDate() - item.dueDaysBeforeMeeting);
+                                                                            const daysLeft = Math.ceil((d.getTime() - new Date().setHours(0,0,0,0)) / (1000*60*60*24));
+                                                                            const dueLabel = daysLeft < 0 ? `Overdue (${d.toLocaleDateString('en-NZ')})` : daysLeft === 0 ? 'Due today' : `Due ${d.toLocaleDateString('en-NZ')}`;
+                                                                            dueBadge = <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${daysLeft <= 1 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : daysLeft <= 7 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>{dueLabel}</span>;
+                                                                        }
+                                                                        return (
+                                                                            <label key={item.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors group">
+                                                                                <input type="checkbox" className="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 shrink-0" checked={isDone} onChange={() => handleToggleChecklistItem(item.id, stage)} disabled={effectiveLocked} />
+                                                                                <span className={`text-xs ${isDone ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
+                                                                                {dueBadge}
+                                                                            </label>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         );

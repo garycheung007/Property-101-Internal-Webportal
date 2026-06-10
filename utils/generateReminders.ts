@@ -1,7 +1,9 @@
-import { BodyCorporate, Reminder, ReminderType, InsuranceSettings } from '../types';
+import { BodyCorporate, Reminder, ReminderType, InsuranceSettings, MeetingChecklistItem } from '../types';
 import { DEFAULT_INSURANCE_SETTINGS, DEFAULT_WORKFLOW } from '../constants/defaults';
 
-export function generateReminders(complexes: BodyCorporate[], settings: InsuranceSettings = DEFAULT_INSURANCE_SETTINGS): Reminder[] {
+type ChecklistTemplates = { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; PRIOR_TO_MEETING: MeetingChecklistItem[]; AFTER_MEETING: MeetingChecklistItem[]; };
+
+export function generateReminders(complexes: BodyCorporate[], settings: InsuranceSettings = DEFAULT_INSURANCE_SETTINGS, checklistTemplates?: ChecklistTemplates): Reminder[] {
   const reminders: Reminder[] = [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const workflowSteps = settings.workflowSteps || DEFAULT_WORKFLOW;
@@ -98,6 +100,36 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
       }
     });
   });
+
+  // Checklist item due-date reminders
+  if (checklistTemplates) {
+    complexes.filter(c => !c.isArchived).forEach(bc => {
+      (bc.meetings || []).forEach(meeting => {
+        const mtgDate = new Date(meeting.date);
+        if (isNaN(mtgDate.getTime())) return;
+        const progress = meeting.checklistProgress || {};
+        (['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).forEach(stage => {
+          (checklistTemplates[stage] || []).forEach(item => {
+            if (!item.dueDaysBeforeMeeting || progress[item.id]) return;
+            const dueDate = new Date(mtgDate);
+            dueDate.setDate(dueDate.getDate() - item.dueDaysBeforeMeeting);
+            const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysUntilDue > 7) return;
+            const id = `chk-${bc.id}-${meeting.id}-${item.id}`;
+            const dueDateStr = dueDate.toISOString().split('T')[0];
+            const msg = `CHECKLIST: "${item.label}" — ${meeting.type} on ${mtgDate.toLocaleDateString('en-NZ')}`;
+            reminders.push({
+              id, bcId: bc.id, bcName: bc.name,
+              type: daysUntilDue <= 1 ? ReminderType.COMPLIANCE : ReminderType.UPCOMING_ACTION,
+              dueDate: dueDateStr,
+              message: msg,
+              severity: daysUntilDue <= 1 ? 'high' : 'medium',
+            });
+          });
+        });
+      });
+    });
+  }
 
   return reminders;
 }
