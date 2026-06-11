@@ -1,7 +1,8 @@
 import { BodyCorporate, Reminder, ReminderType, InsuranceSettings, MeetingChecklistItem } from '../types';
 import { DEFAULT_INSURANCE_SETTINGS, DEFAULT_WORKFLOW } from '../constants/defaults';
 
-type ChecklistTemplates = { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; PRIOR_TO_MEETING: MeetingChecklistItem[]; AFTER_MEETING: MeetingChecklistItem[]; };
+type StageTemplates = { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; PRIOR_TO_MEETING: MeetingChecklistItem[]; AFTER_MEETING: MeetingChecklistItem[]; };
+type ChecklistTemplates = { bc: StageTemplates; rs: StageTemplates; };
 
 export function generateReminders(complexes: BodyCorporate[], settings: InsuranceSettings = DEFAULT_INSURANCE_SETTINGS, checklistTemplates?: ChecklistTemplates): Reminder[] {
   const reminders: Reminder[] = [];
@@ -104,12 +105,13 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
   // Checklist item due-date reminders
   if (checklistTemplates) {
     complexes.filter(c => !c.isArchived).forEach(bc => {
+      const stageTemplates = bc.type === 'Incorporated Society' ? checklistTemplates.rs : checklistTemplates.bc;
       (bc.meetings || []).forEach(meeting => {
         const mtgDate = new Date(meeting.date);
         if (isNaN(mtgDate.getTime())) return;
         const progress = meeting.checklistProgress || {};
         (['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).forEach(stage => {
-          (checklistTemplates[stage] || []).forEach(item => {
+          (stageTemplates[stage] || []).forEach(item => {
             if (!item.dueDaysBeforeMeeting || progress[item.id]) return;
             const dueDate = new Date(mtgDate);
             dueDate.setDate(dueDate.getDate() - item.dueDaysBeforeMeeting);

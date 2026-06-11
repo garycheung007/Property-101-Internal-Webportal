@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
+import { DEFAULT_MEETING_CHECKLIST } from '../constants/defaults';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -170,7 +171,12 @@ const AdminPanel: React.FC = () => {
     // Local configuration states for granular tabs
     const [localInsurance, setLocalInsurance] = useState<InsuranceSettings>(systemSettings.insuranceSettings || { valuationValidityYears: 2, workflowSteps: [] });
     const [localCategories, setLocalCategories] = useState<string[]>(systemSettings.contractorCategories || []);
-    const [localChecklists, setLocalChecklists] = useState({ NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [], ...systemSettings.meetingChecklistTemplates });
+    const emptyStages = { NOI: [] as any[], NOM: [] as any[], PRIOR_TO_MEETING: [] as any[], AFTER_MEETING: [] as any[] };
+    const [localChecklists, setLocalChecklists] = useState({
+        bc: { ...emptyStages, ...(systemSettings.meetingChecklistTemplates?.bc || DEFAULT_MEETING_CHECKLIST.bc) },
+        rs: { ...emptyStages, ...(systemSettings.meetingChecklistTemplates?.rs || DEFAULT_MEETING_CHECKLIST.rs) },
+    });
+    const [checklistType, setChecklistType] = useState<'bc' | 'rs'>('bc');
     const [checklistDrag, setChecklistDrag] = useState<{ stage: string; fromIdx: number; overIdx: number } | null>(null);
     const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
     const [newVenueInput, setNewVenueInput] = useState('');
@@ -205,7 +211,14 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.bwofConfirmationMessage) setBwofMessage(systemSettings.bwofConfirmationMessage);
         if (systemSettings.insuranceSettings) setLocalInsurance(systemSettings.insuranceSettings);
         if (systemSettings.contractorCategories) setLocalCategories(systemSettings.contractorCategories);
-        if (systemSettings.meetingChecklistTemplates) setLocalChecklists({ NOI: [], NOM: [], PRIOR_TO_MEETING: [], AFTER_MEETING: [], ...systemSettings.meetingChecklistTemplates });
+        if (systemSettings.meetingChecklistTemplates) {
+            const tpl = systemSettings.meetingChecklistTemplates;
+            const empty = { NOI: [] as any[], NOM: [] as any[], PRIOR_TO_MEETING: [] as any[], AFTER_MEETING: [] as any[] };
+            setLocalChecklists({
+                bc: { ...empty, ...(tpl.bc || DEFAULT_MEETING_CHECKLIST.bc) },
+                rs: { ...empty, ...(tpl.rs || DEFAULT_MEETING_CHECKLIST.rs) },
+            });
+        }
         if (systemSettings.meetingVenues) setLocalVenues(systemSettings.meetingVenues);
         if (systemSettings.waterRateOptions) setLocalWaterRateOptions(systemSettings.waterRateOptions);
         if (systemSettings.conflictRegisterTemplate) setLocalConflictRegisterTemplate(systemSettings.conflictRegisterTemplate);
@@ -891,10 +904,16 @@ const AdminPanel: React.FC = () => {
                             </div>
 
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-8">
-                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-4">
-                                    <ClipboardCheck size={18} className="text-pink-600" /> Master Meeting Checklists
-                                </h2>
-                                
+                                <div className="flex items-center justify-between border-b dark:border-slate-800 pb-4">
+                                    <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                        <ClipboardCheck size={18} className="text-pink-600" /> Master Meeting Checklists
+                                    </h2>
+                                    <div className="flex rounded-lg overflow-hidden border dark:border-slate-700 text-xs font-bold">
+                                        <button onClick={() => setChecklistType('bc')} className={`px-4 py-1.5 transition-colors ${checklistType === 'bc' ? 'bg-pink-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>Body Corporate</button>
+                                        <button onClick={() => setChecklistType('rs')} className={`px-4 py-1.5 transition-colors border-l dark:border-slate-700 ${checklistType === 'rs' ? 'bg-pink-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>Resident Society</button>
+                                    </div>
+                                </div>
+
                                 {(['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).map(stage => {
                                     const stageLabel = { NOI: 'NOI', NOM: 'NOM', PRIOR_TO_MEETING: 'Prior to Meeting', AFTER_MEETING: 'After Meeting' }[stage];
                                     return (
@@ -909,7 +928,7 @@ const AdminPanel: React.FC = () => {
                                                 <span className="w-20 text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center shrink-0">Days Before Mtg</span>
                                                 <span className="w-8 shrink-0" />
                                             </div>
-                                            {localChecklists[stage].map((item, idx) => {
+                                            {localChecklists[checklistType][stage].map((item, idx) => {
                                                 const isDragOver = checklistDrag?.stage === stage && checklistDrag.overIdx === idx && checklistDrag.fromIdx !== idx;
                                                 const isDragging = checklistDrag?.stage === stage && checklistDrag.fromIdx === idx;
                                                 return (
@@ -923,10 +942,10 @@ const AdminPanel: React.FC = () => {
                                                         const { fromIdx, overIdx } = checklistDrag;
                                                         if (fromIdx === overIdx) { setChecklistDrag(null); return; }
                                                         const next = { ...localChecklists };
-                                                        const items = [...next[stage]];
-                                                        const [moved] = items.splice(fromIdx, 1);
-                                                        items.splice(overIdx, 0, moved);
-                                                        next[stage] = items;
+                                                        const stageItems = [...next[checklistType][stage]];
+                                                        const [moved] = stageItems.splice(fromIdx, 1);
+                                                        stageItems.splice(overIdx, 0, moved);
+                                                        next[checklistType] = { ...next[checklistType], [stage]: stageItems };
                                                         setLocalChecklists(next);
                                                         setChecklistDrag(null);
                                                     }}
@@ -943,8 +962,10 @@ const AdminPanel: React.FC = () => {
                                                         className="flex-1 bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-lg p-2 text-sm"
                                                         value={item.label}
                                                         onChange={(e) => {
-                                                            const next = {...localChecklists};
-                                                            next[stage][idx].label = e.target.value;
+                                                            const next = { ...localChecklists };
+                                                            const stageItems = [...next[checklistType][stage]];
+                                                            stageItems[idx] = { ...stageItems[idx], label: e.target.value };
+                                                            next[checklistType] = { ...next[checklistType], [stage]: stageItems };
                                                             setLocalChecklists(next);
                                                         }}
                                                     />
@@ -956,15 +977,17 @@ const AdminPanel: React.FC = () => {
                                                         className="w-20 shrink-0 bg-white dark:bg-slate-900 border dark:border-slate-700 rounded-lg p-2 text-sm text-center"
                                                         value={item.dueDaysBeforeMeeting ?? ''}
                                                         onChange={(e) => {
-                                                            const next = {...localChecklists};
-                                                            next[stage][idx] = { ...next[stage][idx], dueDaysBeforeMeeting: e.target.value ? parseInt(e.target.value) : undefined };
+                                                            const next = { ...localChecklists };
+                                                            const stageItems = [...next[checklistType][stage]];
+                                                            stageItems[idx] = { ...stageItems[idx], dueDaysBeforeMeeting: e.target.value ? parseInt(e.target.value) : undefined };
+                                                            next[checklistType] = { ...next[checklistType], [stage]: stageItems };
                                                             setLocalChecklists(next);
                                                         }}
                                                     />
                                                     <button
                                                         onClick={() => {
-                                                            const next = {...localChecklists};
-                                                            next[stage] = next[stage].filter((_, i) => i !== idx);
+                                                            const next = { ...localChecklists };
+                                                            next[checklistType] = { ...next[checklistType], [stage]: next[checklistType][stage].filter((_, i) => i !== idx) };
                                                             setLocalChecklists(next);
                                                         }}
                                                         className="p-2 text-slate-400 hover:text-red-500 transition-colors"
@@ -976,8 +999,8 @@ const AdminPanel: React.FC = () => {
                                             })}
                                             <button
                                                 onClick={() => {
-                                                    const next = {...localChecklists};
-                                                    next[stage] = [...next[stage], { id: `${stage.toLowerCase()}_${Date.now()}`, label: 'New Requirement' }];
+                                                    const next = { ...localChecklists };
+                                                    next[checklistType] = { ...next[checklistType], [stage]: [...next[checklistType][stage], { id: `${checklistType}_${stage.toLowerCase()}_${Date.now()}`, label: 'New Requirement' }] };
                                                     setLocalChecklists(next);
                                                 }}
                                                 className="w-full py-2 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-pink-600 transition-all font-bold uppercase text-[10px]"

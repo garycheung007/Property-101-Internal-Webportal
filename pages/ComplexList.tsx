@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry } from '../types';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
+import { DEFAULT_MEETING_CHECKLIST } from '../constants/defaults';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -220,8 +221,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
     useEffect(() => { setForm(complex); }, [complex]);
 
+    const getChecklistStages = (complexType?: string) => {
+        const key = complexType === 'Incorporated Society' ? 'rs' : 'bc';
+        return systemSettings.meetingChecklistTemplates?.[key] || DEFAULT_MEETING_CHECKLIST[key];
+    };
+
     const checkStageComplete = (stage: 'NOI' | 'NOM' | 'PRIOR_TO_MEETING' | 'AFTER_MEETING', currentMeeting: Partial<Meeting>) => {
-        const templates = systemSettings.meetingChecklistTemplates?.[stage] || [];
+        const templates = getChecklistStages(form.type)?.[stage] || [];
         if (templates.length === 0) return false;
         const progress = currentMeeting.checklistProgress || {};
         return templates.every(item => progress[item.id] === true);
@@ -302,7 +308,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     };
 
     const allChecklistItems = (['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const)
-        .flatMap(stage => systemSettings.meetingChecklistTemplates?.[stage] || []);
+        .flatMap(stage => getChecklistStages(form.type)?.[stage] || []);
     const checklistProgress = meetingForm.checklistProgress || {};
     const isMeetingLocked = allChecklistItems.length > 0 && allChecklistItems.every(item => checklistProgress[item.id]);
     const effectiveLocked = isMeetingLocked && !adminUnlocked;
@@ -938,7 +944,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                                     {(['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).map(stage => {
                                                         const stageLabel = { NOI: 'NOI', NOM: 'NOM', PRIOR_TO_MEETING: 'Prior to Meeting', AFTER_MEETING: 'After Meeting' }[stage];
-                                                        const items = systemSettings.meetingChecklistTemplates?.[stage] || [];
+                                                        const items = getChecklistStages(form.type)?.[stage] || [];
                                                         const progress = meetingForm.checklistProgress || {};
                                                         return (
                                                             <div key={stage} className="space-y-2 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700 transition-colors">

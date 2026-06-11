@@ -71,7 +71,18 @@ const cleanData = (obj: any): any => {
 
 const migrateSettings = (data: SystemSettings): SystemSettings => {
   if (!data.contractorCategories) data.contractorCategories = DEFAULT_CATEGORIES;
-  if (!data.meetingChecklistTemplates) data.meetingChecklistTemplates = DEFAULT_MEETING_CHECKLIST;
+  {
+    const tpl = data.meetingChecklistTemplates as any;
+    if (!tpl) {
+      data.meetingChecklistTemplates = DEFAULT_MEETING_CHECKLIST;
+    } else if ('NOI' in tpl && !('bc' in tpl)) {
+      // Migrate old flat format — preserve existing BC items, seed RS with defaults
+      data.meetingChecklistTemplates = {
+        bc: { NOI: tpl.NOI || [], NOM: tpl.NOM || [], PRIOR_TO_MEETING: tpl.PRIOR_TO_MEETING || [], AFTER_MEETING: tpl.AFTER_MEETING || [] },
+        rs: DEFAULT_MEETING_CHECKLIST.rs,
+      };
+    }
+  }
   if (!data.bwofConfirmationMessage) data.bwofConfirmationMessage = DEFAULT_BWOF_MESSAGE;
   if (!data.documentTemplates) data.documentTemplates = DEFAULT_TEMPLATES;
   if (!data.conflictRegisterTemplate) data.conflictRegisterTemplate = DEFAULT_CONFLICT_REGISTER_TEMPLATE;

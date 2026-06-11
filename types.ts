@@ -220,10 +220,8 @@ export interface SystemSettings {
   contractorCategories?: string[];
   bwofConfirmationMessage?: string;
   meetingChecklistTemplates?: {
-    NOI: MeetingChecklistItem[];
-    NOM: MeetingChecklistItem[];
-    PRIOR_TO_MEETING: MeetingChecklistItem[];
-    AFTER_MEETING: MeetingChecklistItem[];
+    bc: { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; PRIOR_TO_MEETING: MeetingChecklistItem[]; AFTER_MEETING: MeetingChecklistItem[] };
+    rs: { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; PRIOR_TO_MEETING: MeetingChecklistItem[]; AFTER_MEETING: MeetingChecklistItem[] };
   };
   meetingVenues?: string[];
   disclosureStandardParagraph?: string;

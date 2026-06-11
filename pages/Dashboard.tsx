@@ -92,10 +92,10 @@ const Dashboard: React.FC = () => {
 
   const totalUnits = filteredComplexes.reduce((sum, c) => sum + c.units, 0);
 
-  const meetingChecklistTemplates = systemSettings.meetingChecklistTemplates || DEFAULT_MEETING_CHECKLIST;
-
-  const meetingChecklistItems = filteredComplexes.flatMap(c =>
-    (c.meetings || []).flatMap(meeting => {
+  const meetingChecklistItems = filteredComplexes.flatMap(c => {
+    const tplKey = c.type === 'Incorporated Society' ? 'rs' : 'bc';
+    const meetingChecklistTemplates = systemSettings.meetingChecklistTemplates?.[tplKey] || DEFAULT_MEETING_CHECKLIST[tplKey];
+    return (c.meetings || []).flatMap(meeting => {
       const mtgDate = new Date(meeting.date);
       if (isNaN(mtgDate.getTime())) return [];
       const isFuture = mtgDate >= today;
@@ -131,7 +131,8 @@ const Dashboard: React.FC = () => {
       }
 
       return items;
-    })
+    });
+  }
   );
 
   const getNextDocumentStatus = (meeting: any) => {
