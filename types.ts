@@ -44,6 +44,9 @@ export interface Meeting {
   nomIssued?: boolean;
   noiNotApplicable?: boolean;
   minutesIssued?: boolean;
+  noiIssuedDate?: string;
+  nomIssuedDate?: string;
+  minutesIssuedDate?: string;
 
   // Checklist Progress: map of itemId to boolean
   checklistProgress?: Record<string, boolean>;

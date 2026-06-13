@@ -270,10 +270,26 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         const currentProgress = meetingForm.checklistProgress || {};
         const updatedProgress = { ...currentProgress, [itemId]: !currentProgress[itemId] };
         const updatedMeeting = { ...meetingForm, checklistProgress: updatedProgress };
-        updatedMeeting.noiIssued = checkStageComplete('NOI', updatedMeeting);
-        updatedMeeting.nomIssued = checkStageComplete('NOM', updatedMeeting);
-        updatedMeeting.minutesIssued = checkStageComplete('AFTER_MEETING', updatedMeeting);
+        const today = new Date().toISOString().split('T')[0];
+        if (!updatedMeeting.noiIssuedDate && checkStageComplete('NOI', updatedMeeting)) {
+            updatedMeeting.noiIssued = true; updatedMeeting.noiIssuedDate = today;
+        }
+        if (!updatedMeeting.nomIssuedDate && checkStageComplete('NOM', updatedMeeting)) {
+            updatedMeeting.nomIssued = true; updatedMeeting.nomIssuedDate = today;
+        }
+        if (!updatedMeeting.minutesIssuedDate && checkStageComplete('AFTER_MEETING', updatedMeeting)) {
+            updatedMeeting.minutesIssued = true; updatedMeeting.minutesIssuedDate = today;
+        }
         setMeetingForm(updatedMeeting);
+    };
+
+    const handleMarkIssued = (stage: 'NOI' | 'NOM' | 'AFTER_MEETING', issued: boolean) => {
+        const today = new Date().toISOString().split('T')[0];
+        const updates: Partial<Meeting> = {};
+        if (stage === 'NOI') { updates.noiIssued = issued; updates.noiIssuedDate = issued ? today : undefined; }
+        else if (stage === 'NOM') { updates.nomIssued = issued; updates.nomIssuedDate = issued ? today : undefined; }
+        else { updates.minutesIssued = issued; updates.minutesIssuedDate = issued ? today : undefined; }
+        setMeetingForm({ ...meetingForm, ...updates });
     };
 
     const handleSaveMeetingForm = () => {
@@ -991,7 +1007,21 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         const progress = meetingForm.checklistProgress || {};
                                                         return (
                                                             <div key={stage} className="space-y-2 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700 transition-colors">
-                                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stageLabel}</span>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stageLabel}</span>
+                                                                    {(stage === 'NOI' || stage === 'NOM' || stage === 'AFTER_MEETING') && (() => {
+                                                                        const isIssued = stage === 'NOI' ? !!meetingForm.noiIssued : stage === 'NOM' ? !!meetingForm.nomIssued : !!meetingForm.minutesIssued;
+                                                                        const issuedDate = stage === 'NOI' ? meetingForm.noiIssuedDate : stage === 'NOM' ? meetingForm.nomIssuedDate : meetingForm.minutesIssuedDate;
+                                                                        if (isIssued) return (
+                                                                            <div className="flex items-center gap-1">
+                                                                                <CheckCircle2 size={10} className="text-emerald-500" />
+                                                                                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">Issued {issuedDate ? new Date(issuedDate).toLocaleDateString('en-NZ') : ''}</span>
+                                                                                {!effectiveLocked && <button onClick={() => handleMarkIssued(stage as 'NOI' | 'NOM' | 'AFTER_MEETING', false)} className="ml-1 text-[8px] text-slate-400 hover:text-red-500 underline">Undo</button>}
+                                                                            </div>
+                                                                        );
+                                                                        return <button onClick={() => handleMarkIssued(stage as 'NOI' | 'NOM' | 'AFTER_MEETING', true)} disabled={effectiveLocked} className="text-[9px] font-bold text-pink-600 hover:text-pink-700 border border-pink-200 hover:border-pink-300 px-1.5 py-0.5 rounded transition-colors disabled:opacity-40">{stage === 'AFTER_MEETING' ? 'Mark Minutes Issued' : 'Mark as Issued'}</button>;
+                                                                    })()}
+                                                                </div>
                                                                 <div className="space-y-1">
                                                                     {items.map(item => {
                                                                         const isDone = progress[item.id] || false;

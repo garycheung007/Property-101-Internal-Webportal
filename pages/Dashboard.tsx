@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, BellOff } from 'lucide-react';
 import { Reminder, ReminderType } from '../types';
-import { DEFAULT_MEETING_CHECKLIST } from '../constants/defaults';
+import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
 const subtractWorkingDays = (date: Date, days: number): Date => {
   const result = new Date(date);
@@ -60,16 +60,21 @@ const Dashboard: React.FC = () => {
   const upcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION);
 
   const upcomingMeetings = filteredComplexes
-    .map(c => {
-        // Find most relevant next AGM or EGM session
+    .flatMap(c => {
+        const todayMs = new Date(new Date().setHours(0,0,0,0));
+        const typeKey = c.type === 'Incorporated Society' ? 'rs' : 'bc';
+        const sysDefault = systemSettings.meetingDateSettings?.[typeKey] || DEFAULT_MEETING_DATE_SETTINGS[typeKey];
+        const mds = { ...sysDefault, ...c.meetingDateSettings };
+        const results: any[] = [];
+
         const nextMtg = (c.meetings || [])
-            .filter(m => m.type !== 'Committee' && new Date(m.date) >= new Date(new Date().setHours(0,0,0,0)))
+            .filter(m => m.type !== 'Committee' && new Date(m.date) >= todayMs)
             .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
 
         if (nextMtg) {
-            return {
+            results.push({
                 id: nextMtg.id,
-                type: nextMtg.type as any,
+                type: nextMtg.type,
                 date: nextMtg.date,
                 time: nextMtg.time || 'TBC',
                 bcNumber: c.bcNumber,
@@ -81,14 +86,42 @@ const Dashboard: React.FC = () => {
                 complexType: c.type,
                 nomDaysPrior: c.isocNomDaysPrior,
                 noiNotApplicable: nextMtg.noiNotApplicable,
-                minutesIssued: nextMtg.minutesIssued
-            }
+                minutesIssued: nextMtg.minutesIssued,
+                noiIssuedDate: nextMtg.noiIssuedDate,
+                nomIssuedDate: nextMtg.nomIssuedDate,
+                minutesIssuedDate: nextMtg.minutesIssuedDate,
+                minutesPrefDays: mds.minutesPreferDays,
+                minutesDeadDays: mds.minutesDeadlineDays,
+                isPastMeeting: false,
+            });
         }
-        return null;
+
+        (c.meetings || [])
+            .filter(m => m.type !== 'Committee' && new Date(m.date) < todayMs && !m.minutesIssued)
+            .forEach(m => {
+                results.push({
+                    id: m.id,
+                    type: m.type,
+                    date: m.date,
+                    time: m.time || 'TBC',
+                    bcNumber: c.bcNumber,
+                    bcName: c.name,
+                    bcId: c.id,
+                    complexType: c.type,
+                    minutesIssued: m.minutesIssued,
+                    noiIssuedDate: m.noiIssuedDate,
+                    nomIssuedDate: m.nomIssuedDate,
+                    minutesIssuedDate: m.minutesIssuedDate,
+                    minutesPrefDays: mds.minutesPreferDays,
+                    minutesDeadDays: mds.minutesDeadlineDays,
+                    isPastMeeting: true,
+                });
+            });
+
+        return results;
     })
-    .filter((m): m is any => m !== null)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 10);
+    .slice(0, 15);
 
   const totalUnits = filteredComplexes.reduce((sum, c) => sum + c.units, 0);
 
@@ -137,6 +170,22 @@ const Dashboard: React.FC = () => {
 
   const getNextDocumentStatus = (meeting: any) => {
       const mDate = new Date(meeting.date);
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      if (meeting.isPastMeeting) {
+          const minPref = new Date(mDate); minPref.setDate(minPref.getDate() + (meeting.minutesPrefDays || 7));
+          const minDead = new Date(mDate); minDead.setDate(minDead.getDate() + (meeting.minutesDeadDays || 14));
+          const isUrgent = today > minDead;
+          const isWarning = today >= minPref;
+          return {
+              label: 'After Meeting',
+              pref: minPref.toISOString().split('T')[0],
+              deadline: minDead.toISOString().split('T')[0],
+              status: isUrgent ? 'urgent' : (isWarning ? 'warning' : 'good'),
+              issuedItems: [] as { label: string; date: string }[],
+          };
+      }
+
       let noiPref: Date;
       let noiDead: Date;
       let nomPref: Date;
@@ -167,40 +216,33 @@ const Dashboard: React.FC = () => {
           nomDead = new Date(mDate); nomDead.setDate(nomDead.getDate() - 14); // 2 weeks
       }
 
-      const today = new Date();
-      today.setHours(0,0,0,0);
-
-      const processStatus = (pref: Date, dead: Date, issued: boolean, notApp?: boolean) => {
-          const isUrgent = today > pref; // Escalation triggers when Preferred passes
+      const processStatus = (pref: Date, dead: Date) => {
+          const isUrgent = today > pref;
           const upcomingTrigger = new Date(pref);
           upcomingTrigger.setDate(upcomingTrigger.getDate() - 7);
           const isWarning = today >= upcomingTrigger;
-
-          return {
-              isUrgent,
-              isWarning,
-              prefStr: pref.toISOString().split('T')[0],
-              deadStr: dead.toISOString().split('T')[0]
-          };
+          return { isUrgent, isWarning, prefStr: pref.toISOString().split('T')[0], deadStr: dead.toISOString().split('T')[0] };
       };
 
       if (!meeting.noiIssued && !meeting.noiNotApplicable) {
-          const s = processStatus(noiPref, noiDead, false);
-          return { 
-            label: 'NOI Required', 
-            pref: s.prefStr, 
-            deadline: s.deadStr, 
-            status: s.isUrgent ? 'urgent' : (s.isWarning ? 'warning' : 'good') 
+          const s = processStatus(noiPref, noiDead);
+          return {
+            label: 'NOI Required',
+            pref: s.prefStr,
+            deadline: s.deadStr,
+            status: s.isUrgent ? 'urgent' : (s.isWarning ? 'warning' : 'good'),
+            issuedItems: [] as { label: string; date: string }[],
           };
       }
 
       if (!meeting.nomIssued) {
-          const s = processStatus(nomPref, nomDead, false);
-          return { 
-            label: 'NOM Required', 
-            pref: s.prefStr, 
-            deadline: s.deadStr, 
-            status: s.isUrgent ? 'urgent' : (s.isWarning ? 'warning' : 'good') 
+          const s = processStatus(nomPref, nomDead);
+          return {
+            label: 'NOM Required',
+            pref: s.prefStr,
+            deadline: s.deadStr,
+            status: s.isUrgent ? 'urgent' : (s.isWarning ? 'warning' : 'good'),
+            issuedItems: meeting.noiIssuedDate ? [{ label: 'NOI', date: meeting.noiIssuedDate }] : [] as { label: string; date: string }[],
           };
       }
 
@@ -214,11 +256,21 @@ const Dashboard: React.FC = () => {
               label: 'Prior to Meeting',
               pref: priorDue.toISOString().split('T')[0],
               deadline: priorDue.toISOString().split('T')[0],
-              status: isUrgent ? 'urgent' : (isWarning ? 'warning' : 'good')
+              status: isUrgent ? 'urgent' : (isWarning ? 'warning' : 'good'),
+              issuedItems: [
+                  ...(meeting.noiIssuedDate ? [{ label: 'NOI', date: meeting.noiIssuedDate }] : []),
+                  ...(meeting.nomIssuedDate ? [{ label: 'NOM', date: meeting.nomIssuedDate }] : []),
+              ] as { label: string; date: string }[],
           };
       }
 
-      return { label: 'Notices Sent', pref: 'Complete', deadline: 'Complete', status: 'good' };
+      return {
+          label: 'Notices Sent', pref: 'Complete', deadline: 'Complete', status: 'good',
+          issuedItems: [
+              ...(meeting.noiIssuedDate ? [{ label: 'NOI', date: meeting.noiIssuedDate }] : []),
+              ...(meeting.nomIssuedDate ? [{ label: 'NOM', date: meeting.nomIssuedDate }] : []),
+          ] as { label: string; date: string }[],
+      };
   };
 
   const navigateToProperty = (bcId: string, reminderType: ReminderType, message: string) => {
@@ -477,15 +529,15 @@ const Dashboard: React.FC = () => {
         <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
             <Clock className="text-pink-500" size={20} />
-            Upcoming Meetings
+            Meetings
           </h2>
-          <p className="text-xs text-slate-400 mb-4">Confirmed AGM schedule</p>
+          <p className="text-xs text-slate-400 mb-4">Upcoming schedule & pending minutes</p>
 
           <div className="overflow-y-auto max-h-[420px] pr-2 custom-scrollbar">
               {upcomingMeetings.length === 0 ? (
                   <div className="text-center text-slate-400 py-10 flex flex-col items-center">
                       <Calendar size={32} className="mb-2 opacity-50" />
-                      <span>No confirmed AGMs.</span>
+                      <span>No upcoming meetings or pending minutes.</span>
                   </div>
               ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -504,21 +556,34 @@ const Dashboard: React.FC = () => {
                                             <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{m.bcNumber}</span>
                                             <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
                                         </div>
-                                        <span className="text-[10px] bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400 px-2 py-0.5 rounded font-bold">{m.type}</span>
+                                        <div className="flex items-center gap-1">
+                                            {m.isPastMeeting && <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase">Past</span>}
+                                            <span className="text-[10px] bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400 px-2 py-0.5 rounded font-bold">{m.type}</span>
+                                        </div>
                                     </div>
                                     <p className="text-xs text-slate-600 dark:text-slate-400 truncate mb-2">{m.bcName}</p>
-                                    
+
                                     <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-3">
                                         <Calendar size={12} />
-                                        <span>{new Date(m.date).toLocaleDateString('en-NZ')} at {m.time}</span>
+                                        <span>{m.isPastMeeting ? 'Mtg: ' : ''}{new Date(m.date).toLocaleDateString('en-NZ')}{!m.isPastMeeting ? ` at ${m.time}` : ''}</span>
                                     </div>
 
                                     <div className={`text-[10px] p-2.5 rounded-xl border flex flex-col gap-1 transition-colors ${
-                                        isUrgent ? 'bg-red-50 text-red-700 border-red-100 dark:bg-red-950/20 dark:border-red-900/30' : 
-                                        docStatus.status === 'warning' ? 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/30' : 
+                                        isUrgent ? 'bg-red-50 text-red-700 border-red-100 dark:bg-red-950/20 dark:border-red-900/30' :
+                                        docStatus.status === 'warning' ? 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/30' :
                                         docStatus.status === 'good' && !isNoticeSent ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/30' :
                                         'bg-slate-50 text-slate-600 border-slate-100 dark:bg-slate-800 dark:border-slate-700'
                                     }`}>
+                                        {docStatus.issuedItems && docStatus.issuedItems.length > 0 && (
+                                            <div className="flex flex-col gap-0.5 mb-1 pb-1.5 border-b border-emerald-200/50 dark:border-emerald-900/30">
+                                                {docStatus.issuedItems.map((item: { label: string; date: string }) => (
+                                                    <div key={item.label} className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                                        <CheckCircle2 size={9} />
+                                                        <span className="font-bold">{item.label} issued: {item.date ? new Date(item.date).toLocaleDateString('en-NZ') : '✓'}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                         <div className="flex justify-between items-center">
                                             <div className="flex items-center gap-1.5 font-bold uppercase tracking-tight">
                                                 {isComplete && isNoticeSent && <CheckCircle2 size={10} />}
@@ -546,6 +611,17 @@ const Dashboard: React.FC = () => {
                                                                 ))}
                                                             </div>
                                                         )}
+                                                    </>
+                                                ) : docStatus.label === 'After Meeting' ? (
+                                                    <>
+                                                        <div className="flex justify-between">
+                                                            <span className="opacity-70">Minutes preferred by:</span>
+                                                            <span className="font-bold">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="opacity-70">Minutes deadline:</span>
+                                                            <span className="font-medium italic">{new Date(docStatus.deadline!).toLocaleDateString('en-NZ')}</span>
+                                                        </div>
                                                     </>
                                                 ) : (
                                                     <>
