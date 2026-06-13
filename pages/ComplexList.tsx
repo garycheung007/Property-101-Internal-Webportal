@@ -12,9 +12,9 @@ import {
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
     FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2
 } from 'lucide-react';
-import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry } from '../types';
+import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry, MeetingDateSettings } from '../types';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
-import { DEFAULT_MEETING_CHECKLIST } from '../constants/defaults';
+import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -395,21 +395,17 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
             d.setDate(d.getDate() + days);
             return d.toISOString().split('T')[0];
         };
-        if (form.type === 'Incorporated Society') {
-            const period = form.isocNomDaysPrior || 7;
-            const nomDeadDate = new Date(mDate);
-            nomDeadDate.setDate(nomDeadDate.getDate() - period);
-            const nomPrefDate = new Date(nomDeadDate); nomPrefDate.setDate(nomPrefDate.getDate() - 7);
-            const noiDeadDate = new Date(nomDeadDate); noiDeadDate.setDate(noiDeadDate.getDate() - 7);
-            const noiPrefDate = new Date(nomDeadDate); noiPrefDate.setDate(noiPrefDate.getDate() - 14);
-            return {
-                noiPref: noiPrefDate.toISOString().split('T')[0],
-                noiDead: noiDeadDate.toISOString().split('T')[0],
-                nomPref: nomPrefDate.toISOString().split('T')[0],
-                nomDead: nomDeadDate.toISOString().split('T')[0],
-            };
-        }
-        return { noiPref: shift(-35), noiDead: shift(-21), nomPref: shift(-21), nomDead: shift(-14) };
+        const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc';
+        const sysDefault = systemSettings.meetingDateSettings?.[typeKey] || DEFAULT_MEETING_DATE_SETTINGS[typeKey];
+        const s: MeetingDateSettings = { ...sysDefault, ...form.meetingDateSettings };
+        return {
+            noiPref: shift(-s.noiPreferDays),
+            noiDead: shift(-s.noiDeadlineDays),
+            nomPref: shift(-s.nomPreferDays),
+            nomDead: shift(-s.nomDeadlineDays),
+            minutesPref: shift(s.minutesPreferDays),
+            minutesDead: shift(s.minutesDeadlineDays),
+        };
     };
 
     const toggleStatutoryField = (field: keyof BodyCorporate) => {
@@ -760,6 +756,53 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 </div>
                             </div>
                         </div>
+                        {currentUser?.role === 'admin' && (
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-4">
+                            <div className="flex items-center justify-between border-b dark:border-slate-800 pb-3">
+                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Calendar size={16} className="text-pink-600" /> Meeting Date Settings
+                                </h3>
+                                {form.meetingDateSettings && Object.values(form.meetingDateSettings).some(v => v !== undefined) && (
+                                    <button onClick={() => setForm(prev => ({ ...prev, meetingDateSettings: undefined }))} className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-widest">Reset to defaults</button>
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-400">Override system defaults for this complex. Leave blank to use system defaults.</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {([
+                                    { key: 'noiPreferDays', label: 'NOI Preferred (days before)' },
+                                    { key: 'noiDeadlineDays', label: 'NOI Deadline (days before)' },
+                                    { key: 'nomPreferDays', label: 'NOM Preferred (days before)' },
+                                    { key: 'nomDeadlineDays', label: 'NOM Deadline (days before)' },
+                                    { key: 'minutesPreferDays', label: 'Minutes Preferred (days after)' },
+                                    { key: 'minutesDeadlineDays', label: 'Minutes Deadline (days after)' },
+                                ] as { key: keyof MeetingDateSettings; label: string }[]).map(({ key, label }) => {
+                                    const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc';
+                                    const sysDefault = systemSettings.meetingDateSettings?.[typeKey]?.[key] ?? DEFAULT_MEETING_DATE_SETTINGS[typeKey][key];
+                                    return (
+                                        <div key={key}>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                placeholder={`${sysDefault} (default)`}
+                                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm"
+                                                value={form.meetingDateSettings?.[key] ?? ''}
+                                                onChange={e => {
+                                                    const val = e.target.value ? parseInt(e.target.value) : undefined;
+                                                    setForm(prev => {
+                                                        const updated = { ...(prev.meetingDateSettings || {}), [key]: val };
+                                                        const hasAny = Object.values(updated).some(v => v !== undefined);
+                                                        return { ...prev, meetingDateSettings: hasAny ? updated as Partial<MeetingDateSettings> : undefined };
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        )}
+
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-3">
                             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
                                 <MessageSquareMore size={16} className="text-pink-600" /> Notes
@@ -1017,6 +1060,21 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                 <div className="text-[9px] font-bold uppercase tracking-widest text-pink-400 mb-1">Meeting Date</div>
                                                                 <div className="text-sm font-mono font-bold text-pink-700 dark:text-pink-400">{fmt(meetingForm.date)}</div>
                                                             </div>
+                                                            {isPast(meetingForm.date) && (
+                                                                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border dark:border-slate-700">
+                                                                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Minutes</div>
+                                                                    <div className="space-y-1.5">
+                                                                        <div className="flex justify-between items-center text-xs">
+                                                                            <span className="text-slate-500">Preferred</span>
+                                                                            <span className={`font-mono font-bold ${isPast(dates.minutesPref) && !meetingForm.minutesIssued ? 'text-amber-500' : 'text-slate-700 dark:text-slate-300'}`}>{fmt(dates.minutesPref)}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between items-center text-xs">
+                                                                            <span className="text-slate-500">Deadline</span>
+                                                                            <span className={`font-mono font-bold ${isPast(dates.minutesDead) && !meetingForm.minutesIssued ? 'text-red-500' : 'text-amber-600 dark:text-amber-400'}`}>{fmt(dates.minutesDead)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })() : (

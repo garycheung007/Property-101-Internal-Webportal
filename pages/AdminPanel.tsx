@@ -2,16 +2,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
-import { DEFAULT_MEETING_CHECKLIST } from '../constants/defaults';
+import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord } from '../types';
+import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord, MeetingDateSettings } from '../types';
 import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
@@ -178,6 +178,11 @@ const AdminPanel: React.FC = () => {
     });
     const [checklistType, setChecklistType] = useState<'bc' | 'rs'>('bc');
     const [checklistDrag, setChecklistDrag] = useState<{ stage: string; fromIdx: number; overIdx: number } | null>(null);
+    const [localMeetingDateSettings, setLocalMeetingDateSettings] = useState({
+        bc: { ...(systemSettings.meetingDateSettings?.bc || DEFAULT_MEETING_DATE_SETTINGS.bc) },
+        rs: { ...(systemSettings.meetingDateSettings?.rs || DEFAULT_MEETING_DATE_SETTINGS.rs) },
+    });
+    const [meetingDateTab, setMeetingDateTab] = useState<'bc' | 'rs'>('bc');
     const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
     const [newVenueInput, setNewVenueInput] = useState('');
     const [localStandardParagraph, setLocalStandardParagraph] = useState(systemSettings.disclosureStandardParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing.');
@@ -217,6 +222,12 @@ const AdminPanel: React.FC = () => {
             setLocalChecklists({
                 bc: { ...empty, ...(tpl.bc || DEFAULT_MEETING_CHECKLIST.bc) },
                 rs: { ...empty, ...(tpl.rs || DEFAULT_MEETING_CHECKLIST.rs) },
+            });
+        }
+        if (systemSettings.meetingDateSettings) {
+            setLocalMeetingDateSettings({
+                bc: { ...DEFAULT_MEETING_DATE_SETTINGS.bc, ...systemSettings.meetingDateSettings.bc },
+                rs: { ...DEFAULT_MEETING_DATE_SETTINGS.rs, ...systemSettings.meetingDateSettings.rs },
             });
         }
         if (systemSettings.meetingVenues) setLocalVenues(systemSettings.meetingVenues);
@@ -441,6 +452,7 @@ const AdminPanel: React.FC = () => {
             disclosureRemediationParagraph: localRemediationParagraph,
             waterRateOptions: localWaterRateOptions,
             conflictRegisterTemplate: localConflictRegisterTemplate,
+            meetingDateSettings: localMeetingDateSettings,
         });
         alert("System settings updated successfully.");
     };
@@ -900,6 +912,46 @@ const AdminPanel: React.FC = () => {
                                     >
                                         <Plus size={16} /> Add
                                     </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-4">
+                                <div className="flex items-center justify-between border-b dark:border-slate-800 pb-4">
+                                    <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                        <Calendar size={18} className="text-pink-600" /> Meeting Date Defaults
+                                    </h2>
+                                    <div className="flex rounded-lg overflow-hidden border dark:border-slate-700 text-xs font-bold">
+                                        <button onClick={() => setMeetingDateTab('bc')} className={`px-4 py-1.5 transition-colors ${meetingDateTab === 'bc' ? 'bg-pink-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>Body Corporate</button>
+                                        <button onClick={() => setMeetingDateTab('rs')} className={`px-4 py-1.5 transition-colors border-l dark:border-slate-700 ${meetingDateTab === 'rs' ? 'bg-pink-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>Resident Society</button>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-400">Default notice periods used for all complexes. Override for individual complexes in the complex Details tab.</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {([
+                                        { key: 'noiPreferDays', label: 'NOI Preferred (days before)' },
+                                        { key: 'noiDeadlineDays', label: 'NOI Deadline (days before)' },
+                                        { key: 'nomPreferDays', label: 'NOM Preferred (days before)' },
+                                        { key: 'nomDeadlineDays', label: 'NOM Deadline (days before)' },
+                                        { key: 'minutesPreferDays', label: 'Minutes Preferred (days after)' },
+                                        { key: 'minutesDeadlineDays', label: 'Minutes Deadline (days after)' },
+                                    ] as { key: keyof MeetingDateSettings; label: string }[]).map(({ key, label }) => (
+                                        <div key={key}>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm"
+                                                value={localMeetingDateSettings[meetingDateTab][key]}
+                                                onChange={e => {
+                                                    const val = parseInt(e.target.value) || 1;
+                                                    setLocalMeetingDateSettings(prev => ({
+                                                        ...prev,
+                                                        [meetingDateTab]: { ...prev[meetingDateTab], [key]: val }
+                                                    }));
+                                                }}
+                                            />
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 

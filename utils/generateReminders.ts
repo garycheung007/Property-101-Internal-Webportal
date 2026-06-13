@@ -1,13 +1,20 @@
-import { BodyCorporate, Reminder, ReminderType, InsuranceSettings, MeetingChecklistItem } from '../types';
-import { DEFAULT_INSURANCE_SETTINGS, DEFAULT_WORKFLOW } from '../constants/defaults';
+import { BodyCorporate, Reminder, ReminderType, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings } from '../types';
+import { DEFAULT_INSURANCE_SETTINGS, DEFAULT_WORKFLOW, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
 type StageTemplates = { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; PRIOR_TO_MEETING: MeetingChecklistItem[]; AFTER_MEETING: MeetingChecklistItem[]; };
 type ChecklistTemplates = { bc: StageTemplates; rs: StageTemplates; };
+type MeetingDateConfig = { bc: MeetingDateSettings; rs: MeetingDateSettings; };
 
-export function generateReminders(complexes: BodyCorporate[], settings: InsuranceSettings = DEFAULT_INSURANCE_SETTINGS, checklistTemplates?: ChecklistTemplates): Reminder[] {
+export function generateReminders(complexes: BodyCorporate[], settings: InsuranceSettings = DEFAULT_INSURANCE_SETTINGS, checklistTemplates?: ChecklistTemplates, meetingDateConfig?: MeetingDateConfig): Reminder[] {
   const reminders: Reminder[] = [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const workflowSteps = settings.workflowSteps || DEFAULT_WORKFLOW;
+
+  const getDateSettings = (bc: BodyCorporate): MeetingDateSettings => {
+    const typeKey = bc.type === 'Incorporated Society' ? 'rs' : 'bc';
+    const sysDefault = meetingDateConfig?.[typeKey] || DEFAULT_MEETING_DATE_SETTINGS[typeKey];
+    return { ...sysDefault, ...bc.meetingDateSettings };
+  };
 
   complexes.filter(c => !c.isArchived).forEach(bc => {
     const progress = bc.insuranceWorkflowProgress || {};
@@ -58,25 +65,16 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
       });
     }
 
+    // NOI/NOM reminders — upcoming meetings only
     (bc.meetings || []).forEach(meeting => {
       const mtgDate = new Date(meeting.date);
       if (isNaN(mtgDate.getTime()) || mtgDate < today) return;
 
-      let noiPref: Date, noiDead: Date, nomPref: Date, nomDead: Date;
-
-      if (bc.type === 'Incorporated Society') {
-        const nomPeriod = bc.isocNomDaysPrior || 7;
-        const dNomDead = new Date(mtgDate); dNomDead.setDate(dNomDead.getDate() - nomPeriod);
-        nomDead = dNomDead;
-        nomPref = new Date(dNomDead); nomPref.setDate(nomPref.getDate() - 7);
-        noiDead = new Date(dNomDead); noiDead.setDate(noiDead.getDate() - 7);
-        noiPref = new Date(dNomDead); noiPref.setDate(noiPref.getDate() - 14);
-      } else {
-        noiPref = new Date(mtgDate); noiPref.setDate(noiPref.getDate() - 35);
-        noiDead = new Date(mtgDate); noiDead.setDate(noiDead.getDate() - 21);
-        nomPref = new Date(mtgDate); nomPref.setDate(nomPref.getDate() - 21);
-        nomDead = new Date(mtgDate); nomDead.setDate(nomDead.getDate() - 14);
-      }
+      const s = getDateSettings(bc);
+      const noiPref = new Date(mtgDate); noiPref.setDate(noiPref.getDate() - s.noiPreferDays);
+      const noiDead = new Date(mtgDate); noiDead.setDate(noiDead.getDate() - s.noiDeadlineDays);
+      const nomPref = new Date(mtgDate); nomPref.setDate(nomPref.getDate() - s.nomPreferDays);
+      const nomDead = new Date(mtgDate); nomDead.setDate(nomDead.getDate() - s.nomDeadlineDays);
 
       const processMeetingTask = (type: 'NOI' | 'NOM', prefDate: Date, deadDate: Date, issued?: boolean, notApp?: boolean) => {
         if (issued || notApp) return;
@@ -99,6 +97,30 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
       } else if (!meeting.nomIssued) {
         processMeetingTask('NOM', nomPref, nomDead, false, false);
       }
+    });
+
+    // Minutes reminders — past meetings where minutes not yet issued
+    (bc.meetings || []).forEach(meeting => {
+      if (meeting.minutesIssued) return;
+      const mtgDate = new Date(meeting.date);
+      if (isNaN(mtgDate.getTime()) || mtgDate >= today) return;
+
+      const s = getDateSettings(bc);
+      const minPref = new Date(mtgDate); minPref.setDate(minPref.getDate() + s.minutesPreferDays);
+      const minDead = new Date(mtgDate); minDead.setDate(minDead.getDate() + s.minutesDeadlineDays);
+
+      if (today < minPref) return;
+
+      const daysUntilDead = Math.ceil((minDead.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const isOverdue = daysUntilDead < 0;
+      reminders.push({
+        id: `min-${bc.id}-${meeting.id}`,
+        bcId: bc.id, bcName: bc.name,
+        type: isOverdue ? ReminderType.AGM : ReminderType.UPCOMING_ACTION,
+        dueDate: minDead.toISOString().split('T')[0],
+        message: `${isOverdue ? 'OVERDUE' : 'ACTION'}: Issue minutes for ${meeting.type} (Mtg: ${meeting.date}). ${isOverdue ? 'Deadline: ' + minDead.toLocaleDateString('en-NZ') : 'Due by: ' + minDead.toLocaleDateString('en-NZ')}`,
+        severity: isOverdue ? 'high' : 'medium',
+      });
     });
   });
 

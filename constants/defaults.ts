@@ -1,4 +1,4 @@
-import { WorkflowStepConfig, InsuranceSettings, MeetingChecklistItem } from '../types';
+import { WorkflowStepConfig, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings } from '../types';
 
 export const DEFAULT_CATEGORIES: string[] = [
   'Insurance Broker',
@@ -77,3 +77,22 @@ export const DEFAULT_MEETING_CHECKLIST: { bc: StageTemplates; rs: StageTemplates
 };
 
 export const DEFAULT_BWOF_MESSAGE = "Please confirm that you have received the signed BWOF 12A certificate from the compliance company and it has been uploaded to the complex OneDrive folder before advancing the expiry date.";
+
+export const DEFAULT_MEETING_DATE_SETTINGS: { bc: MeetingDateSettings; rs: MeetingDateSettings } = {
+  bc: {
+    noiPreferDays: 35,
+    noiDeadlineDays: 21,
+    nomPreferDays: 21,
+    nomDeadlineDays: 14,
+    minutesPreferDays: 7,
+    minutesDeadlineDays: 14,
+  },
+  rs: {
+    noiPreferDays: 28,
+    noiDeadlineDays: 21,
+    nomPreferDays: 14,
+    nomDeadlineDays: 7,
+    minutesPreferDays: 14,
+    minutesDeadlineDays: 28,
+  },
+};

@@ -5,6 +5,15 @@ export interface MeetingChecklistItem {
   dueDaysBeforeMeeting?: number;
 }
 
+export interface MeetingDateSettings {
+  noiPreferDays: number;
+  noiDeadlineDays: number;
+  nomPreferDays: number;
+  nomDeadlineDays: number;
+  minutesPreferDays: number;
+  minutesDeadlineDays: number;
+}
+
 export interface ConflictEntry {
   id: string;
   memberName: string;
@@ -195,6 +204,7 @@ export interface BodyCorporate {
   levyDueDates?: string;
 
   notes?: string;
+  meetingDateSettings?: Partial<MeetingDateSettings>;
 }
 
 export type UserRole = 'admin' | 'account_manager' | 'support';
@@ -228,6 +238,7 @@ export interface SystemSettings {
   disclosureRemediationParagraph?: string;
   waterRateOptions?: string[];
   conflictRegisterTemplate?: string;
+  meetingDateSettings?: { bc: MeetingDateSettings; rs: MeetingDateSettings };
 }
 
 export type ContractorCategory = string;
