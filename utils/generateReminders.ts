@@ -114,7 +114,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
           (stageTemplates[stage] || []).forEach(item => {
             if (!item.dueDaysBeforeMeeting || progress[item.id]) return;
             const dueDate = new Date(mtgDate);
-            dueDate.setDate(dueDate.getDate() - item.dueDaysBeforeMeeting);
+            dueDate.setDate(dueDate.getDate() + (stage === 'AFTER_MEETING' ? item.dueDaysBeforeMeeting : -item.dueDaysBeforeMeeting));
             const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
             if (daysUntilDue > 7) return;
             const id = `chk-${bc.id}-${meeting.id}-${item.id}`;

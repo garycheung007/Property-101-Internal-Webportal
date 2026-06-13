@@ -955,7 +955,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                         let dueBadge: React.ReactNode = null;
                                                                         if (item.dueDaysBeforeMeeting && meetingForm.date && !isDone) {
                                                                             const d = new Date(meetingForm.date);
-                                                                            d.setDate(d.getDate() - item.dueDaysBeforeMeeting);
+                                                                            d.setDate(d.getDate() + (stage === 'AFTER_MEETING' ? item.dueDaysBeforeMeeting : -item.dueDaysBeforeMeeting));
                                                                             const daysLeft = Math.ceil((d.getTime() - new Date().setHours(0,0,0,0)) / (1000*60*60*24));
                                                                             const dueLabel = daysLeft < 0 ? `Overdue (${d.toLocaleDateString('en-NZ')})` : daysLeft === 0 ? 'Due today' : `Due ${d.toLocaleDateString('en-NZ')}`;
                                                                             dueBadge = <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${daysLeft <= 1 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : daysLeft <= 7 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>{dueLabel}</span>;
