@@ -83,7 +83,7 @@ const calculateDefaultResponseDueDate = (dateStr?: string) => {
 };
 
 const ComplexList: React.FC = () => {
-  const { complexes, updateComplex, managers, initializeDummyData, updateMeeting, deleteMeeting } = useData();
+  const { complexes, updateComplex, addComplex, managers, initializeDummyData, updateMeeting, deleteMeeting } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -93,6 +93,7 @@ const ComplexList: React.FC = () => {
   const hasInitializedFilter = useRef(false);
   const [selectedComplexId, setSelectedComplexId] = useState<string | null>(null);
   const [initialModalTab, setInitialModalTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>('details');
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const selectedComplex = complexes.find(c => c.id === selectedComplexId) || null;
 
@@ -159,6 +160,11 @@ const ComplexList: React.FC = () => {
     <div className="space-y-6">
        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div><h1 className="text-2xl font-bold text-slate-800 dark:text-white">Properties</h1><p className="text-slate-500">View and Update Portfolios</p></div>
+        {user?.role === 'admin' && (
+          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <Plus size={16} /> Add Complex
+          </button>
+        )}
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border dark:border-slate-800 overflow-hidden transition-colors">
@@ -189,6 +195,100 @@ const ComplexList: React.FC = () => {
         </div>
       </div>
       {selectedComplex && <EditComplexModal complex={selectedComplex} onClose={handleCloseModal} onSave={handleUpdate} initialTab={initialModalTab} />}
+      {showAddModal && <AddComplexModal managers={managers} onClose={() => setShowAddModal(false)} onSave={async (bc) => { await addComplex(bc); setShowAddModal(false); }} />}
+    </div>
+  );
+};
+
+const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: () => void; onSave: (bc: BodyCorporate) => Promise<void> }> = ({ managers, onClose, onSave }) => {
+  const [form, setForm] = useState({
+    name: '',
+    bcNumber: '',
+    address: '',
+    type: 'Body Corporate' as import('../types').ComplexType,
+    managerName: managers[0]?.name || '',
+    managementStartDate: '',
+    insuranceExpiry: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.bcNumber.trim() || !form.address.trim()) {
+      setError('Name, BC Number, and Address are required.');
+      return;
+    }
+    setSaving(true);
+    const newBc: BodyCorporate = {
+      id: `bc_${Date.now()}`,
+      bcNumber: form.bcNumber.trim(),
+      name: form.name.trim(),
+      address: form.address.trim(),
+      units: 0,
+      type: form.type,
+      managerName: form.managerName,
+      managementFee: 0,
+      managementStartDate: form.managementStartDate || undefined,
+      financialYearEnd: '',
+      insuranceExpiry: form.insuranceExpiry || '',
+      meetings: [],
+    };
+    await onSave(newBc);
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b dark:border-slate-700">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white">Add New Complex</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Complex Name *</label>
+              <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" placeholder="e.g. Harbour View Apartments" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">BC / IS Number *</label>
+              <input type="text" value={form.bcNumber} onChange={e => setForm(f => ({ ...f, bcNumber: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" placeholder="e.g. BC12345" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Type</label>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as import('../types').ComplexType }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none">
+                <option value="Body Corporate">Body Corporate</option>
+                <option value="Incorporated Society">Incorporated Society</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Address *</label>
+              <input type="text" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" placeholder="e.g. 123 Main Street, Auckland" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Manager</label>
+              <select value={form.managerName} onChange={e => setForm(f => ({ ...f, managerName: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none">
+                {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Management Start Date</label>
+              <input type="date" value={form.managementStartDate} onChange={e => setForm(f => ({ ...f, managementStartDate: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Insurance Expiry</label>
+              <input type="date" value={form.insuranceExpiry} onChange={e => setForm(f => ({ ...f, insuranceExpiry: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" />
+            </div>
+          </div>
+          <p className="text-xs text-slate-400">Other details (units, fees, financial year, etc.) can be filled in after creation.</p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm rounded-lg border dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-medium transition-colors disabled:opacity-50">{saving ? 'Saving...' : 'Create Complex'}</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
