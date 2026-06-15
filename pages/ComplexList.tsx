@@ -650,6 +650,38 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                 <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30 dark:bg-slate-950/30 transition-colors relative">
                     {activeTab === 'details' && (
                         <div className="space-y-6">
+                        {currentUser?.role === 'admin' && (
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-4">
+                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
+                                    <Pencil size={16} className="text-pink-600" /> Property Information
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Complex Name</label>
+                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">BC / IS Number</label>
+                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcNumber || ''} onChange={e => setForm({...form, bcNumber: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Type</label>
+                                        <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.type || 'Body Corporate'} onChange={e => setForm({...form, type: e.target.value as import('../types').ComplexType})}>
+                                            <option value="Body Corporate">Body Corporate</option>
+                                            <option value="Incorporated Society">Incorporated Society</option>
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Address</label>
+                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Number of Units</label>
+                                        <input type="number" min={0} className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.units || 0} onChange={e => setForm({...form, units: parseInt(e.target.value) || 0})} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
