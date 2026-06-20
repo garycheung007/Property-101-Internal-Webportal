@@ -55,6 +55,8 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
 interface CsvColumnDef { key: keyof BodyCorporate; header: string; type?: 'number' | 'boolean' | 'date'; }
 interface CsvChange { field: string; oldValue: string; newValue: string; }
 interface CsvPreviewRow { id: string; bcNumber: string; name: string; changes: CsvChange[]; updates: Partial<BodyCorporate>; }
+interface CsvNewRow { tempId: string; bcNumber: string; name: string; address: string; newData: Partial<BodyCorporate>; }
+interface CsvDuplicateWarning { rowNum: number; csvName: string; csvBcNumber: string; matchField: string; matchedName: string; matchedBcNumber: string; }
 
 const CSV_COLUMNS: CsvColumnDef[] = [
     { key: 'bcNumber',                   header: 'BC Number' },
@@ -157,7 +159,7 @@ const AdminPanel: React.FC = () => {
     const {
         complexes, managers, users, contractors, systemSettings, loading: dataLoading,
         addUser, updateUser, updateSystemSettings, initializeDummyData, toggleArchiveComplex, updateComplex,
-        restoreData, bulkUpdateComplexes
+        restoreData, bulkUpdateComplexes, addComplexes
     } = useData();
     
     const [activeTab, setActiveTab] = useState<'properties' | 'contractors' | 'users' | 'settings' | 'meetings' | 'templates' | 'diagnostics' | 'data'>('properties');
@@ -197,6 +199,9 @@ const AdminPanel: React.FC = () => {
     // Data tab — CSV
     const [csvPreview, setCsvPreview] = useState<CsvPreviewRow[] | null>(null);
     const [csvSelectedIds, setCsvSelectedIds] = useState<Set<string>>(new Set());
+    const [csvNewRows, setCsvNewRows] = useState<CsvNewRow[]>([]);
+    const [csvSelectedNewIds, setCsvSelectedNewIds] = useState<Set<string>>(new Set());
+    const [csvDuplicates, setCsvDuplicates] = useState<CsvDuplicateWarning[]>([]);
     const [csvErrors, setCsvErrors] = useState<string[]>([]);
     const [csvImporting, setCsvImporting] = useState(false);
     const [csvSuccess, setCsvSuccess] = useState('');
@@ -300,9 +305,9 @@ const AdminPanel: React.FC = () => {
 
     // ── CSV handlers ────────────────────────────────────────────────────────
     const handleCsvExport = () => {
-        const headers = CSV_COLUMNS.map(c => c.header);
+        const headers = ['ID', ...CSV_COLUMNS.map(c => c.header)];
         const rows = complexes.map(bc =>
-            CSV_COLUMNS.map(col => escapeCsvValue(formatValueForCsv((bc as any)[col.key], col.type)))
+            [escapeCsvValue(bc.id), ...CSV_COLUMNS.map(col => escapeCsvValue(formatValueForCsv((bc as any)[col.key], col.type)))]
         );
         const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
         const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -318,7 +323,8 @@ const AdminPanel: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file) return;
         e.target.value = '';
-        setCsvPreview(null); setCsvErrors([]); setCsvSuccess(''); setCsvSelectedIds(new Set());
+        setCsvPreview(null); setCsvNewRows([]); setCsvDuplicates([]);
+        setCsvErrors([]); setCsvSuccess(''); setCsvSelectedIds(new Set()); setCsvSelectedNewIds(new Set());
         const reader = new FileReader();
         reader.onload = (ev) => {
             const raw = ev.target?.result as string;
@@ -327,47 +333,110 @@ const AdminPanel: React.FC = () => {
             if (lines.length < 2) { setCsvErrors(['CSV has no data rows.']); return; }
             const headers = parseCsvLine(lines[0]);
             const errors: string[] = [];
-            const preview: CsvPreviewRow[] = [];
+            const updates: CsvPreviewRow[] = [];
+            const newRows: CsvNewRow[] = [];
+            const duplicates: CsvDuplicateWarning[] = [];
+
             for (let i = 1; i < lines.length; i++) {
                 const vals = parseCsvLine(lines[i]);
                 const row: Record<string, string> = {};
                 headers.forEach((h, idx) => { row[h] = vals[idx] ?? ''; });
+
+                const rowId = row['ID']?.trim();
                 const bcNum = row['BC Number']?.trim();
-                if (!bcNum) continue;
-                const existing = complexes.find(c => c.bcNumber === bcNum);
-                if (!existing) { errors.push(`Row ${i + 1}: BC Number "${bcNum}" not found.`); continue; }
-                const changes: CsvChange[] = [];
-                const updates: Partial<BodyCorporate> = {};
-                for (const col of CSV_COLUMNS) {
-                    if (col.key === 'bcNumber') continue;
-                    const csvVal = row[col.header]?.trim();
-                    if (!csvVal) continue;
-                    const currentDisplay = formatValueForCsv((existing as any)[col.key], col.type);
-                    if (csvVal === currentDisplay) continue;
-                    const newVal = parseValueFromCsv(csvVal, col.type);
-                    (updates as any)[col.key] = newVal;
-                    changes.push({ field: col.header, oldValue: currentDisplay || '(blank)', newValue: csvVal });
+                const rowName = row['Name']?.trim();
+                const rowAddress = row['Address']?.trim();
+
+                // Match existing: by ID first, then by BC Number
+                let existing = rowId ? complexes.find(c => c.id === rowId) : null;
+                if (!existing && bcNum) existing = complexes.find(c => c.bcNumber === bcNum);
+
+                if (existing) {
+                    // UPDATE — all fields including BC Number are now editable
+                    const changes: CsvChange[] = [];
+                    const fieldUpdates: Partial<BodyCorporate> = {};
+                    for (const col of CSV_COLUMNS) {
+                        const csvVal = row[col.header]?.trim();
+                        if (!csvVal) continue;
+                        const currentDisplay = formatValueForCsv((existing as any)[col.key], col.type);
+                        if (csvVal === currentDisplay) continue;
+                        const newVal = parseValueFromCsv(csvVal, col.type);
+                        (fieldUpdates as any)[col.key] = newVal;
+                        changes.push({ field: col.header, oldValue: currentDisplay || '(blank)', newValue: csvVal });
+                    }
+                    if (changes.length > 0) updates.push({ id: existing.id, bcNumber: existing.bcNumber, name: existing.name, changes, updates: fieldUpdates });
+                } else {
+                    // CREATE — validate required fields
+                    if (!bcNum && !rowName) { errors.push(`Row ${i + 1}: Missing BC Number and Name — skipped.`); continue; }
+
+                    // Duplicate checks: BC Number, Name, Address
+                    const dupByBc = bcNum ? complexes.find(c => c.bcNumber.toLowerCase() === bcNum.toLowerCase()) : null;
+                    const dupByName = rowName ? complexes.find(c => c.name.toLowerCase() === rowName.toLowerCase()) : null;
+                    const dupByAddress = rowAddress ? complexes.find(c => c.address.toLowerCase().trim() === rowAddress.toLowerCase().trim()) : null;
+
+                    if (dupByBc || dupByName || dupByAddress) {
+                        const matched = (dupByBc || dupByName || dupByAddress)!;
+                        const matchField = dupByBc ? 'BC Number' : dupByName ? 'Name' : 'Address';
+                        duplicates.push({ rowNum: i + 1, csvName: rowName || '(no name)', csvBcNumber: bcNum || '(no number)', matchField, matchedName: matched.name, matchedBcNumber: matched.bcNumber });
+                        continue;
+                    }
+
+                    // Build new complex data from all CSV columns
+                    const newData: Partial<BodyCorporate> = {};
+                    for (const col of CSV_COLUMNS) {
+                        const csvVal = row[col.header]?.trim();
+                        if (!csvVal) continue;
+                        (newData as any)[col.key] = parseValueFromCsv(csvVal, col.type);
+                    }
+                    newRows.push({ tempId: `new_${i}_${Date.now()}`, bcNumber: bcNum || '', name: rowName || '', address: rowAddress || '', newData });
                 }
-                if (changes.length > 0) preview.push({ id: existing.id, bcNumber: bcNum, name: existing.name, changes, updates });
             }
+
             setCsvErrors(errors);
-            setCsvPreview(preview);
-            setCsvSelectedIds(new Set(preview.map(r => r.id)));
+            setCsvPreview(updates);
+            setCsvNewRows(newRows);
+            setCsvDuplicates(duplicates);
+            setCsvSelectedIds(new Set(updates.map(r => r.id)));
+            setCsvSelectedNewIds(new Set(newRows.map(r => r.tempId)));
         };
         reader.readAsText(file, 'utf-8');
     };
 
     const handleApplyCsvChanges = async () => {
-        if (!csvPreview || csvPreview.length === 0) return;
-        const toApply = csvPreview.filter(row => csvSelectedIds.has(row.id));
-        if (toApply.length === 0) return;
-        if (!window.confirm(`Apply changes to ${toApply.length} complex${toApply.length !== 1 ? 'es' : ''}?`)) return;
+        const toUpdate = (csvPreview || []).filter(row => csvSelectedIds.has(row.id));
+        const toCreate = csvNewRows.filter(row => csvSelectedNewIds.has(row.tempId));
+        if (toUpdate.length === 0 && toCreate.length === 0) return;
+        const msg = [
+            toUpdate.length > 0 ? `update ${toUpdate.length} complex${toUpdate.length !== 1 ? 'es' : ''}` : '',
+            toCreate.length > 0 ? `create ${toCreate.length} new complex${toCreate.length !== 1 ? 'es' : ''}` : '',
+        ].filter(Boolean).join(' and ');
+        if (!window.confirm(`This will ${msg}. Continue?`)) return;
         setCsvImporting(true);
         try {
-            await bulkUpdateComplexes(toApply.map(row => ({ id: row.id, ...row.updates })));
-            setCsvSuccess(`Updated ${toApply.length} complex${toApply.length !== 1 ? 'es' : ''} successfully.`);
-            setCsvPreview(null);
-            setCsvSelectedIds(new Set());
+            if (toUpdate.length > 0) await bulkUpdateComplexes(toUpdate.map(row => ({ id: row.id, ...row.updates })));
+            if (toCreate.length > 0) {
+                const newComplexes: BodyCorporate[] = toCreate.map((row, idx) => ({
+                    id: `bc_${Date.now()}_${idx}`,
+                    bcNumber: row.bcNumber,
+                    name: row.name,
+                    address: row.address,
+                    units: 0,
+                    managerName: '',
+                    managementFee: 0,
+                    financialYearEnd: '',
+                    insuranceExpiry: '',
+                    meetings: [],
+                    ...row.newData,
+                }));
+                await addComplexes(newComplexes);
+            }
+            const parts = [
+                toUpdate.length > 0 ? `${toUpdate.length} complex${toUpdate.length !== 1 ? 'es' : ''} updated` : '',
+                toCreate.length > 0 ? `${toCreate.length} new complex${toCreate.length !== 1 ? 'es' : ''} created` : '',
+            ].filter(Boolean).join(', ');
+            setCsvSuccess(`${parts} successfully.`);
+            setCsvPreview(null); setCsvNewRows([]); setCsvDuplicates([]);
+            setCsvSelectedIds(new Set()); setCsvSelectedNewIds(new Set());
         } catch {
             setCsvErrors(['Failed to apply changes. Please try again.']);
         } finally {
@@ -1124,14 +1193,14 @@ const AdminPanel: React.FC = () => {
                                 <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                                     <FileText size={18} className="text-pink-600" /> Complex Data — CSV
                                 </h2>
-                                <p className="text-xs text-slate-500">Export all complex details to a spreadsheet. Edit values, then re-upload to update multiple records at once. Matched by BC Number — cannot create new complexes via CSV.</p>
+                                <p className="text-xs text-slate-500">Export all complex details to a spreadsheet. Edit values or add new rows, then re-upload. Existing records are matched by ID (or BC Number as fallback). New rows without an ID are created. All fields including BC Number are editable on update.</p>
 
                                 <div>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Export</p>
                                     <button onClick={handleCsvExport} className="flex items-center gap-2 px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl transition-colors">
                                         <Download size={14} /> Download Complexes CSV
                                     </button>
-                                    <p className="text-[10px] text-slate-400 mt-1.5">{complexes.length} complexes · {CSV_COLUMNS.length} columns</p>
+                                    <p className="text-[10px] text-slate-400 mt-1.5">{complexes.length} complexes · {CSV_COLUMNS.length + 1} columns (incl. ID)</p>
                                 </div>
 
                                 <div className="border-t dark:border-slate-800 pt-5 space-y-3">
@@ -1152,59 +1221,100 @@ const AdminPanel: React.FC = () => {
                                             <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">{csvSuccess}</p>
                                         </div>
                                     )}
-                                    {csvPreview !== null && csvPreview.length === 0 && !csvErrors.length && (
-                                        <p className="text-xs text-slate-400 italic">No changes detected in uploaded CSV.</p>
+                                    {csvPreview !== null && csvPreview.length === 0 && csvNewRows.length === 0 && csvDuplicates.length === 0 && !csvErrors.length && (
+                                        <p className="text-xs text-slate-400 italic">No changes or new complexes detected in uploaded CSV.</p>
                                     )}
-                                    {csvPreview && csvPreview.length > 0 && (
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                                    {csvSelectedIds.size} of {csvPreview.length} selected &nbsp;·&nbsp; {csvPreview.filter(r => csvSelectedIds.has(r.id)).reduce((a, r) => a + r.changes.length, 0)} field change{csvPreview.filter(r => csvSelectedIds.has(r.id)).reduce((a, r) => a + r.changes.length, 0) !== 1 ? 's' : ''}
-                                                </p>
-                                                <button
-                                                    onClick={() => setCsvSelectedIds(csvSelectedIds.size === csvPreview.length ? new Set() : new Set(csvPreview.map(r => r.id)))}
-                                                    className="text-[10px] font-bold text-pink-600 hover:underline uppercase shrink-0"
-                                                >
-                                                    {csvSelectedIds.size === csvPreview.length ? 'Deselect All' : 'Select All'}
-                                                </button>
-                                            </div>
-                                            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-                                                {csvPreview.map(row => {
-                                                    const isSelected = csvSelectedIds.has(row.id);
-                                                    return (
-                                                        <div key={row.id} className={`rounded-xl p-3 border transition-all ${isSelected ? 'bg-slate-50 dark:bg-slate-800 border-transparent' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 opacity-50'}`}>
-                                                            <label className="flex items-start gap-2.5 cursor-pointer">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={isSelected}
-                                                                    onChange={(e) => {
-                                                                        const next = new Set(csvSelectedIds);
-                                                                        if (e.target.checked) next.add(row.id); else next.delete(row.id);
-                                                                        setCsvSelectedIds(next);
-                                                                    }}
-                                                                    className="mt-0.5 accent-pink-600 shrink-0"
-                                                                />
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.name} <span className="font-normal text-slate-400">BC {row.bcNumber}</span></p>
-                                                                    <div className="mt-1.5 space-y-1">
-                                                                        {row.changes.map(ch => (
-                                                                            <div key={ch.field} className="flex items-baseline gap-1.5 text-[11px]">
-                                                                                <span className="text-slate-400 shrink-0 w-36 truncate">{ch.field}</span>
-                                                                                <span className="text-red-500 line-through shrink-0">{ch.oldValue}</span>
-                                                                                <span className="text-slate-400 shrink-0">→</span>
-                                                                                <span className="text-emerald-600 dark:text-emerald-400">{ch.newValue}</span>
+                                    {csvPreview !== null && (csvPreview.length > 0 || csvNewRows.length > 0 || csvDuplicates.length > 0) && (
+                                        <div className="space-y-4">
+
+                                            {/* Updates section */}
+                                            {csvPreview.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Updates ({csvPreview.length})</p>
+                                                        <button onClick={() => setCsvSelectedIds(csvSelectedIds.size === csvPreview.length ? new Set() : new Set(csvPreview.map(r => r.id)))} className="text-[10px] font-bold text-pink-600 hover:underline uppercase">
+                                                            {csvSelectedIds.size === csvPreview.length ? 'Deselect All' : 'Select All'}
+                                                        </button>
+                                                    </div>
+                                                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                                                        {csvPreview.map(row => {
+                                                            const isSelected = csvSelectedIds.has(row.id);
+                                                            return (
+                                                                <div key={row.id} className={`rounded-xl p-3 border transition-all ${isSelected ? 'bg-slate-50 dark:bg-slate-800 border-transparent' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 opacity-50'}`}>
+                                                                    <label className="flex items-start gap-2.5 cursor-pointer">
+                                                                        <input type="checkbox" checked={isSelected} onChange={(e) => { const next = new Set(csvSelectedIds); if (e.target.checked) next.add(row.id); else next.delete(row.id); setCsvSelectedIds(next); }} className="mt-0.5 accent-pink-600 shrink-0" />
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{row.name} <span className="font-normal text-slate-400">· {row.bcNumber}</span></p>
+                                                                            <div className="mt-1.5 space-y-1">
+                                                                                {row.changes.map(ch => (
+                                                                                    <div key={ch.field} className="flex items-baseline gap-1.5 text-[11px]">
+                                                                                        <span className="text-slate-400 shrink-0 w-36 truncate">{ch.field}</span>
+                                                                                        <span className="text-red-500 line-through shrink-0">{ch.oldValue}</span>
+                                                                                        <span className="text-slate-400 shrink-0">→</span>
+                                                                                        <span className="text-emerald-600 dark:text-emerald-400">{ch.newValue}</span>
+                                                                                    </div>
+                                                                                ))}
                                                                             </div>
-                                                                        ))}
-                                                                    </div>
+                                                                        </div>
+                                                                    </label>
                                                                 </div>
-                                                            </label>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                            <button onClick={handleApplyCsvChanges} disabled={csvImporting || csvSelectedIds.size === 0} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors">
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* New complexes section */}
+                                            {csvNewRows.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">New Complexes ({csvNewRows.length})</p>
+                                                        <button onClick={() => setCsvSelectedNewIds(csvSelectedNewIds.size === csvNewRows.length ? new Set() : new Set(csvNewRows.map(r => r.tempId)))} className="text-[10px] font-bold text-pink-600 hover:underline uppercase">
+                                                            {csvSelectedNewIds.size === csvNewRows.length ? 'Deselect All' : 'Select All'}
+                                                        </button>
+                                                    </div>
+                                                    <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                                                        {csvNewRows.map(row => {
+                                                            const isSelected = csvSelectedNewIds.has(row.tempId);
+                                                            return (
+                                                                <div key={row.tempId} className={`rounded-xl p-3 border transition-all ${isSelected ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 opacity-50'}`}>
+                                                                    <label className="flex items-start gap-2.5 cursor-pointer">
+                                                                        <input type="checkbox" checked={isSelected} onChange={(e) => { const next = new Set(csvSelectedNewIds); if (e.target.checked) next.add(row.tempId); else next.delete(row.tempId); setCsvSelectedNewIds(next); }} className="mt-0.5 accent-pink-600 shrink-0" />
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">{row.name || '(no name)'}</p>
+                                                                            <p className="text-[11px] text-slate-500">{row.bcNumber && `BC: ${row.bcNumber}`}{row.address && ` · ${row.address}`}</p>
+                                                                        </div>
+                                                                        <span className="text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded uppercase shrink-0">New</span>
+                                                                    </label>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Duplicates section */}
+                                            {csvDuplicates.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Duplicate Warnings ({csvDuplicates.length}) — Skipped</p>
+                                                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                                                        {csvDuplicates.map((d, i) => (
+                                                            <div key={i} className="rounded-xl p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30">
+                                                                <p className="text-xs font-bold text-amber-700 dark:text-amber-400">Row {d.rowNum}: {d.csvName} <span className="font-normal">({d.csvBcNumber})</span></p>
+                                                                <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-0.5">{d.matchField} matches existing: {d.matchedName} ({d.matchedBcNumber})</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <button
+                                                onClick={handleApplyCsvChanges}
+                                                disabled={csvImporting || (csvSelectedIds.size === 0 && csvSelectedNewIds.size === 0)}
+                                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors"
+                                            >
                                                 {csvImporting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                                                Apply {csvSelectedIds.size} Change{csvSelectedIds.size !== 1 ? 's' : ''}
+                                                Apply ({csvSelectedIds.size} update{csvSelectedIds.size !== 1 ? 's' : ''}{csvSelectedNewIds.size > 0 ? ` · ${csvSelectedNewIds.size} new` : ''})
                                             </button>
                                         </div>
                                     )}
