@@ -3,21 +3,31 @@ import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Contractor, ContractorCategory, NotingMethod, NotingRequirement } from '../types';
-import { HardHat, Search, Plus, Phone, Mail, Edit2, Trash2, X, Info, PlusCircle, MinusCircle, Loader2, Save } from 'lucide-react';
+import { HardHat, Search, Plus, Phone, Mail, Edit2, Trash2, X, Info, PlusCircle, MinusCircle, Loader2, Save, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 
 const ContractorList: React.FC = () => {
     const { contractors, addContractor, updateContractor, deleteContractor, systemSettings } = useData();
     const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterCategory, setFilterCategory] = useState('all');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingContractor, setEditingContractor] = useState<Contractor | null>(null);
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
-    const filteredContractors = contractors.filter(c => 
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const allCategories = Array.from(new Set([
+        ...(systemSettings.contractorCategories || []),
+        ...contractors.map(c => c.category),
+    ])).filter(Boolean).sort();
+
+    const filteredContractors = contractors
+        .filter(c =>
+            (filterCategory === 'all' || c.category === filterCategory) &&
+            (c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             c.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             c.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()))
+        )
+        .sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
     const handleEdit = (c: Contractor) => {
         setEditingContractor(c);
@@ -86,24 +96,37 @@ const ContractorList: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors">
-                <div className="p-4 border-b border-slate-100 dark:border-slate-800 transition-colors">
-                    <div className="relative w-full max-w-md">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800 transition-colors flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="Filter by name or category..." 
+                        <input
+                            type="text"
+                            placeholder="Search by name or contact..."
                             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500 text-sm transition-all"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    <select
+                        className="py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-pink-500 transition-all"
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                    >
+                        <option value="all">All Categories</option>
+                        {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
                         <thead className="bg-slate-50 dark:bg-slate-800/50 text-xs uppercase font-bold text-slate-500 dark:text-slate-400">
                             <tr>
-                                <th className="px-6 py-4">Company</th>
+                                <th className="px-6 py-4">
+                                    <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} className="flex items-center gap-1.5 hover:text-pink-600 transition-colors">
+                                        Company
+                                        {sortDir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                    </button>
+                                </th>
                                 <th className="px-6 py-4">Category</th>
                                 <th className="px-6 py-4">Contact</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
