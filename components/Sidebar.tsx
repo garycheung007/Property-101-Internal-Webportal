@@ -95,15 +95,15 @@ const Sidebar: React.FC = () => {
           <HardHat size={20} />
           <span>Contractors</span>
         </Link>
-        
+        <Link to="/financials" className={getNavClass('/financials')}>
+          <DollarSign size={20} />
+          <span>Portfolio</span>
+        </Link>
+
         {/* Admin Only Section */}
         {user?.role === 'admin' && (
              <div className="pt-4 mt-4 border-t border-pink-800 dark:border-slate-800">
                  <p className="px-4 text-xs font-semibold text-pink-300 dark:text-slate-500 uppercase tracking-wider mb-2">Administration</p>
-                 <Link to="/financials" className={getNavClass('/financials')}>
-                    <DollarSign size={20} />
-                    <span>Financials</span>
-                </Link>
                  <Link to="/admin" className={getNavClass('/admin')}>
                     <Settings size={20} />
                     <span>Admin Panel</span>

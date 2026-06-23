@@ -17,8 +17,9 @@ const Financials: React.FC = () => {
     const [invoiceFilterDocType, setInvoiceFilterDocType] = useState('all');
     const [invoiceFilterStatus, setInvoiceFilterStatus] = useState('outstanding');
     const [recoveringId, setRecoveringId] = useState<string | null>(null);
+    const [chartView, setChartView] = useState<'revenue' | 'complexes' | 'units' | 'meetings'>('revenue');
 
-    if (!user || (user.role !== 'admin' && user.role !== 'account_manager')) return <Navigate to="/" replace />;
+    if (!user) return <Navigate to="/" replace />;
 
     const activeComplexes = complexes.filter(c => !c.isArchived);
     const totalFees = activeComplexes.reduce((acc, c) => acc + (c.managementFee || 0), 0);
@@ -34,6 +35,39 @@ const Financials: React.FC = () => {
             .map(([name, fee]) => ({ name, fee }))
             .sort((a, b) => b.fee - a.fee);
     })();
+
+    const currentYear = new Date().getFullYear().toString();
+
+    const complexesByManager = (() => {
+        const map: Record<string, number> = {};
+        activeComplexes.forEach(c => { const m = c.managerName || 'Unassigned'; map[m] = (map[m] || 0) + 1; });
+        return Object.entries(map).map(([name, count]) => ({ name, value: count })).sort((a, b) => b.value - a.value);
+    })();
+
+    const unitsByManager = (() => {
+        const map: Record<string, number> = {};
+        activeComplexes.forEach(c => { const m = c.managerName || 'Unassigned'; map[m] = (map[m] || 0) + (c.units || 0); });
+        return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    })();
+
+    const meetingsByManager = (() => {
+        const map: Record<string, number> = {};
+        activeComplexes.forEach(c => {
+            const m = c.managerName || 'Unassigned';
+            map[m] = (map[m] || 0) + (c.meetings || []).filter(mt => mt.date?.startsWith(currentYear)).length;
+        });
+        return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    })();
+
+    const getActiveChart = () => {
+        switch (chartView) {
+            case 'revenue':   return { data: revenueByManager.map(d => ({ name: d.name, value: d.fee })), label: 'Revenue Distribution by Manager',       yFmt: (v: number) => `$${(v/1000).toFixed(0)}k`, ttFmt: (v: number) => [`$${v.toLocaleString('en-NZ')}`, 'Annual Fees'] as [string, string] };
+            case 'complexes': return { data: complexesByManager, label: 'Complexes per Manager',                 yFmt: (v: number) => `${v}`,                      ttFmt: (v: number) => [`${v}`, 'Complexes']                          as [string, string] };
+            case 'units':     return { data: unitsByManager,     label: 'Units per Manager',                     yFmt: (v: number) => `${v}`,                      ttFmt: (v: number) => [`${v}`, 'Units']                              as [string, string] };
+            case 'meetings':  return { data: meetingsByManager,  label: `Meetings per Manager (${currentYear})`, yFmt: (v: number) => `${v}`,                      ttFmt: (v: number) => [`${v}`, 'Meetings']                           as [string, string] };
+        }
+    };
+    const activeChart = getActiveChart();
 
     const filteredInvoices = invoices
         .filter(inv => invoiceFilterComplex === 'all' || inv.complexId === invoiceFilterComplex)
@@ -88,7 +122,7 @@ const Financials: React.FC = () => {
     return (
         <div className="space-y-8 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Financial Overview</h1>
+                <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Portfolio Overview</h1>
                 <button 
                     onClick={handleExport}
                     className="bg-slate-800 hover:bg-black text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all"
@@ -123,24 +157,41 @@ const Financials: React.FC = () => {
                 </div>
             </div>
 
-            {/* Revenue by Manager Chart */}
+            {/* Manager Chart */}
             <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border dark:border-slate-800 shadow-sm h-[400px] flex flex-col">
-                <h3 className="text-sm font-bold uppercase tracking-widest mb-8 flex items-center gap-2 dark:text-white">
-                    <TrendingUp size={18} className="text-emerald-500" /> Revenue Distribution by Manager
-                </h3>
+                <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 dark:text-white">
+                        <TrendingUp size={18} className="text-emerald-500" /> {activeChart.label}
+                    </h3>
+                    {user.role === 'admin' && (
+                        <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-xs font-bold">
+                            {(['revenue', 'complexes', 'units', 'meetings'] as const).map(v => (
+                                <button
+                                    key={v}
+                                    onClick={() => setChartView(v)}
+                                    className={`px-3 py-1.5 rounded-lg transition-colors ${chartView === v ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                >
+                                    {v === 'revenue' ? 'Revenue' : v === 'complexes' ? 'Complexes' : v === 'units' ? 'Units' : 'Meetings'}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
                 <div className="flex-1 w-full min-h-0">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={revenueByManager}>
+                        <BarChart data={activeChart.data}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} />
-                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} />
-                            <Tooltip 
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}} tickFormatter={activeChart.yFmt} />
+                            <Tooltip
                                 cursor={{fill: 'rgba(241, 245, 249, 0.1)'}}
                                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', backgroundColor: '#1e293b', color: '#fff' }}
-                                formatter={(value: number) => [`$${value.toLocaleString()}`, 'Annual Fees']}
+                                labelStyle={{ color: '#fff' }}
+                                itemStyle={{ color: '#fff' }}
+                                formatter={(value) => activeChart.ttFmt(Number(value))}
                             />
-                            <Bar dataKey="fee" radius={[6, 6, 0, 0]} maxBarSize={50}>
-                                {revenueByManager.map((entry, index) => (
+                            <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={50}>
+                                {activeChart.data.map((_entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Bar>

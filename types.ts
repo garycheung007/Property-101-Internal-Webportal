@@ -229,7 +229,7 @@ export interface BodyCorporate {
   meetingDateSettings?: Partial<MeetingDateSettings>;
 }
 
-export type UserRole = 'admin' | 'account_manager' | 'support';
+export type UserRole = 'admin' | 'account_manager' | 'support' | 'accounts';
 
 export interface User {
   id: string;
