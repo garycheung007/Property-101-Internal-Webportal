@@ -4,9 +4,10 @@ import { doc, getDoc } from 'firebase/firestore';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
-import { FileSignature, Download, Loader2, FileText, Edit3, Eye, AlertTriangle } from 'lucide-react';
+import { FileSignature, Download, Loader2, FileText, Edit3, Eye, AlertTriangle, DollarSign, CheckCircle2 } from 'lucide-react';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Contractor, TemplateFileRecord } from '../types';
 
 // Minimal 1×1 transparent GIF used as fallback when no signature is available
@@ -98,7 +99,8 @@ const buildIframeSrcDoc = (html: string) =>
     })();</script></body></html>`;
 
 const DisclosureGenerator: React.FC = () => {
-  const { complexes, contractors, managers } = useData();
+  const { complexes, contractors, managers, invoices, addInvoice } = useData();
+  const { user } = useAuth();
 
   const [selectedBcId, setSelectedBcId] = useState<string>('');
   const [complexSearch, setComplexSearch] = useState('');
@@ -121,8 +123,20 @@ const DisclosureGenerator: React.FC = () => {
   const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewing, setPreviewing] = useState(false);
+  const [invoiceEnabled, setInvoiceEnabled] = useState(false);
+  const [invoiceAmount, setInvoiceAmount] = useState('');
+  const [invoiceCreating, setInvoiceCreating] = useState(false);
+  const [invoiceSuccess, setInvoiceSuccess] = useState(false);
 
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
+  const duplicateInvoice = invoiceEnabled && selectedBcId && unitNumber.trim()
+    ? invoices.find(inv =>
+        inv.complexId === selectedBcId &&
+        inv.documentType === docType.toUpperCase() &&
+        inv.unitReference.toLowerCase().trim() === unitNumber.toLowerCase().trim() &&
+        !inv.recoveredAt
+      )
+    : undefined;
   const _wdesc = (selectedComplex?.waterRateDescription || '').toLowerCase();
   const isBcOnCharged = (_wdesc.includes('on-charged') || _wdesc.includes('on charged')) &&
     !_wdesc.includes('utility agent') && !_wdesc.includes('third party');
@@ -158,6 +172,9 @@ const DisclosureGenerator: React.FC = () => {
     setWaterReadingDate('');
     setWaterAmountOutstanding('');
     setPreviewHtml('');
+    setInvoiceEnabled(false);
+    setInvoiceAmount('');
+    setInvoiceSuccess(false);
   }, [selectedBcId]);
 
   const formatStatutory = (isYes?: boolean, details?: string) =>
@@ -321,6 +338,33 @@ const DisclosureGenerator: React.FC = () => {
     };
   };
 
+  const handleCreateInvoice = async () => {
+    if (!selectedComplex || !invoiceAmount || parseFloat(invoiceAmount) <= 0) return;
+    setInvoiceCreating(true);
+    try {
+      const exclGst = parseFloat(invoiceAmount);
+      const gst = parseFloat((exclGst * 0.15).toFixed(2));
+      await addInvoice({
+        date: new Date().toISOString().split('T')[0],
+        complexId: selectedComplex.id,
+        complexName: selectedComplex.name,
+        bcNumber: selectedComplex.bcNumber,
+        documentType: docType.toUpperCase() as 'S146' | 'S147' | 'CPL',
+        unitReference: unitNumber.trim() || 'TBC',
+        details: `${docType.toUpperCase()} Fee for Unit ${unitNumber.trim() || 'TBC'}`,
+        amountExclGst: exclGst,
+        gstAmount: gst,
+        amountInclGst: parseFloat((exclGst + gst).toFixed(2)),
+        generatedBy: user?.name || 'Unknown',
+        generatedAt: new Date().toISOString(),
+      });
+      setInvoiceSuccess(true);
+      setInvoiceAmount('');
+    } finally {
+      setInvoiceCreating(false);
+    }
+  };
+
   const handlePreview = async () => {
     if (!currentTemplate || !selectedComplex) return;
     setPreviewing(true);
@@ -405,7 +449,7 @@ const DisclosureGenerator: React.FC = () => {
                 ] as const).map(type => (
                   <button
                     key={type.id}
-                    onClick={() => { setDocType(type.id); setPreviewHtml(''); }}
+                    onClick={() => { setDocType(type.id); setPreviewHtml(''); setInvoiceEnabled(false); setInvoiceAmount(''); setInvoiceSuccess(false); }}
                     className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${docType === type.id ? 'border-pink-600 bg-pink-50 dark:bg-pink-900/10' : 'border-transparent bg-slate-50 dark:bg-slate-800/50 text-slate-500'}`}
                   >
                     <div className={`w-2 h-2 rounded-full ${docType === type.id ? 'bg-pink-600' : 'bg-slate-300'}`} />
@@ -567,6 +611,83 @@ const DisclosureGenerator: React.FC = () => {
               </p>
             )}
           </div>
+
+          {/* Invoice panel */}
+          {selectedBcId && (
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <DollarSign size={14} className="text-emerald-600" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">On-charge Invoice</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setInvoiceEnabled(p => !p); setInvoiceSuccess(false); }}
+                  className={`flex items-center w-10 h-5 rounded-full p-0.5 transition-colors ${invoiceEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${invoiceEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              {invoiceEnabled && (
+                <>
+                  {duplicateInvoice && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                        <span><strong>Duplicate:</strong> An unrecovered invoice already exists for {docType.toUpperCase()} Unit {unitNumber} — created {new Date(duplicateInvoice.generatedAt).toLocaleDateString('en-NZ')} by {duplicateInvoice.generatedBy} (${duplicateInvoice.amountInclGst.toFixed(2)} incl. GST). Mark it recovered in Financials before creating a new one.</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Amount excl. GST ($)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm"
+                      placeholder="e.g. 150.00"
+                      value={invoiceAmount}
+                      onChange={e => { setInvoiceAmount(e.target.value); setInvoiceSuccess(false); }}
+                    />
+                  </div>
+
+                  {invoiceAmount && parseFloat(invoiceAmount) > 0 && (
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 text-xs space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Excl. GST</span>
+                        <span className="font-mono font-bold dark:text-white">${parseFloat(invoiceAmount).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">GST (15%)</span>
+                        <span className="font-mono font-bold dark:text-white">${(parseFloat(invoiceAmount) * 0.15).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between border-t dark:border-slate-700 pt-1 mt-1">
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Incl. GST</span>
+                        <span className="font-mono font-bold text-emerald-600">${(parseFloat(invoiceAmount) * 1.15).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {invoiceSuccess ? (
+                    <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-bold">
+                      <CheckCircle2 size={14} /> Invoice created successfully
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleCreateInvoice}
+                      disabled={!!duplicateInvoice || !invoiceAmount || parseFloat(invoiceAmount) <= 0 || invoiceCreating}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {invoiceCreating ? <Loader2 size={14} className="animate-spin" /> : <DollarSign size={14} />}
+                      Create Invoice
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right panel — preview */}

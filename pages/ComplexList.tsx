@@ -1211,12 +1211,20 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                             ))}
                                                             <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border dark:border-slate-700">
                                                                 <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">NOI Response Due <span className="text-pink-500 font-normal normal-case">(editable)</span></div>
-                                                                <input
-                                                                    type="date"
-                                                                    className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono ${meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate) ? 'text-red-500 border-red-300' : 'dark:text-white'}`}
-                                                                    value={meetingForm.noiResponseDueDate || ''}
-                                                                    onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})}
-                                                                />
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <input
+                                                                        type="date"
+                                                                        className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono ${meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate) ? 'text-red-500 border-red-300' : 'dark:text-white'}`}
+                                                                        value={meetingForm.noiResponseDueDate || ''}
+                                                                        onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})}
+                                                                    />
+                                                                    <input
+                                                                        type="time"
+                                                                        className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-2 py-1.5 text-xs font-mono"
+                                                                        value={meetingForm.noiResponseDueTime || ''}
+                                                                        onChange={e => setMeetingForm({...meetingForm, noiResponseDueTime: e.target.value})}
+                                                                    />
+                                                                </div>
                                                             </div>
                                                             <div className="p-3 bg-pink-50 dark:bg-pink-900/10 rounded-xl border border-pink-200 dark:border-pink-900/30">
                                                                 <div className="text-[9px] font-bold uppercase tracking-widest text-pink-400 mb-1">Meeting Date</div>

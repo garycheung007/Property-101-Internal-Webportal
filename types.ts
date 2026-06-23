@@ -33,9 +33,10 @@ export interface Meeting {
   venueAddress?: string;
   
   // Specific to AGM
-  noiDueDate?: string; 
-  noiResponseDueDate?: string; 
-  nomDueDate?: string; 
+  noiDueDate?: string;
+  noiResponseDueDate?: string;
+  noiResponseDueTime?: string;
+  nomDueDate?: string;
   agendaSentDate?: string;
   minutesSentDate?: string;
 
@@ -50,6 +51,24 @@ export interface Meeting {
 
   // Checklist Progress: map of itemId to boolean
   checklistProgress?: Record<string, boolean>;
+}
+
+export interface Invoice {
+  id: string;
+  date: string;
+  complexId: string;
+  complexName: string;
+  bcNumber: string;
+  documentType: 'S146' | 'S147' | 'CPL';
+  unitReference: string;
+  details: string;
+  amountExclGst: number;
+  gstAmount: number;
+  amountInclGst: number;
+  generatedBy: string;
+  generatedAt: string;
+  recoveredAt?: string;
+  recoveredBy?: string;
 }
 
 export type ComplexType = 'Body Corporate' | 'Incorporated Society';

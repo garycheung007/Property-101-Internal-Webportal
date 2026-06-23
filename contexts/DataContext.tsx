@@ -8,7 +8,7 @@ import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import {
   BodyCorporate, Reminder, User, Meeting, UserRole,
-  Contractor, ActionComment, SystemSettings, SnoozedAlert
+  Contractor, ActionComment, SystemSettings, SnoozedAlert, Invoice
 } from '../types';
 import {
   DEFAULT_CATEGORIES, DEFAULT_INSURANCE_SETTINGS,
@@ -53,6 +53,9 @@ interface DataContextType {
   restoreData: (data: any) => Promise<void>;
   bulkUpdateComplexes: (updates: Array<{ id: string } & Partial<BodyCorporate>>) => Promise<void>;
   initializeDummyData: () => Promise<void>;
+  invoices: Invoice[];
+  addInvoice: (invoice: Omit<Invoice, 'id'>) => Promise<void>;
+  markInvoiceRecovered: (invoiceId: string, userName: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -150,6 +153,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [actionComments, setActionComments] = useState<ActionComment[]>([]);
   const [snoozedAlerts, setSnoozedAlerts] = useState<SnoozedAlert[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [loading, setLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -179,6 +183,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const unsubContractors = onSnapshot(collection(db, 'contractors'),  s => setContractors(s.docs.map(d => ({ id: d.id, ...d.data() } as Contractor))));
     const unsubComments    = onSnapshot(collection(db, 'comments'),       s => setActionComments(s.docs.map(d => ({ id: d.id, ...d.data() } as ActionComment))));
     const unsubSnoozed     = onSnapshot(collection(db, 'snoozed_alerts'), s => setSnoozedAlerts(s.docs.map(d => ({ id: d.id, ...d.data() } as SnoozedAlert))));
+    const unsubInvoices    = onSnapshot(collection(db, 'invoices'),       s => setInvoices(s.docs.map(d => ({ id: d.id, ...d.data() } as Invoice))));
 
     const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), docSnap => {
       if (docSnap.exists()) {
@@ -195,7 +200,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    return () => { unsubComplexes(); unsubMeetings(); unsubUsers(); unsubContractors(); unsubComments(); unsubSnoozed(); unsubSettings(); };
+    return () => { unsubComplexes(); unsubMeetings(); unsubUsers(); unsubContractors(); unsubComments(); unsubSnoozed(); unsubSettings(); unsubInvoices(); };
   }, [isAuthenticated]);
 
   const reminders = useMemo(() => (
@@ -276,6 +281,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const addInvoice = async (invoice: Omit<Invoice, 'id'>) => {
+    await addDoc(collection(db, 'invoices'), invoice);
+  };
+  const markInvoiceRecovered = async (invoiceId: string, userName: string) => {
+    await setDoc(doc(db, 'invoices', invoiceId), { recoveredAt: new Date().toISOString(), recoveredBy: userName }, { merge: true });
+  };
+
   const restoreData = async (data: any) => {
     const batch = writeBatch(db);
     if (data.complexes)      data.complexes.forEach((bc: any)   => batch.set(doc(db, 'complexes',   bc.id), cleanData(bc),  { merge: true }));
@@ -313,7 +325,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addComplex, addComplexes, updateComplex, toggleArchiveComplex, getComplex, assignManagerToComplex,
       addUser, updateUser, deleteUser, updateUserRole, addMeeting, updateMeeting, deleteMeeting,
       addContractor, addContractors, updateContractor, deleteContractor,
-      addActionComment, removeActionComment, snoozeAlert, unsnoozeAlert, updateSystemSettings, restoreData, bulkUpdateComplexes, initializeDummyData
+      addActionComment, removeActionComment, snoozeAlert, unsnoozeAlert, updateSystemSettings, restoreData, bulkUpdateComplexes, initializeDummyData,
+      invoices, addInvoice, markInvoiceRecovered
     }}>{children}</DataContext.Provider>
   );
 };

@@ -28,7 +28,8 @@ const replaceMergeTags = (template: string, data: { complex: BodyCorporate, meet
     const noiDueDate = noiDueRaw ? new Date(noiDueRaw).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '[NOI Due Date]';
     const noiDueDay = noiDueRaw ? new Date(noiDueRaw).toLocaleDateString('en-NZ', { weekday: 'long' }) : '[Day]';
     
-    const noiDueTime = data.complex.noiResponseDueTime ? new Date(`2000-01-01T${data.complex.noiResponseDueTime}`).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase() : '4:00 pm';
+    const noiDueTimeRaw = data.meeting?.noiResponseDueTime || data.complex.noiResponseDueTime;
+    const noiDueTime = noiDueTimeRaw ? new Date(`2000-01-01T${noiDueTimeRaw}`).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase() : '4:00 pm';
 
     const sigHtml = data.manager?.signatureUrl 
         ? `<img src="${data.manager.signatureUrl}" width="200" style="width: 200px; height: auto; display: block; margin-top: 10pt; margin-bottom: 0pt;" />` 
