@@ -12,6 +12,7 @@ import Reports from './pages/Reports';
 import AdminPanel from './pages/AdminPanel';
 import MeetingDocsTest from './pages/MeetingDocsTest';
 import Financials from './pages/Financials';
+import Financial from './pages/Financial';
 import ContractorList from './pages/ContractorList';
 import Sidebar from './components/Sidebar';
 
@@ -39,6 +40,7 @@ const AppRoutes = () => {
       <Route path="/admin"       element={<ProtectedLayout><AdminPanel /></ProtectedLayout>} />
       <Route path="/meeting-docs-test" element={<ProtectedLayout><MeetingDocsTest /></ProtectedLayout>} />
       <Route path="/financials"  element={<ProtectedLayout><Financials /></ProtectedLayout>} />
+      <Route path="/financial"   element={<ProtectedLayout><Financial /></ProtectedLayout>} />
     </Routes>
   );
 };
