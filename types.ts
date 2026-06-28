@@ -60,7 +60,7 @@ export interface Invoice {
   complexId: string;
   complexName: string;
   bcNumber: string;
-  documentType: 'S146' | 'S147' | 'CPL';
+  documentType: 'S146' | 'S147' | 'CPL' | 'Other';
   unitReference: string;
   details: string;
   amountExclGst: number;

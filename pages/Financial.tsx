@@ -17,8 +17,9 @@ const Financial: React.FC = () => {
     // Create invoice modal
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [createComplexId, setCreateComplexId] = useState('');
-    const [createDocType, setCreateDocType] = useState<'S146' | 'S147' | 'CPL'>('S146');
+    const [createDocType, setCreateDocType] = useState<'S146' | 'S147' | 'CPL' | 'Other'>('S146');
     const [createUnitRef, setCreateUnitRef] = useState('');
+    const [createDescription, setCreateDescription] = useState('');
     const [createTierId, setCreateTierId] = useState('');
     const [createCustomAmount, setCreateCustomAmount] = useState('');
     const [creating, setCreating] = useState(false);
@@ -49,12 +50,16 @@ const Financial: React.FC = () => {
     const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-NZ');
 
     const activeTier = pricingTiers.find(t => t.id === createTierId);
-    const createAmount = createTierId === 'other' ? createCustomAmount : (activeTier ? String(activeTier.amountExclGst) : '');
+    const createAmount = createDocType === 'Other'
+        ? createCustomAmount
+        : createTierId === 'other'
+            ? createCustomAmount
+            : (activeTier ? String(activeTier.amountExclGst) : '');
     const createComplex = complexes.find(c => c.id === createComplexId);
 
     const handleCreateInvoice = async () => {
-        if (!createComplex || !createAmount || parseFloat(createAmount) <= 0 || !createUnitRef.trim()) {
-            setCreateError('Please fill in all fields.');
+        if (!createComplex || !createAmount || parseFloat(createAmount) <= 0 || !createUnitRef.trim() || !createDescription.trim()) {
+            setCreateError('Please fill in all fields including description.');
             return;
         }
         setCreateError('');
@@ -62,7 +67,6 @@ const Financial: React.FC = () => {
         try {
             const exclGst = parseFloat(createAmount);
             const gst = parseFloat((exclGst * 0.15).toFixed(2));
-            const tierName = createTierId === 'other' ? 'Custom' : (activeTier?.name || createDocType);
             await addInvoice({
                 date: new Date().toISOString().split('T')[0],
                 complexId: createComplex.id,
@@ -70,7 +74,7 @@ const Financial: React.FC = () => {
                 bcNumber: createComplex.bcNumber,
                 documentType: createDocType,
                 unitReference: createUnitRef.trim(),
-                details: `${tierName} — Unit ${createUnitRef.trim()}`,
+                details: createDescription.trim(),
                 amountExclGst: exclGst,
                 gstAmount: gst,
                 amountInclGst: parseFloat((exclGst + gst).toFixed(2)),
@@ -81,6 +85,7 @@ const Financial: React.FC = () => {
             setCreateComplexId('');
             setCreateDocType('S146');
             setCreateUnitRef('');
+            setCreateDescription('');
             setCreateTierId('');
             setCreateCustomAmount('');
         } finally {
@@ -133,6 +138,7 @@ const Financial: React.FC = () => {
                     <option value="S146">S146</option>
                     <option value="S147">S147</option>
                     <option value="CPL">CPL</option>
+                    <option value="Other">Other</option>
                 </select>
                 <select
                     value={invoiceFilterStatus}
@@ -291,11 +297,16 @@ const Financial: React.FC = () => {
                                     <select
                                         className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                                         value={createDocType}
-                                        onChange={e => setCreateDocType(e.target.value as 'S146' | 'S147' | 'CPL')}
+                                        onChange={e => {
+                                            setCreateDocType(e.target.value as 'S146' | 'S147' | 'CPL' | 'Other');
+                                            setCreateTierId('');
+                                            setCreateCustomAmount('');
+                                        }}
                                     >
                                         <option value="S146">S146</option>
                                         <option value="S147">S147</option>
                                         <option value="CPL">CPL</option>
+                                        <option value="Other">Others</option>
                                     </select>
                                 </div>
                                 <div>
@@ -310,22 +321,49 @@ const Financial: React.FC = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Invoice Amount</label>
-                                <select
-                                    className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                                    value={createTierId}
-                                    onChange={e => { setCreateTierId(e.target.value); setCreateCustomAmount(''); }}
-                                >
-                                    <option value="">— Select amount —</option>
-                                    {pricingTiers.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name} (${t.amountExclGst.toFixed(2)} + GST)</option>
-                                    ))}
-                                    <option value="other">Other (custom amount)</option>
-                                </select>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Description</label>
+                                <input
+                                    type="text"
+                                    className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm"
+                                    placeholder="e.g. S146 disclosure for Unit 5A"
+                                    value={createDescription}
+                                    onChange={e => setCreateDescription(e.target.value)}
+                                />
                             </div>
-                            {createTierId === 'other' && (
+                            {createDocType !== 'Other' ? (
+                                <>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Invoice Amount</label>
+                                        <select
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                                            value={createTierId}
+                                            onChange={e => { setCreateTierId(e.target.value); setCreateCustomAmount(''); }}
+                                        >
+                                            <option value="">— Select amount —</option>
+                                            {pricingTiers.map(t => (
+                                                <option key={t.id} value={t.id}>{t.name} (${t.amountExclGst.toFixed(2)} + GST)</option>
+                                            ))}
+                                            <option value="other">Other (custom amount)</option>
+                                        </select>
+                                    </div>
+                                    {createTierId === 'other' && (
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Custom Amount excl. GST ($)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm"
+                                                placeholder="e.g. 150.00"
+                                                value={createCustomAmount}
+                                                onChange={e => setCreateCustomAmount(e.target.value)}
+                                            />
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Custom Amount excl. GST ($)</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Invoice Amount excl. GST ($)</label>
                                     <input
                                         type="number"
                                         min="0"
