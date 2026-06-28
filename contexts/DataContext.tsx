@@ -8,11 +8,11 @@ import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import {
   BodyCorporate, Reminder, User, Meeting, UserRole,
-  Contractor, ActionComment, SystemSettings, SnoozedAlert, Invoice
+  Contractor, ActionComment, SystemSettings, SnoozedAlert, Invoice, InvoicePricingTier
 } from '../types';
 import {
   DEFAULT_CATEGORIES, DEFAULT_INSURANCE_SETTINGS,
-  DEFAULT_MEETING_CHECKLIST, DEFAULT_BWOF_MESSAGE
+  DEFAULT_MEETING_CHECKLIST, DEFAULT_BWOF_MESSAGE, DEFAULT_INVOICE_PRICING_TIERS
 } from '../constants/defaults';
 import { DEFAULT_TEMPLATES, DEFAULT_CONFLICT_REGISTER_TEMPLATE, CHAIRPERSON_TABLE_HTML, COMMITTEE_TABLE_HTML } from '../constants/defaultTemplates';
 import { generateReminders } from '../utils/generateReminders';
@@ -54,8 +54,10 @@ interface DataContextType {
   bulkUpdateComplexes: (updates: Array<{ id: string } & Partial<BodyCorporate>>) => Promise<void>;
   initializeDummyData: () => Promise<void>;
   invoices: Invoice[];
-  addInvoice: (invoice: Omit<Invoice, 'id'>) => Promise<void>;
+  addInvoice: (invoice: Omit<Invoice, 'id' | 'invoiceNumber'>) => Promise<void>;
   markInvoiceRecovered: (invoiceId: string, userName: string) => Promise<void>;
+  pricingTiers: InvoicePricingTier[];
+  updateInvoicePricingTiers: (tiers: InvoicePricingTier[]) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -90,6 +92,7 @@ const migrateSettings = (data: SystemSettings): SystemSettings => {
   if (!data.documentTemplates) data.documentTemplates = DEFAULT_TEMPLATES;
   if (!data.conflictRegisterTemplate) data.conflictRegisterTemplate = DEFAULT_CONFLICT_REGISTER_TEMPLATE;
   if (data.paragraphSpacing === undefined) data.paragraphSpacing = 10;
+  if (!data.invoicePricingTiers) data.invoicePricingTiers = DEFAULT_INVOICE_PRICING_TIERS;
 
   if (data.documentTemplates) {
     const templateKeys = ['noiLetter', 'responseForm', 'noiLetterBC', 'responseFormBC', 'noiLetterISOC', 'responseFormISOC', 's146', 's147', 'cpl'];
@@ -281,11 +284,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const addInvoice = async (invoice: Omit<Invoice, 'id'>) => {
-    await addDoc(collection(db, 'invoices'), invoice);
+  const addInvoice = async (invoice: Omit<Invoice, 'id' | 'invoiceNumber'>) => {
+    const year = new Date().getFullYear();
+    const yearPrefix = `OC-${year}-`;
+    const yearCount = invoices.filter(i => i.invoiceNumber?.startsWith(yearPrefix)).length;
+    const invoiceNumber = `${yearPrefix}${String(yearCount + 1).padStart(4, '0')}`;
+    await addDoc(collection(db, 'invoices'), { ...invoice, invoiceNumber });
   };
   const markInvoiceRecovered = async (invoiceId: string, userName: string) => {
     await setDoc(doc(db, 'invoices', invoiceId), { recoveredAt: new Date().toISOString(), recoveredBy: userName }, { merge: true });
+  };
+  const updateInvoicePricingTiers = async (tiers: InvoicePricingTier[]) => {
+    await setDoc(doc(db, 'settings', 'global'), { invoicePricingTiers: tiers }, { merge: true });
   };
 
   const restoreData = async (data: any) => {
@@ -326,7 +336,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addUser, updateUser, deleteUser, updateUserRole, addMeeting, updateMeeting, deleteMeeting,
       addContractor, addContractors, updateContractor, deleteContractor,
       addActionComment, removeActionComment, snoozeAlert, unsnoozeAlert, updateSystemSettings, restoreData, bulkUpdateComplexes, initializeDummyData,
-      invoices, addInvoice, markInvoiceRecovered
+      invoices, addInvoice, markInvoiceRecovered,
+      pricingTiers: systemSettings.invoicePricingTiers || DEFAULT_INVOICE_PRICING_TIERS,
+      updateInvoicePricingTiers,
     }}>{children}</DataContext.Provider>
   );
 };

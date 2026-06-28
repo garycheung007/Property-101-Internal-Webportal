@@ -6,12 +6,12 @@ import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../con
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord, MeetingDateSettings } from '../types';
+import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord, MeetingDateSettings, InvoicePricingTier } from '../types';
 import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar, DollarSign
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
@@ -159,7 +159,8 @@ const AdminPanel: React.FC = () => {
     const {
         complexes, managers, users, contractors, systemSettings, loading: dataLoading,
         addUser, updateUser, updateSystemSettings, initializeDummyData, toggleArchiveComplex, updateComplex,
-        restoreData, bulkUpdateComplexes, addComplexes
+        restoreData, bulkUpdateComplexes, addComplexes,
+        pricingTiers, updateInvoicePricingTiers,
     } = useData();
     
     const [activeTab, setActiveTab] = useState<'properties' | 'contractors' | 'users' | 'settings' | 'meetings' | 'templates' | 'diagnostics' | 'data'>('properties');
@@ -195,6 +196,10 @@ const AdminPanel: React.FC = () => {
     const [localConflictRegisterTemplate, setLocalConflictRegisterTemplate] = useState<string>(
         systemSettings.conflictRegisterTemplate ?? DEFAULT_CONFLICT_REGISTER_TEMPLATE
     );
+    const [localPricingTiers, setLocalPricingTiers] = useState<InvoicePricingTier[]>(pricingTiers);
+    const [newTierName, setNewTierName] = useState('');
+    const [newTierAmount, setNewTierAmount] = useState('');
+    const [savingTiers, setSavingTiers] = useState(false);
 
     // Data tab — CSV
     const [csvPreview, setCsvPreview] = useState<CsvPreviewRow[] | null>(null);
@@ -238,6 +243,7 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.meetingVenues) setLocalVenues(systemSettings.meetingVenues);
         if (systemSettings.waterRateOptions) setLocalWaterRateOptions(systemSettings.waterRateOptions);
         if (systemSettings.conflictRegisterTemplate) setLocalConflictRegisterTemplate(systemSettings.conflictRegisterTemplate);
+        if (systemSettings.invoicePricingTiers) setLocalPricingTiers(systemSettings.invoicePricingTiers);
     }, [systemSettings]);
 
     useEffect(() => {
@@ -615,6 +621,92 @@ const AdminPanel: React.FC = () => {
 
                     {activeTab === 'contractors' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
+                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <DollarSign size={18} className="text-pink-600" /> On-charge Invoice Pricing
+                                </h2>
+                                <p className="text-xs text-slate-500">Configure the pricing tiers available when generating on-charge invoices for S146, S147, and CPL documents.</p>
+                                <div className="space-y-2">
+                                    {localPricingTiers.map((tier, idx) => (
+                                        <div key={tier.id} className="flex items-center gap-2 group">
+                                            <input
+                                                type="text"
+                                                className="flex-1 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                                placeholder="Name (e.g. Standard S146)"
+                                                value={tier.name}
+                                                onChange={e => {
+                                                    const next = [...localPricingTiers];
+                                                    next[idx] = { ...next[idx], name: e.target.value };
+                                                    setLocalPricingTiers(next);
+                                                }}
+                                            />
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-28 pl-7 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                                    placeholder="0.00"
+                                                    value={tier.amountExclGst}
+                                                    onChange={e => {
+                                                        const next = [...localPricingTiers];
+                                                        next[idx] = { ...next[idx], amountExclGst: parseFloat(e.target.value) || 0 };
+                                                        setLocalPricingTiers(next);
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">+ GST</span>
+                                            <button
+                                                onClick={() => setLocalPricingTiers(localPricingTiers.filter((_, i) => i !== idx))}
+                                                className="p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        className="flex-1 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                        placeholder="New tier name (e.g. Standard S146)"
+                                        value={newTierName}
+                                        onChange={e => setNewTierName(e.target.value)}
+                                    />
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="w-28 pl-7 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                            placeholder="0.00"
+                                            value={newTierAmount}
+                                            onChange={e => setNewTierAmount(e.target.value)}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (!newTierName.trim() || !newTierAmount || parseFloat(newTierAmount) <= 0) return;
+                                            setLocalPricingTiers([...localPricingTiers, { id: `tier_${Date.now()}`, name: newTierName.trim(), amountExclGst: parseFloat(newTierAmount) }]);
+                                            setNewTierName('');
+                                            setNewTierAmount('');
+                                        }}
+                                        className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold uppercase transition-all"
+                                    >
+                                        <Plus size={14} />
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={async () => { setSavingTiers(true); await updateInvoicePricingTiers(localPricingTiers); setSavingTiers(false); }}
+                                    disabled={savingTiers}
+                                    className="w-full flex items-center justify-center gap-2 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                                >
+                                    {savingTiers ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                    Save Pricing Tiers
+                                </button>
+                            </div>
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
                                 <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                                     <LayoutGrid size={18} className="text-pink-600" /> Contractor Categories

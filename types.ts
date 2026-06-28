@@ -55,6 +55,7 @@ export interface Meeting {
 
 export interface Invoice {
   id: string;
+  invoiceNumber: string;
   date: string;
   complexId: string;
   complexName: string;
@@ -69,6 +70,12 @@ export interface Invoice {
   generatedAt: string;
   recoveredAt?: string;
   recoveredBy?: string;
+}
+
+export interface InvoicePricingTier {
+  id: string;
+  name: string;
+  amountExclGst: number;
 }
 
 export type ComplexType = 'Body Corporate' | 'Incorporated Society';
@@ -261,6 +268,7 @@ export interface SystemSettings {
   waterRateOptions?: string[];
   conflictRegisterTemplate?: string;
   meetingDateSettings?: { bc: MeetingDateSettings; rs: MeetingDateSettings };
+  invoicePricingTiers?: InvoicePricingTier[];
 }
 
 export type ContractorCategory = string;

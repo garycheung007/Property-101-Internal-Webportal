@@ -1,4 +1,4 @@
-import { WorkflowStepConfig, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings } from '../types';
+import { WorkflowStepConfig, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings, InvoicePricingTier } from '../types';
 
 export const DEFAULT_CATEGORIES: string[] = [
   'Insurance Broker',
@@ -75,6 +75,12 @@ export const DEFAULT_MEETING_CHECKLIST: { bc: StageTemplates; rs: StageTemplates
     ]
   }
 };
+
+export const DEFAULT_INVOICE_PRICING_TIERS: InvoicePricingTier[] = [
+  { id: 'tier_s146_std',  name: 'Standard S146 (PCDS)',         amountExclGst: 150 },
+  { id: 'tier_s147_std',  name: 'Standard S147 (Pre-Settlement)', amountExclGst: 150 },
+  { id: 'tier_cpl_std',   name: 'Standard CPL',                  amountExclGst: 100 },
+];
 
 export const DEFAULT_BWOF_MESSAGE = "Please confirm that you have received the signed BWOF 12A certificate from the compliance company and it has been uploaded to the complex OneDrive folder before advancing the expiry date.";
 
