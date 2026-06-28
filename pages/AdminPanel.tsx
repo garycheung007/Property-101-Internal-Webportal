@@ -164,7 +164,7 @@ const AdminPanel: React.FC = () => {
     } = useData();
     
     const [activeTab, setActiveTab] = useState<'properties' | 'contractors' | 'users' | 'settings' | 'meetings' | 'templates' | 'diagnostics' | 'data'>('properties');
-    const [templateSubTab, setTemplateSubTab] = useState<'bc' | 'isoc' | 'disclosure' | 'conflict'>('bc');
+    const [templateSubTab, setTemplateSubTab] = useState<'bc' | 'isoc' | 'disclosure' | 'conflict' | 'invoicePricing'>('bc');
     const [searchTerm, setSearchTerm] = useState('');
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -620,93 +620,7 @@ const AdminPanel: React.FC = () => {
                     )}
 
                     {activeTab === 'contractors' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
-                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                                    <DollarSign size={18} className="text-pink-600" /> On-charge Invoice Pricing
-                                </h2>
-                                <p className="text-xs text-slate-500">Configure the pricing tiers available when generating on-charge invoices for S146, S147, and CPL documents.</p>
-                                <div className="space-y-2">
-                                    {localPricingTiers.map((tier, idx) => (
-                                        <div key={tier.id} className="flex items-center gap-2 group">
-                                            <input
-                                                type="text"
-                                                className="flex-1 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
-                                                placeholder="Name (e.g. Standard S146)"
-                                                value={tier.name}
-                                                onChange={e => {
-                                                    const next = [...localPricingTiers];
-                                                    next[idx] = { ...next[idx], name: e.target.value };
-                                                    setLocalPricingTiers(next);
-                                                }}
-                                            />
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    className="w-28 pl-7 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
-                                                    placeholder="0.00"
-                                                    value={tier.amountExclGst}
-                                                    onChange={e => {
-                                                        const next = [...localPricingTiers];
-                                                        next[idx] = { ...next[idx], amountExclGst: parseFloat(e.target.value) || 0 };
-                                                        setLocalPricingTiers(next);
-                                                    }}
-                                                />
-                                            </div>
-                                            <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">+ GST</span>
-                                            <button
-                                                onClick={() => setLocalPricingTiers(localPricingTiers.filter((_, i) => i !== idx))}
-                                                className="p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        className="flex-1 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
-                                        placeholder="New tier name (e.g. Standard S146)"
-                                        value={newTierName}
-                                        onChange={e => setNewTierName(e.target.value)}
-                                    />
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="w-28 pl-7 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
-                                            placeholder="0.00"
-                                            value={newTierAmount}
-                                            onChange={e => setNewTierAmount(e.target.value)}
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            if (!newTierName.trim() || !newTierAmount || parseFloat(newTierAmount) <= 0) return;
-                                            setLocalPricingTiers([...localPricingTiers, { id: `tier_${Date.now()}`, name: newTierName.trim(), amountExclGst: parseFloat(newTierAmount) }]);
-                                            setNewTierName('');
-                                            setNewTierAmount('');
-                                        }}
-                                        className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold uppercase transition-all"
-                                    >
-                                        <Plus size={14} />
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={async () => { setSavingTiers(true); await updateInvoicePricingTiers(localPricingTiers); setSavingTiers(false); }}
-                                    disabled={savingTiers}
-                                    className="w-full flex items-center justify-center gap-2 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                                >
-                                    {savingTiers ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                    Save Pricing Tiers
-                                </button>
-                            </div>
+                        <div className="max-w-lg">
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
                                 <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                                     <LayoutGrid size={18} className="text-pink-600" /> Contractor Categories
@@ -734,7 +648,7 @@ const AdminPanel: React.FC = () => {
                                             </button>
                                         </div>
                                     ))}
-                                    <button 
+                                    <button
                                         onClick={() => setLocalCategories([...localCategories, ''])}
                                         className="w-full flex items-center justify-center gap-2 p-2 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 hover:text-pink-600 hover:border-pink-300 transition-all text-sm font-bold uppercase"
                                     >
@@ -744,6 +658,7 @@ const AdminPanel: React.FC = () => {
                             </div>
                         </div>
                     )}
+
 
                     {activeTab === 'settings' && (
                         <div className="space-y-8 pb-24">
@@ -943,6 +858,7 @@ const AdminPanel: React.FC = () => {
                                     <button onClick={() => setTemplateSubTab('isoc')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'isoc' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Inc Society</button>
                                     <button onClick={() => setTemplateSubTab('disclosure')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'disclosure' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Disclosure & CPL</button>
                                     <button onClick={() => setTemplateSubTab('conflict')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'conflict' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Conflict Register</button>
+                                    <button onClick={() => setTemplateSubTab('invoicePricing')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'invoicePricing' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Invoice Pricing</button>
                                 </div>
                             </div>
 
@@ -1001,6 +917,100 @@ const AdminPanel: React.FC = () => {
                                                 <Save size={16} /> Save Template
                                             </button>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {templateSubTab === 'invoicePricing' && (
+                                <div className="animate-in fade-in duration-300">
+                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
+                                        <div className="flex items-start gap-3 border-b dark:border-slate-800 pb-4">
+                                            <DollarSign size={20} className="text-pink-600 mt-0.5 shrink-0" />
+                                            <div>
+                                                <h3 className="font-bold text-sm dark:text-white">On-charge Invoice Pricing</h3>
+                                                <p className="text-xs text-slate-400 mt-1">Configure the pricing tiers available when generating on-charge invoices for S146, S147, and CPL documents.</p>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {localPricingTiers.map((tier, idx) => (
+                                                <div key={tier.id} className="flex items-center gap-2 group">
+                                                    <input
+                                                        type="text"
+                                                        className="flex-1 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                                        placeholder="Name (e.g. Standard S146)"
+                                                        value={tier.name}
+                                                        onChange={e => {
+                                                            const next = [...localPricingTiers];
+                                                            next[idx] = { ...next[idx], name: e.target.value };
+                                                            setLocalPricingTiers(next);
+                                                        }}
+                                                    />
+                                                    <div className="relative">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            className="w-28 pl-7 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                                            placeholder="0.00"
+                                                            value={tier.amountExclGst}
+                                                            onChange={e => {
+                                                                const next = [...localPricingTiers];
+                                                                next[idx] = { ...next[idx], amountExclGst: parseFloat(e.target.value) || 0 };
+                                                                setLocalPricingTiers(next);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">+ GST</span>
+                                                    <button
+                                                        onClick={() => setLocalPricingTiers(localPricingTiers.filter((_, i) => i !== idx))}
+                                                        className="p-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                className="flex-1 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                                placeholder="New tier name (e.g. Standard S146)"
+                                                value={newTierName}
+                                                onChange={e => setNewTierName(e.target.value)}
+                                            />
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-28 pl-7 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
+                                                    placeholder="0.00"
+                                                    value={newTierAmount}
+                                                    onChange={e => setNewTierAmount(e.target.value)}
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    if (!newTierName.trim() || !newTierAmount || parseFloat(newTierAmount) <= 0) return;
+                                                    setLocalPricingTiers([...localPricingTiers, { id: `tier_${Date.now()}`, name: newTierName.trim(), amountExclGst: parseFloat(newTierAmount) }]);
+                                                    setNewTierName('');
+                                                    setNewTierAmount('');
+                                                }}
+                                                className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold uppercase transition-all"
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                        </div>
+                                        <button
+                                            onClick={async () => { setSavingTiers(true); await updateInvoicePricingTiers(localPricingTiers); setSavingTiers(false); }}
+                                            disabled={savingTiers}
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                                        >
+                                            {savingTiers ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                            Save Pricing Tiers
+                                        </button>
                                     </div>
                                 </div>
                             )}
