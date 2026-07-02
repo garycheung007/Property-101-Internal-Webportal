@@ -70,6 +70,9 @@ export interface Invoice {
   generatedAt: string;
   recoveredAt?: string;
   recoveredBy?: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  deletionReason?: string;
 }
 
 export interface InvoicePricingTier {

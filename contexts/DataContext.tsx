@@ -56,6 +56,8 @@ interface DataContextType {
   invoices: Invoice[];
   addInvoice: (invoice: Omit<Invoice, 'id' | 'invoiceNumber'>) => Promise<void>;
   markInvoiceRecovered: (invoiceId: string, userName: string) => Promise<void>;
+  deleteInvoice: (invoiceId: string, reason: string, userName: string) => Promise<void>;
+  restoreInvoice: (invoiceId: string) => Promise<void>;
   pricingTiers: InvoicePricingTier[];
   updateInvoicePricingTiers: (tiers: InvoicePricingTier[]) => Promise<void>;
 }
@@ -294,6 +296,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const markInvoiceRecovered = async (invoiceId: string, userName: string) => {
     await setDoc(doc(db, 'invoices', invoiceId), { recoveredAt: new Date().toISOString(), recoveredBy: userName }, { merge: true });
   };
+  const deleteInvoice = async (invoiceId: string, reason: string, userName: string) => {
+    await setDoc(doc(db, 'invoices', invoiceId), { deletedAt: new Date().toISOString(), deletedBy: userName, deletionReason: reason }, { merge: true });
+  };
+  const restoreInvoice = async (invoiceId: string) => {
+    await setDoc(doc(db, 'invoices', invoiceId), { deletedAt: null, deletedBy: null, deletionReason: null }, { merge: true });
+  };
   const updateInvoicePricingTiers = async (tiers: InvoicePricingTier[]) => {
     await setDoc(doc(db, 'settings', 'global'), { invoicePricingTiers: tiers }, { merge: true });
   };
@@ -336,7 +344,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addUser, updateUser, deleteUser, updateUserRole, addMeeting, updateMeeting, deleteMeeting,
       addContractor, addContractors, updateContractor, deleteContractor,
       addActionComment, removeActionComment, snoozeAlert, unsnoozeAlert, updateSystemSettings, restoreData, bulkUpdateComplexes, initializeDummyData,
-      invoices, addInvoice, markInvoiceRecovered,
+      invoices, addInvoice, markInvoiceRecovered, deleteInvoice, restoreInvoice,
       pricingTiers: systemSettings.invoicePricingTiers || DEFAULT_INVOICE_PRICING_TIERS,
       updateInvoicePricingTiers,
     }}>{children}</DataContext.Provider>
