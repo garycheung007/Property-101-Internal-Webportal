@@ -129,6 +129,7 @@ const DisclosureGenerator: React.FC = () => {
   const [invoiceCreating, setInvoiceCreating] = useState(false);
   const [invoiceSuccess, setInvoiceSuccess] = useState(false);
   const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false);
+  const [duplicateReason, setDuplicateReason] = useState('');
   const [pendingDownload, setPendingDownload] = useState<'docx' | null>(null);
 
   const selectedComplex = complexes.find(c => c.id === selectedBcId);
@@ -141,7 +142,8 @@ const DisclosureGenerator: React.FC = () => {
         inv.complexId === selectedBcId &&
         inv.documentType === docType.toUpperCase() &&
         inv.unitReference.toLowerCase().trim() === unitNumber.toLowerCase().trim() &&
-        !inv.recoveredAt
+        !inv.recoveredAt &&
+        !inv.deletedAt
       )
     : undefined;
   const _wdesc = (selectedComplex?.waterRateDescription || '').toLowerCase();
@@ -185,6 +187,7 @@ const DisclosureGenerator: React.FC = () => {
     setInvoiceSuccess(false);
     setPendingDownload(null);
     setShowDuplicateConfirm(false);
+    setDuplicateReason('');
   }, [selectedBcId]);
 
   const formatStatutory = (isYes?: boolean, details?: string) =>
@@ -791,19 +794,31 @@ const DisclosureGenerator: React.FC = () => {
                   An unrecovered invoice already exists for <strong>{docType.toUpperCase()} Unit {unitNumber}</strong>:<br />
                   Created {new Date(duplicateInvoice.generatedAt).toLocaleDateString('en-NZ')} by {duplicateInvoice.generatedBy} — <span className="font-mono">${duplicateInvoice.amountInclGst.toFixed(2)} incl. GST</span>
                 </p>
-                <p className="text-sm text-slate-500 mt-2">Do you want to proceed and create another invoice?</p>
+                <p className="text-sm text-slate-500 mt-2">Please provide a reason to proceed and create another invoice.</p>
+                <div className="mt-3">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Reason <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm"
+                    placeholder="e.g. Previous invoice was for a different buyer..."
+                    value={duplicateReason}
+                    onChange={e => setDuplicateReason(e.target.value)}
+                    autoFocus
+                  />
+                </div>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
               <button
-                onClick={() => { setShowDuplicateConfirm(false); setPendingDownload(null); }}
+                onClick={() => { setShowDuplicateConfirm(false); setPendingDownload(null); setDuplicateReason(''); }}
                 className="flex-1 py-2.5 rounded-xl border dark:border-slate-700 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDuplicate}
-                className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-colors"
+                disabled={!duplicateReason.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-colors disabled:opacity-50"
               >
                 Yes, proceed
               </button>
