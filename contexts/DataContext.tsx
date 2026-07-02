@@ -58,6 +58,7 @@ interface DataContextType {
   markInvoiceRecovered: (invoiceId: string, userName: string) => Promise<void>;
   deleteInvoice: (invoiceId: string, reason: string, userName: string) => Promise<void>;
   restoreInvoice: (invoiceId: string) => Promise<void>;
+  unrecoverInvoice: (invoiceId: string, reason: string) => Promise<void>;
   pricingTiers: InvoicePricingTier[];
   updateInvoicePricingTiers: (tiers: InvoicePricingTier[]) => Promise<void>;
 }
@@ -302,6 +303,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const restoreInvoice = async (invoiceId: string) => {
     await setDoc(doc(db, 'invoices', invoiceId), { deletedAt: null, deletedBy: null, deletionReason: null }, { merge: true });
   };
+  const unrecoverInvoice = async (invoiceId: string, reason: string) => {
+    await setDoc(doc(db, 'invoices', invoiceId), { recoveredAt: null, recoveredBy: null, unrecoveryReason: reason }, { merge: true });
+  };
   const updateInvoicePricingTiers = async (tiers: InvoicePricingTier[]) => {
     await setDoc(doc(db, 'settings', 'global'), { invoicePricingTiers: tiers }, { merge: true });
   };
@@ -344,7 +348,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addUser, updateUser, deleteUser, updateUserRole, addMeeting, updateMeeting, deleteMeeting,
       addContractor, addContractors, updateContractor, deleteContractor,
       addActionComment, removeActionComment, snoozeAlert, unsnoozeAlert, updateSystemSettings, restoreData, bulkUpdateComplexes, initializeDummyData,
-      invoices, addInvoice, markInvoiceRecovered, deleteInvoice, restoreInvoice,
+      invoices, addInvoice, markInvoiceRecovered, deleteInvoice, restoreInvoice, unrecoverInvoice,
       pricingTiers: systemSettings.invoicePricingTiers || DEFAULT_INVOICE_PRICING_TIERS,
       updateInvoicePricingTiers,
     }}>{children}</DataContext.Provider>

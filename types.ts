@@ -73,6 +73,7 @@ export interface Invoice {
   deletedAt?: string;
   deletedBy?: string;
   deletionReason?: string;
+  unrecoveryReason?: string;
 }
 
 export interface InvoicePricingTier {

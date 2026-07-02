@@ -7,7 +7,7 @@ import { Receipt, Clock, CheckCircle2, Loader2, Plus, AlertTriangle, X, Trash2, 
 
 const Financial: React.FC = () => {
     const { user } = useAuth();
-    const { invoices, markInvoiceRecovered, addInvoice, deleteInvoice, restoreInvoice, complexes, pricingTiers } = useData();
+    const { invoices, markInvoiceRecovered, addInvoice, deleteInvoice, restoreInvoice, unrecoverInvoice, complexes, pricingTiers } = useData();
     const [invoiceFilterComplex, setInvoiceFilterComplex] = useState('all');
     const [invoiceFilterDocType, setInvoiceFilterDocType] = useState('all');
     const [recoveringId, setRecoveringId] = useState<string | null>(null);
@@ -21,6 +21,11 @@ const Financial: React.FC = () => {
 
     // Restore
     const [restoringId, setRestoringId] = useState<string | null>(null);
+
+    // Un-recover modal
+    const [confirmUnrecoverId, setConfirmUnrecoverId] = useState<string | null>(null);
+    const [unrecoverReason, setUnrecoverReason] = useState('');
+    const [unrecovering, setUnrecovering] = useState(false);
 
     // Create invoice modal
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -77,6 +82,13 @@ const Financial: React.FC = () => {
         finally { setRestoringId(null); }
     };
 
+    const handleUnrecoverInvoice = async () => {
+        if (!confirmUnrecoverId || !unrecoverReason.trim()) return;
+        setUnrecovering(true);
+        try { await unrecoverInvoice(confirmUnrecoverId, unrecoverReason.trim()); }
+        finally { setUnrecovering(false); setConfirmUnrecoverId(null); setUnrecoverReason(''); }
+    };
+
     const fmtCurrency = (n: number) => `$${n.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-NZ');
 
@@ -88,7 +100,7 @@ const Financial: React.FC = () => {
             : (activeTier ? String(activeTier.amountExclGst) : '');
     const createComplex = complexes.find(c => c.id === createComplexId);
     const autoDescription = createUnitRef.trim()
-        ? `${createDocType} - ${createUnitRef.trim()}`
+        ? `${createDocType} - Unit ${createUnitRef.trim()}`
         : createDocType;
     const displayDescription = createDescriptionCustomized ? createDescription : autoDescription;
 
@@ -131,6 +143,7 @@ const Financial: React.FC = () => {
 
     const confirmInvoice = invoices.find(i => i.id === confirmRecoverId);
     const deleteInvoiceObj = invoices.find(i => i.id === confirmDeleteId);
+    const unrecoverInvoiceObj = invoices.find(i => i.id === confirmUnrecoverId);
 
     const InvoiceTable: React.FC<{
         rows: typeof outstandingInvoices;
@@ -301,7 +314,7 @@ const Financial: React.FC = () => {
                                     <th className="px-4 py-3">Description</th>
                                     <th className="px-4 py-3 text-right">Incl. GST</th>
                                     <th className="px-4 py-3">Recovered By</th>
-                                    {canDeleteRestore && <th className="px-4 py-3"></th>}
+                                    <th className="px-4 py-3"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y dark:divide-slate-800">
@@ -321,17 +334,26 @@ const Financial: React.FC = () => {
                                             <div className="text-xs font-medium dark:text-white">{inv.recoveredBy}</div>
                                             <div className="text-[10px] text-slate-400">{fmtDate(inv.recoveredAt!)}</div>
                                         </td>
-                                        {canDeleteRestore && (
-                                            <td className="px-4 py-3">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-1">
                                                 <button
-                                                    onClick={() => { setConfirmDeleteId(inv.id); setDeleteReason(''); }}
-                                                    title="Delete invoice"
-                                                    className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                                                    onClick={() => { setConfirmUnrecoverId(inv.id); setUnrecoverReason(''); }}
+                                                    title="Un-recover invoice"
+                                                    className="p-1.5 text-slate-400 hover:text-amber-500 transition-colors"
                                                 >
-                                                    <Trash2 size={14} />
+                                                    <RotateCcw size={14} />
                                                 </button>
-                                            </td>
-                                        )}
+                                                {canDeleteRestore && (
+                                                    <button
+                                                        onClick={() => { setConfirmDeleteId(inv.id); setDeleteReason(''); }}
+                                                        title="Delete invoice"
+                                                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -440,6 +462,47 @@ const Financial: React.FC = () => {
                             <button onClick={() => handleMarkRecovered(confirmRecoverId)} disabled={!!recoveringId} className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
                                 {recoveringId ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                                 Yes, mark recovered
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Un-recover confirmation modal */}
+            {confirmUnrecoverId && unrecoverInvoiceObj && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border dark:border-slate-800 p-6 space-y-4">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-xl shrink-0">
+                                <RotateCcw size={20} className="text-amber-600" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-slate-800 dark:text-white">Un-recover Invoice</h3>
+                                <p className="text-sm text-slate-500 mt-1">This will move the invoice back to Outstanding. Please enter a reason.</p>
+                                <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs space-y-1">
+                                    <div className="flex justify-between"><span className="text-slate-400">Invoice No.</span><span className="font-mono font-bold text-pink-600 dark:text-pink-400">{unrecoverInvoiceObj.invoiceNumber || '—'}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Property</span><span className="font-bold dark:text-white">{unrecoverInvoiceObj.complexName}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Unit</span><span className="font-mono dark:text-white">{unrecoverInvoiceObj.unitReference}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Amount (incl. GST)</span><span className="font-mono font-bold text-emerald-600">{fmtCurrency(unrecoverInvoiceObj.amountInclGst)}</span></div>
+                                </div>
+                                <div className="mt-3">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Reason <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm"
+                                        placeholder="e.g. Marked recovered in error..."
+                                        value={unrecoverReason}
+                                        onChange={e => setUnrecoverReason(e.target.value)}
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button onClick={() => { setConfirmUnrecoverId(null); setUnrecoverReason(''); }} className="flex-1 py-2.5 rounded-xl border dark:border-slate-700 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                            <button onClick={handleUnrecoverInvoice} disabled={unrecovering || !unrecoverReason.trim()} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                                {unrecovering ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                                Un-recover
                             </button>
                         </div>
                     </div>
