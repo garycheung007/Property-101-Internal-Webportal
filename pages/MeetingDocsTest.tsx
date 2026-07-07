@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, Meeting, TemplateFileRecord } from '../types';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 
-type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'debtCollectionFlowchart' | 'noticeOfDelegation' | 'noiCoverLetterIsoc' | 'responseFormIsoc' | 'debtCollectionFlowchartIsoc';
+type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'debtCollectionFlowchart' | 'noticeOfDelegation' | 'noiCoverLetterIsoc' | 'responseFormIsoc' | 'debtCollectionFlowchartIsoc' | 'declarationFormIsoc';
 
 const LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'NOI Cover Letter',
@@ -21,10 +21,11 @@ const LABELS: Record<TemplateKey, string> = {
   noiCoverLetterIsoc: 'NOI Cover Letter',
   responseFormIsoc: 'Response Form',
   debtCollectionFlowchartIsoc: 'Debt Collection Flowchart',
+  declarationFormIsoc: 'Declaration Form - Financial Statement',
 };
 
 const BC_KEYS: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation'];
-const IS_KEYS: TemplateKey[] = ['noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
+const IS_KEYS: TemplateKey[] = ['noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 'declarationFormIsoc'];
 
 const DOC_LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'Notice of Intention Cover Letter',
@@ -34,6 +35,7 @@ const DOC_LABELS: Record<TemplateKey, string> = {
   noiCoverLetterIsoc: 'Notice of Intention Cover Letter',
   responseFormIsoc: 'Response Form',
   debtCollectionFlowchartIsoc: 'Debt Collection Flowchart',
+  declarationFormIsoc: 'Declaration Form - Financial Statement',
 };
 
 const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager?: { name?: string; title?: string }) => {
@@ -134,7 +136,7 @@ const MeetingDocsTest: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const keys: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc'];
+    const keys: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 'declarationFormIsoc'];
     Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
       const loaded: Partial<Record<TemplateKey, TemplateFileRecord>> = {};
       snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });
