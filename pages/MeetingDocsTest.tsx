@@ -51,6 +51,16 @@ const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager
   const fmtTime = (t: string) =>
     t ? new Date(`2000-01-01T${t}`).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase() : '';
 
+  let financialYearEnd = '';
+  if (complex.financialYearEnd) {
+    const fyParsed = new Date(complex.financialYearEnd + 'T00:00:00');
+    const refDate = targetDate ? new Date(targetDate + 'T00:00:00') : new Date();
+    const refYear = refDate.getFullYear();
+    const candidate = new Date(refYear, fyParsed.getMonth(), fyParsed.getDate());
+    const resolved = candidate <= refDate ? candidate : new Date(refYear - 1, fyParsed.getMonth(), fyParsed.getDate());
+    financialYearEnd = resolved.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
   return {
     BC_Number: complex.bcNumber,
     BC_Name: complex.name,
@@ -65,6 +75,7 @@ const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager
     Current_Date: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
     Manager_Name: manager?.name || complex.managerName || '',
     Manager_Title: manager?.title || 'Body Corporate Manager',
+    Financial_Year_End: financialYearEnd,
   };
 };
 
