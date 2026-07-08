@@ -307,6 +307,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [bwofRenewalPrompt, setBwofRenewalPrompt] = useState<{ show: boolean, pendingDate: string }>({ show: false, pendingDate: '' });
     const [feeEditing, setFeeEditing] = useState(false);
     const [balanceEditing, setBalanceEditing] = useState(false);
+    const [aigEditing, setAigEditing] = useState(false);
     const [ltmpEditing, setLtmpEditing] = useState(false);
     const [venueOther, setVenueOther] = useState(false);
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
@@ -612,6 +613,10 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
             changes.push(`Contracted Committee Meetings changed from ${complex.numberOfCommitteeMeetings || 0} to ${form.numberOfCommitteeMeetings || 0}`);
         if (form.managementFee !== complex.managementFee)
             changes.push(`Management Fee changed from $${complex.managementFee || 0} to $${form.managementFee || 0}`);
+        if (form.approvedBudget !== complex.approvedBudget)
+            changes.push(`Approved Budget changed from "${complex.approvedBudget || 'N/A'}" to "${form.approvedBudget || 'N/A'}"`);
+        if (form.numberOfCommitteeMembers !== complex.numberOfCommitteeMembers)
+            changes.push(`Number of Committee Members changed from ${complex.numberOfCommitteeMembers || 0} to ${form.numberOfCommitteeMembers || 0}`);
         if (changes.length > 0)
             await addActionComment(`edit-${Date.now()}`, form.id, changes.join(' | '), currentUser);
         onSave(form);
@@ -1465,6 +1470,49 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.reserveFundBalance || ''} onChange={e => setForm(f => ({ ...f, reserveFundBalance: e.target.value }))} placeholder="e.g. $45,678.90" />
                                         ) : (
                                             <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.reserveFundBalance || '—'}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* AIG Association Liability */}
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border dark:border-slate-800">
+                                <div className="flex items-center justify-between mb-6 border-b dark:border-slate-800 pb-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center text-pink-600">
+                                            <Briefcase size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg dark:text-white">AIG Association Liability</h3>
+                                            <p className="text-xs text-slate-500">Used to pre-fill the AIG Association Liability proposal form.</p>
+                                        </div>
+                                    </div>
+                                    {!aigEditing && (
+                                        <button onClick={() => setAigEditing(true)} className="flex items-center gap-1.5 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors">
+                                            <Pencil size={12} /> Edit
+                                        </button>
+                                    )}
+                                    {aigEditing && (
+                                        <button onClick={() => setAigEditing(false)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors">
+                                            <Check size={12} /> Done
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Approved Budget</label>
+                                        {aigEditing ? (
+                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.approvedBudget || ''} onChange={e => setForm(f => ({ ...f, approvedBudget: e.target.value }))} placeholder="e.g. $120,000" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.approvedBudget || '—'}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Number of Committee Members</label>
+                                        {aigEditing ? (
+                                            <input type="number" min={0} className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.numberOfCommitteeMembers ?? ''} onChange={e => setForm(f => ({ ...f, numberOfCommitteeMembers: parseInt(e.target.value) || 0 }))} placeholder="e.g. 5" />
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.numberOfCommitteeMembers ?? '—'}</p>
                                         )}
                                     </div>
                                 </div>

@@ -139,7 +139,9 @@ export interface BodyCorporate {
   isocNomDaysPrior?: number; 
   noiNotApplicable?: boolean;
 
-  numberOfCommitteeMeetings?: number; 
+  numberOfCommitteeMeetings?: number;
+  numberOfCommitteeMembers?: number;
+  approvedBudget?: string;
 
   meetings: Meeting[];
   conflictRegister?: ConflictEntry[];

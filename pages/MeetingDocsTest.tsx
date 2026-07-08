@@ -80,6 +80,8 @@ const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager
     Manager_Name: manager?.name || complex.managerName || '',
     Manager_Title: manager?.title || 'Body Corporate Manager',
     Financial_Year_End: financialYearEnd,
+    Approved_Budget: complex.approvedBudget || '',
+    Number_Of_Committee_Members: complex.numberOfCommitteeMembers?.toString() || '',
   };
 };
 
