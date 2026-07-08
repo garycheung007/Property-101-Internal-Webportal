@@ -292,6 +292,7 @@ export interface Contractor {
   contactPerson: string;
   email: string;
   phone: string;
+  isPreferred?: boolean;
   notingRequirements?: NotingRequirement[];
   notingInstructions?: string;
 }

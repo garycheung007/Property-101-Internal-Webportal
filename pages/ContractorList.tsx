@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Contractor, ContractorCategory, NotingMethod, NotingRequirement } from '../types';
-import { HardHat, Search, Plus, Phone, Mail, Edit2, Trash2, X, Info, PlusCircle, MinusCircle, Loader2, Save, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { HardHat, Search, Plus, Phone, Mail, Edit2, Trash2, X, Info, PlusCircle, MinusCircle, Loader2, Save, ArrowUpDown, ChevronUp, ChevronDown, Star } from 'lucide-react';
 
 const ContractorList: React.FC = () => {
     const { contractors, addContractor, updateContractor, deleteContractor, systemSettings } = useData();
@@ -11,6 +11,7 @@ const ContractorList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+    const [showPreferredOnly, setShowPreferredOnly] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingContractor, setEditingContractor] = useState<Contractor | null>(null);
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
@@ -22,16 +23,25 @@ const ContractorList: React.FC = () => {
 
     const filteredContractors = contractors
         .filter(c =>
+            (!showPreferredOnly || c.isPreferred) &&
             (filterCategory === 'all' || c.category === filterCategory) &&
             (c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
              c.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
              c.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()))
         )
-        .sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+        .sort((a, b) => {
+            if (a.isPreferred && !b.isPreferred) return -1;
+            if (!a.isPreferred && b.isPreferred) return 1;
+            return sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        });
 
     const handleEdit = (c: Contractor) => {
         setEditingContractor(c);
         setIsModalOpen(true);
+    };
+
+    const handleTogglePreferred = async (c: Contractor) => {
+        await updateContractor({ ...c, isPreferred: !c.isPreferred });
     };
 
     const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
@@ -115,6 +125,13 @@ const ContractorList: React.FC = () => {
                         <option value="all">All Categories</option>
                         {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
+                    <button
+                        onClick={() => setShowPreferredOnly(p => !p)}
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-bold transition-all whitespace-nowrap ${showPreferredOnly ? 'bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-400' : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-amber-300 hover:text-amber-600 dark:hover:text-amber-400'}`}
+                    >
+                        <Star size={15} className={showPreferredOnly ? 'fill-amber-500 text-amber-500' : ''} />
+                        Preferred
+                    </button>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -138,7 +155,14 @@ const ContractorList: React.FC = () => {
                                 return (
                                     <tr key={c.id} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${isDeleting ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
                                         <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-800 dark:text-white">{c.name}</div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="font-bold text-slate-800 dark:text-white">{c.name}</div>
+                                                {c.isPreferred && (
+                                                    <span className="flex items-center gap-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-tight">
+                                                        <Star size={10} className="fill-amber-500 text-amber-500" /> Preferred
+                                                    </span>
+                                                )}
+                                            </div>
                                             {c.notingRequirements && c.notingRequirements.length > 0 && (
                                                 <div className="text-[10px] text-pink-600 dark:text-pink-400 font-bold mt-0.5 flex items-center gap-1 uppercase tracking-tight">
                                                     <Info size={10} /> Noting Required
@@ -159,15 +183,24 @@ const ContractorList: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                                <button 
-                                                    onClick={() => handleEdit(c)} 
+                                                {user?.role === 'admin' && (
+                                                    <button
+                                                        onClick={() => handleTogglePreferred(c)}
+                                                        className={`p-2 rounded-lg transition-colors ${c.isPreferred ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-slate-300 dark:text-slate-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
+                                                        title={c.isPreferred ? 'Remove preferred status' : 'Mark as preferred'}
+                                                    >
+                                                        <Star size={16} className={c.isPreferred ? 'fill-amber-500' : ''} />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleEdit(c)}
                                                     className="p-2 text-slate-400 hover:text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20 rounded-lg transition-colors"
                                                     title="Edit"
                                                 >
                                                     <Edit2 size={16} />
                                                 </button>
-                                                <button 
-                                                    onClick={(e) => handleDelete(e, c.id, c.name)} 
+                                                <button
+                                                    onClick={(e) => handleDelete(e, c.id, c.name)}
                                                     disabled={isDeleting}
                                                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors disabled:opacity-30"
                                                     title="Delete"
