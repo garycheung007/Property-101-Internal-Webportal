@@ -1090,13 +1090,11 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             </div>
                                             <button onClick={() => { setSelectedMeetingId(null); setMeetingForm({}); setMeetingDeleteConfirm(null); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <fieldset className="space-y-4" disabled={effectiveLocked}>
+                                        <div className="space-y-6">
+                                            <fieldset className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={effectiveLocked}>
                                                 <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.date || ''} onChange={e => { const newDate = e.target.value; setMeetingForm({ ...meetingForm, date: newDate, noiResponseDueDate: calculateDefaultResponseDueDate(newDate) }); }} /></div>
-                                                    <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Time</label><input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.time || ''} onChange={e => setMeetingForm({...meetingForm, time: e.target.value})} /></div>
-                                                </div>
+                                                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.date || ''} onChange={e => { const newDate = e.target.value; setMeetingForm({ ...meetingForm, date: newDate, noiResponseDueDate: calculateDefaultResponseDueDate(newDate) }); }} /></div>
+                                                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Time</label><input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.time || ''} onChange={e => setMeetingForm({...meetingForm, time: e.target.value})} /></div>
                                                 <div>
                                                     <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Venue</label>
                                                     {(systemSettings.meetingVenues?.length ?? 0) > 0 ? (
@@ -1127,6 +1125,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                     )}
                                                 </div>
                                             </fieldset>
+                                            <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6">
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-2 border-b dark:border-slate-800 pb-2">
                                                     <ClipboardCheck size={16} className="text-pink-600" />
@@ -1253,6 +1252,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         <p className="text-[10px] text-slate-400">Set a meeting date to see key deadlines</p>
                                                     </div>
                                                 )}
+                                            </div>
                                             </div>
                                         </div>
                                         <div className="pt-4 border-t dark:border-slate-800">
