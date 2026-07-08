@@ -85,7 +85,7 @@ const Sidebar: React.FC = () => {
         </Link>
         <Link to="/meeting-docs-test" className={getNavClass('/meeting-docs-test')}>
           <FileText size={20} />
-          <span>Meeting Docs</span>
+          <span>Document Preparation</span>
         </Link>
         <Link to="/disclosure" className={getNavClass('/disclosure')}>
           <FileSignature size={20} />

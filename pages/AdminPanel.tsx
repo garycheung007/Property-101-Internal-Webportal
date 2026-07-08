@@ -247,7 +247,7 @@ const AdminPanel: React.FC = () => {
     }, [systemSettings]);
 
     useEffect(() => {
-        const keys = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 'declarationFormIsoc', 's146', 's147', 'cpl', 'conflictRegister'];
+        const keys = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'aigAssociationLiabilityBc', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 'declarationFormIsoc', 'aigAssociationLiabilityIsoc', 's146', 's147', 'cpl', 'conflictRegister'];
         Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
             const loaded: Partial<Record<string, TemplateFileRecord>> = {};
             snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });
@@ -868,6 +868,7 @@ const AdminPanel: React.FC = () => {
                                     {renderDocxCard('responseForm', 'Response Form')}
                                     {renderDocxCard('debtCollectionFlowchart', 'Debt Collection Flowchart')}
                                     {renderDocxCard('noticeOfDelegation', 'Notice of Delegation')}
+                                    {renderDocxCard('aigAssociationLiabilityBc', 'AIG Association Liability Form')}
                                 </div>
                             )}
 
@@ -877,6 +878,7 @@ const AdminPanel: React.FC = () => {
                                     {renderDocxCard('responseFormIsoc', 'Response Form')}
                                     {renderDocxCard('debtCollectionFlowchartIsoc', 'Debt Collection Flowchart')}
                                     {renderDocxCard('declarationFormIsoc', 'Declaration Form - Financial Statement')}
+                                    {renderDocxCard('aigAssociationLiabilityIsoc', 'AIG Association Liability Form')}
                                 </div>
                             )}
 

@@ -11,31 +11,35 @@ import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, Meeting, TemplateFileRecord } from '../types';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 
-type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'debtCollectionFlowchart' | 'noticeOfDelegation' | 'noiCoverLetterIsoc' | 'responseFormIsoc' | 'debtCollectionFlowchartIsoc' | 'declarationFormIsoc';
+type TemplateKey = 'noiCoverLetter' | 'responseForm' | 'debtCollectionFlowchart' | 'noticeOfDelegation' | 'aigAssociationLiabilityBc' | 'noiCoverLetterIsoc' | 'responseFormIsoc' | 'debtCollectionFlowchartIsoc' | 'declarationFormIsoc' | 'aigAssociationLiabilityIsoc';
 
 const LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'NOI Cover Letter',
   responseForm: 'Response Form',
   debtCollectionFlowchart: 'Debt Collection Flowchart',
   noticeOfDelegation: 'Notice of Delegation',
+  aigAssociationLiabilityBc: 'AIG Association Liability Form',
   noiCoverLetterIsoc: 'NOI Cover Letter',
   responseFormIsoc: 'Response Form',
   debtCollectionFlowchartIsoc: 'Debt Collection Flowchart',
   declarationFormIsoc: 'Declaration Form - Financial Statement',
+  aigAssociationLiabilityIsoc: 'AIG Association Liability Form',
 };
 
-const BC_KEYS: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation'];
-const IS_KEYS: TemplateKey[] = ['noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 'declarationFormIsoc'];
+const BC_KEYS: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'aigAssociationLiabilityBc'];
+const IS_KEYS: TemplateKey[] = ['noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 'declarationFormIsoc', 'aigAssociationLiabilityIsoc'];
 
 const DOC_LABELS: Record<TemplateKey, string> = {
   noiCoverLetter: 'Notice of Intention Cover Letter',
   responseForm: 'Response Form',
   debtCollectionFlowchart: 'Debt Collection Flowchart',
   noticeOfDelegation: 'Notice of Delegation',
+  aigAssociationLiabilityBc: 'AIG Association Liability Form',
   noiCoverLetterIsoc: 'Notice of Intention Cover Letter',
   responseFormIsoc: 'Response Form',
   debtCollectionFlowchartIsoc: 'Debt Collection Flowchart',
   declarationFormIsoc: 'Declaration Form - Financial Statement',
+  aigAssociationLiabilityIsoc: 'AIG Association Liability Form',
 };
 
 const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager?: { name?: string; title?: string }) => {
@@ -147,7 +151,7 @@ const MeetingDocsTest: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const keys: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 'declarationFormIsoc'];
+    const keys: TemplateKey[] = ['noiCoverLetter', 'responseForm', 'debtCollectionFlowchart', 'noticeOfDelegation', 'aigAssociationLiabilityBc', 'noiCoverLetterIsoc', 'responseFormIsoc', 'debtCollectionFlowchartIsoc', 'declarationFormIsoc', 'aigAssociationLiabilityIsoc'];
     Promise.all(keys.map(k => getDoc(doc(db, 'templates_v2', k)))).then(snaps => {
       const loaded: Partial<Record<TemplateKey, TemplateFileRecord>> = {};
       snaps.forEach((snap, i) => { if (snap.exists()) loaded[keys[i]] = snap.data() as TemplateFileRecord; });
@@ -337,7 +341,7 @@ const MeetingDocsTest: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <FlaskConical className="text-pink-600" size={24} />
-              Meeting Docs
+              Document Preparation
               <span className="text-xs font-semibold text-pink-500 bg-pink-50 dark:bg-pink-900/30 border border-pink-200 dark:border-pink-800 px-2 py-0.5 rounded-full">
                 Test
               </span>
