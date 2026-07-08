@@ -14,6 +14,7 @@ import MeetingDocsTest from './pages/MeetingDocsTest';
 import Financials from './pages/Financials';
 import Financial from './pages/Financial';
 import ContractorList from './pages/ContractorList';
+import ResponseLibrary from './pages/ResponseLibrary';
 import Sidebar from './components/Sidebar';
 
 const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -37,6 +38,7 @@ const AppRoutes = () => {
       <Route path="/reports"     element={<ProtectedLayout><Reports /></ProtectedLayout>} />
       <Route path="/disclosure"  element={<ProtectedLayout><DisclosureGenerator /></ProtectedLayout>} />
       <Route path="/contractors" element={<ProtectedLayout><ContractorList /></ProtectedLayout>} />
+      <Route path="/response-library" element={<ProtectedLayout><ResponseLibrary /></ProtectedLayout>} />
       <Route path="/admin"       element={<ProtectedLayout><AdminPanel /></ProtectedLayout>} />
       <Route path="/meeting-docs-test" element={<ProtectedLayout><MeetingDocsTest /></ProtectedLayout>} />
       <Route path="/financials"  element={<ProtectedLayout><Financials /></ProtectedLayout>} />

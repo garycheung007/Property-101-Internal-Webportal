@@ -8,7 +8,7 @@ import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import {
   BodyCorporate, Reminder, User, Meeting, UserRole,
-  Contractor, ActionComment, SystemSettings, SnoozedAlert, Invoice, InvoicePricingTier
+  Contractor, ActionComment, SystemSettings, SnoozedAlert, Invoice, InvoicePricingTier, ResponseTemplate
 } from '../types';
 import {
   DEFAULT_CATEGORIES, DEFAULT_INSURANCE_SETTINGS,
@@ -61,6 +61,10 @@ interface DataContextType {
   unrecoverInvoice: (invoiceId: string, reason: string) => Promise<void>;
   pricingTiers: InvoicePricingTier[];
   updateInvoicePricingTiers: (tiers: InvoicePricingTier[]) => Promise<void>;
+  responseTemplates: ResponseTemplate[];
+  addResponseTemplate: (template: Omit<ResponseTemplate, 'id'>) => Promise<void>;
+  updateResponseTemplate: (template: ResponseTemplate) => Promise<void>;
+  deleteResponseTemplate: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -160,6 +164,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [actionComments, setActionComments] = useState<ActionComment[]>([]);
   const [snoozedAlerts, setSnoozedAlerts] = useState<SnoozedAlert[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [responseTemplates, setResponseTemplates] = useState<ResponseTemplate[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [loading, setLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -190,6 +195,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const unsubComments    = onSnapshot(collection(db, 'comments'),       s => setActionComments(s.docs.map(d => ({ id: d.id, ...d.data() } as ActionComment))));
     const unsubSnoozed     = onSnapshot(collection(db, 'snoozed_alerts'), s => setSnoozedAlerts(s.docs.map(d => ({ id: d.id, ...d.data() } as SnoozedAlert))));
     const unsubInvoices    = onSnapshot(collection(db, 'invoices'),       s => setInvoices(s.docs.map(d => ({ id: d.id, ...d.data() } as Invoice))));
+    const unsubResponses   = onSnapshot(collection(db, 'responseLibrary'), s => setResponseTemplates(s.docs.map(d => ({ id: d.id, ...d.data() } as ResponseTemplate))));
 
     const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), docSnap => {
       if (docSnap.exists()) {
@@ -206,7 +212,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    return () => { unsubComplexes(); unsubMeetings(); unsubUsers(); unsubContractors(); unsubComments(); unsubSnoozed(); unsubSettings(); unsubInvoices(); };
+    return () => { unsubComplexes(); unsubMeetings(); unsubUsers(); unsubContractors(); unsubComments(); unsubSnoozed(); unsubSettings(); unsubInvoices(); unsubResponses(); };
   }, [isAuthenticated]);
 
   const reminders = useMemo(() => (
@@ -310,6 +316,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await setDoc(doc(db, 'settings', 'global'), { invoicePricingTiers: tiers }, { merge: true });
   };
 
+  const addResponseTemplate    = async (t: Omit<ResponseTemplate, 'id'>) => { await addDoc(collection(db, 'responseLibrary'), cleanData(t)); };
+  const updateResponseTemplate = async (t: ResponseTemplate) => setDoc(doc(db, 'responseLibrary', t.id), cleanData(t), { merge: true });
+  const deleteResponseTemplate = async (id: string) => deleteDoc(doc(db, 'responseLibrary', id));
+
   const restoreData = async (data: any) => {
     const batch = writeBatch(db);
     if (data.complexes)      data.complexes.forEach((bc: any)   => batch.set(doc(db, 'complexes',   bc.id), cleanData(bc),  { merge: true }));
@@ -351,6 +361,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       invoices, addInvoice, markInvoiceRecovered, deleteInvoice, restoreInvoice, unrecoverInvoice,
       pricingTiers: systemSettings.invoicePricingTiers || DEFAULT_INVOICE_PRICING_TIERS,
       updateInvoicePricingTiers,
+      responseTemplates, addResponseTemplate, updateResponseTemplate, deleteResponseTemplate,
     }}>{children}</DataContext.Provider>
   );
 };

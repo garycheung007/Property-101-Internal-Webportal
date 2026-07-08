@@ -344,3 +344,14 @@ export interface SnoozedAlert {
   snoozedByUserName: string;
   snoozedAt: string;
 }
+
+export interface ResponseTemplate {
+  id: string;
+  title: string;
+  category: string;
+  body: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
