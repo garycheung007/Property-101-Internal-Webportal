@@ -191,11 +191,17 @@ const Dashboard: React.FC = () => {
   const groupedUpcomingActions = Array.from(groupedUpcomingActionsMap.values())
     .sort((a, b) => new Date(a.earliestDueDate).getTime() - new Date(b.earliestDueDate).getTime());
 
-  // Group critical alerts by complex + type
-  const groupedCriticalAlertsMap = new Map<string, { key: string; bcId: string; bcName: string; type: ReminderType; items: Reminder[]; earliestDueDate: string; severity: 'high' | 'medium' | 'low' }>();
+  const getAlertCategory = (type: ReminderType): string => {
+    if (type === ReminderType.INSURANCE || type === ReminderType.INSURANCE_VALUATION) return 'INSURANCE';
+    return type;
+  };
+
+  // Group critical alerts by complex + category (INSURANCE + INSURANCE_VALUATION merged)
+  const groupedCriticalAlertsMap = new Map<string, { key: string; bcId: string; bcName: string; type: ReminderType; category: string; items: Reminder[]; earliestDueDate: string; severity: 'high' | 'medium' | 'low' }>();
   criticalAlerts.forEach(r => {
-    const key = `${r.bcId}-${r.type}`;
-    if (!groupedCriticalAlertsMap.has(key)) groupedCriticalAlertsMap.set(key, { key, bcId: r.bcId, bcName: r.bcName, type: r.type, items: [], earliestDueDate: r.dueDate, severity: r.severity });
+    const category = getAlertCategory(r.type);
+    const key = `${r.bcId}-${category}`;
+    if (!groupedCriticalAlertsMap.has(key)) groupedCriticalAlertsMap.set(key, { key, bcId: r.bcId, bcName: r.bcName, type: r.type, category, items: [], earliestDueDate: r.dueDate, severity: r.severity });
     const g = groupedCriticalAlertsMap.get(key)!;
     g.items.push(r);
     if (new Date(r.dueDate) < new Date(g.earliestDueDate)) g.earliestDueDate = r.dueDate;
@@ -553,7 +559,7 @@ const Dashboard: React.FC = () => {
                             <div className="p-4 cursor-pointer group" onClick={() => navigateToProperty(group.bcId, group.type, group.items[0].message)}>
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{group.type}</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{group.category}</span>
                                         {group.items.length > 1 && (
                                             <span className="text-[10px] bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold">
                                                 {group.items.length} alerts
