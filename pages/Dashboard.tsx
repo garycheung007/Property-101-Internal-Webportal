@@ -3,7 +3,7 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, BellOff } from 'lucide-react';
+import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, ChevronDown, ChevronUp, BellOff } from 'lucide-react';
 import { Reminder, ReminderType } from '../types';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
@@ -30,6 +30,8 @@ const Dashboard: React.FC = () => {
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
   const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
   const [showSnoozed, setShowSnoozed] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [snoozeGroupItems, setSnoozeGroupItems] = useState<Reminder[]>([]);
 
   useEffect(() => {
     if (!hasInitializedFilter.current && complexes.length > 0 && user) {
@@ -167,6 +169,52 @@ const Dashboard: React.FC = () => {
     });
   }
   );
+
+  const getActionCategory = (message: string): string => {
+    const match = message.match(/^([A-Z][A-Z\s&]+):/);
+    if (match) return match[1].trim();
+    if (message.toLowerCase().includes('insurance') || message.toLowerCase().includes('valuation')) return 'INSURANCE';
+    if (message.includes('NOI') || message.includes('NOM') || message.includes('Notice')) return 'MEETING';
+    return 'GENERAL';
+  };
+
+  // Group upcoming actions by complex + category derived from message prefix
+  const groupedUpcomingActionsMap = new Map<string, { key: string; bcId: string; bcName: string; category: string; items: Reminder[]; earliestDueDate: string }>();
+  upcomingActions.forEach(r => {
+    const category = getActionCategory(r.message);
+    const key = `${r.bcId}-${category}`;
+    if (!groupedUpcomingActionsMap.has(key)) groupedUpcomingActionsMap.set(key, { key, bcId: r.bcId, bcName: r.bcName, category, items: [], earliestDueDate: r.dueDate });
+    const g = groupedUpcomingActionsMap.get(key)!;
+    g.items.push(r);
+    if (new Date(r.dueDate) < new Date(g.earliestDueDate)) g.earliestDueDate = r.dueDate;
+  });
+  const groupedUpcomingActions = Array.from(groupedUpcomingActionsMap.values())
+    .sort((a, b) => new Date(a.earliestDueDate).getTime() - new Date(b.earliestDueDate).getTime());
+
+  // Group critical alerts by complex + type
+  const groupedCriticalAlertsMap = new Map<string, { key: string; bcId: string; bcName: string; type: ReminderType; items: Reminder[]; earliestDueDate: string; severity: 'high' | 'medium' | 'low' }>();
+  criticalAlerts.forEach(r => {
+    const key = `${r.bcId}-${r.type}`;
+    if (!groupedCriticalAlertsMap.has(key)) groupedCriticalAlertsMap.set(key, { key, bcId: r.bcId, bcName: r.bcName, type: r.type, items: [], earliestDueDate: r.dueDate, severity: r.severity });
+    const g = groupedCriticalAlertsMap.get(key)!;
+    g.items.push(r);
+    if (new Date(r.dueDate) < new Date(g.earliestDueDate)) g.earliestDueDate = r.dueDate;
+    if (r.severity === 'high') g.severity = 'high';
+    else if (r.severity === 'medium' && g.severity !== 'high') g.severity = 'medium';
+  });
+  const groupedCriticalAlerts = Array.from(groupedCriticalAlertsMap.values())
+    .sort((a, b) => new Date(a.earliestDueDate).getTime() - new Date(b.earliestDueDate).getTime());
+
+  // Group checklist items by complex + meeting + stage
+  const groupedChecklistMap = new Map<string, any[]>();
+  meetingChecklistItems.forEach(ci => {
+    const key = `${ci.bcId}-${ci.meetingId}-${ci.stage}`;
+    if (!groupedChecklistMap.has(key)) groupedChecklistMap.set(key, []);
+    groupedChecklistMap.get(key)!.push(ci);
+  });
+  const groupedChecklistGroups = Array.from(groupedChecklistMap.entries())
+    .map(([key, items]) => ({ key, items, bcId: items[0].bcId, bcName: items[0].bcName, meetingId: items[0].meetingId, stage: items[0].stage, dueDate: items[0].dueDate }))
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
   const getNextDocumentStatus = (meeting: any) => {
       const mDate = new Date(meeting.date);
@@ -354,72 +402,124 @@ const Dashboard: React.FC = () => {
           <p className="text-xs text-slate-400 mb-4">Task issuance for portolios</p>
 
           <div className="overflow-y-auto max-h-[420px] space-y-3 pr-2 custom-scrollbar">
-            {upcomingActions.length === 0 && meetingChecklistItems.length === 0 ? (
+            {groupedUpcomingActions.length === 0 && groupedChecklistGroups.length === 0 ? (
                 <div className="text-slate-400 text-center py-10 flex flex-col items-center">
                     <CheckCircle2 size={32} className="mb-2 opacity-50 text-emerald-500" />
                     <span>All actions complete.</span>
                 </div>
             ) : (
                 <>
-                {upcomingActions.map(rem => {
-                    const isOverdue = new Date(rem.dueDate) < new Date();
-                    const isMeetingRelated = rem.message.includes('Notice') || rem.message.includes('NOI') || rem.message.includes('NOM');
-                    const isInsuranceRelated = rem.message.includes('insurance') || rem.message.includes('valuation');
-                    
+                {groupedUpcomingActions.map(group => {
+                    const isOverdue = new Date(group.earliestDueDate) < new Date();
+                    const isExpanded = expandedGroups.has(group.key);
+                    const isSingle = group.items.length === 1;
+                    const catColor = group.category === 'INSURANCE'
+                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                        : 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400';
                     return (
-                        <div key={rem.id} className={`p-4 rounded-xl border-l-4 group transition-all hover:translate-x-1 cursor-pointer hover:shadow-md ${
+                        <div key={group.key} className={`rounded-xl border-l-4 transition-all hover:shadow-md ${
                             isOverdue ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-slate-50 border-slate-300 dark:bg-slate-800/50 dark:border-slate-700'
-                        }`}
-                        onClick={() => navigateToProperty(rem.bcId, rem.type, rem.message)}
-                        >
-                            <div className="flex justify-between items-start mb-1">
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${isOverdue ? 'text-red-600' : 'text-slate-400'}`}>
-                                        {isOverdue ? 'Overdue' : 'Scheduled'}
-                                    </span>
-                                    {isMeetingRelated && <span className="text-[10px] bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 px-1.5 py-0.5 rounded font-bold uppercase">Meeting Task</span>}
-                                    {isInsuranceRelated && <span className="text-[10px] bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold uppercase">Insurance Task</span>}
+                        }`}>
+                            <div className="p-4 cursor-pointer group" onClick={() => navigateToProperty(group.bcId, group.items[0].type, group.items[0].message)}>
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isOverdue ? 'text-red-600' : 'text-slate-400'}`}>
+                                            {isOverdue ? 'Overdue' : 'Scheduled'}
+                                        </span>
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${catColor}`}>{group.category}</span>
+                                        {group.items.length > 1 && (
+                                            <span className="text-[10px] bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold">
+                                                {group.items.length} tasks
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-500 shrink-0">{new Date(group.earliestDueDate).toLocaleDateString('en-NZ')}</span>
                                 </div>
-                                <span className="text-[10px] font-mono text-slate-500">{new Date(rem.dueDate).toLocaleDateString('en-NZ')}</span>
+                                <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center justify-between">
+                                    {group.bcName}
+                                    <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
+                                </p>
+                                {isSingle && <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{group.items[0].message}</p>}
                             </div>
-                            <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center justify-between">
-                                {rem.bcName}
-                                <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
-                            </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-3">{rem.message}</p>
-                            
-                            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
-                                <button onClick={(e) => { e.stopPropagation(); setSelectedReminder(rem); }} className="text-xs font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-pink-200 dark:border-pink-900/50 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors">
-                                    <MessageCircle size={13} /> Log Details
-                                </button>
+                            <div className="px-4 pb-3 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                                {isSingle ? (
+                                    <button onClick={(e) => { e.stopPropagation(); setSelectedReminder(group.items[0]); }}
+                                        className="text-xs font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-pink-200 dark:border-pink-900/50 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors">
+                                        <MessageCircle size={13} /> Log Details
+                                    </button>
+                                ) : (
+                                    <button onClick={(e) => { e.stopPropagation(); setExpandedGroups(prev => { const s = new Set(prev); s.has(group.key) ? s.delete(group.key) : s.add(group.key); return s; }); }}
+                                        className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                        {isExpanded ? 'Hide tasks' : `Show ${group.items.length} tasks`}
+                                    </button>
+                                )}
                             </div>
+                            {!isSingle && isExpanded && (
+                                <div className="px-4 pb-4 space-y-1.5">
+                                    {group.items.map(item => (
+                                        <div key={item.id} className="flex items-start justify-between gap-2 py-2 border-b border-slate-100 dark:border-slate-700/30 last:border-0">
+                                            <p className="text-xs text-slate-600 dark:text-slate-400 flex-1 leading-snug">{item.message}</p>
+                                            <button onClick={() => setSelectedReminder(item)}
+                                                className="text-[10px] font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1 px-2 py-1 rounded border border-pink-200 dark:border-pink-900/50 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors shrink-0">
+                                                <MessageCircle size={11} /> Log
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
-                {meetingChecklistItems.map(ci => {
-                    const ciDueDate = new Date(ci.dueDate);
-                    const ciIsOverdue = ciDueDate < today;
-                    const stageLabel = ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
+                {groupedChecklistGroups.map(group => {
+                    const dueDate = new Date(group.dueDate);
+                    const isOverdue = dueDate < today;
+                    const isExpanded = expandedGroups.has(group.key);
+                    const isSingle = group.items.length === 1;
+                    const stageLabel = group.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
                     return (
-                        <div key={ci.key} className={`p-4 rounded-xl border-l-4 group transition-all hover:translate-x-1 cursor-pointer hover:shadow-md ${
-                            ciIsOverdue ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-slate-50 border-slate-300 dark:bg-slate-800/50 dark:border-slate-700'
-                        }`}
-                        onClick={() => navigate(`/complexes?id=${ci.bcId}&tab=meetings&from=dashboard`)}
-                        >
-                            <div className="flex justify-between items-start mb-1">
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${ciIsOverdue ? 'text-red-600' : 'text-slate-400'}`}>
-                                        {ciIsOverdue ? 'Overdue' : 'Scheduled'}
-                                    </span>
-                                    <span className="text-[10px] bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 px-1.5 py-0.5 rounded font-bold uppercase">Meeting Task</span>
+                        <div key={group.key} className={`rounded-xl border-l-4 transition-all hover:shadow-md ${
+                            isOverdue ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-slate-50 border-slate-300 dark:bg-slate-800/50 dark:border-slate-700'
+                        }`}>
+                            <div className="p-4 cursor-pointer group" onClick={() => navigate(`/complexes?id=${group.bcId}&tab=meetings&from=dashboard`)}>
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isOverdue ? 'text-red-600' : 'text-slate-400'}`}>
+                                            {isOverdue ? 'Overdue' : 'Scheduled'}
+                                        </span>
+                                        <span className="text-[10px] bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 px-1.5 py-0.5 rounded font-bold uppercase">Meeting Task</span>
+                                        {group.items.length > 1 && (
+                                            <span className="text-[10px] bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold">
+                                                {group.items.length} tasks
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-500 shrink-0">{dueDate.toLocaleDateString('en-NZ')}</span>
                                 </div>
-                                <span className="text-[10px] font-mono text-slate-500">{ciDueDate.toLocaleDateString('en-NZ')}</span>
+                                <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center justify-between">
+                                    {group.bcName}
+                                    <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
+                                </p>
+                                {isSingle && <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{stageLabel}: {group.items[0].item.label}</p>}
                             </div>
-                            <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center justify-between">
-                                {ci.bcName}
-                                <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
-                            </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{stageLabel}: {ci.item.label}</p>
+                            {group.items.length > 1 && (
+                                <div className="px-4 pb-3 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                                    <button onClick={(e) => { e.stopPropagation(); setExpandedGroups(prev => { const s = new Set(prev); s.has(group.key) ? s.delete(group.key) : s.add(group.key); return s; }); }}
+                                        className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                        {isExpanded ? 'Hide tasks' : `Show ${group.items.length} tasks`}
+                                    </button>
+                                </div>
+                            )}
+                            {isExpanded && (
+                                <div className="px-4 pb-4 space-y-1.5">
+                                    {group.items.map(ci => (
+                                        <div key={ci.key} className="text-xs text-slate-600 dark:text-slate-400 py-1.5 border-b border-slate-100 dark:border-slate-700/30 last:border-0 leading-snug">
+                                            {stageLabel}: {ci.item.label}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
@@ -443,42 +543,81 @@ const Dashboard: React.FC = () => {
                     <span>No critical risks identified.</span>
                 </div>
             ) : (
-                criticalAlerts.map(rem => (
-                    <div 
-                        key={rem.id} 
-                        onClick={() => navigateToProperty(rem.bcId, rem.type, rem.message)}
-                        className={`p-4 rounded-xl border-l-4 group cursor-pointer transition-all hover:translate-x-1 hover:shadow-md ${
-                            rem.severity === 'high' ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-amber-50 border-amber-400 dark:bg-amber-950/20'
-                        }`}
-                    >
-                        <div className="flex justify-between items-start">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{rem.type}</span>
-                            <span className="text-[10px] font-mono text-slate-500">{new Date(rem.dueDate).toLocaleDateString('en-NZ')}</span>
-                        </div>
-                        <p className="font-bold text-slate-800 dark:text-white mt-1 flex items-center justify-between">
-                            {rem.bcName}
-                            <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
-                        </p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{rem.message}</p>
-                        <div className="mt-3 flex justify-between items-center gap-2">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter shrink-0">Click to Resolve</span>
-                            <div className="flex gap-1.5">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setSnoozeTarget(rem); }}
-                                    className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
-                                >
-                                    <BellOff size={13} /> Snooze
-                                </button>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setSelectedReminder(rem); }}
-                                    className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:text-pink-600 hover:border-pink-200 dark:hover:border-pink-900/50 transition-colors"
-                                >
-                                    <MessageCircle size={13} /> Audit Trail
-                                </button>
+                groupedCriticalAlerts.map(group => {
+                    const isExpanded = expandedGroups.has(group.key);
+                    const isSingle = group.items.length === 1;
+                    return (
+                        <div key={group.key} className={`rounded-xl border-l-4 transition-all hover:shadow-md ${
+                            group.severity === 'high' ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-amber-50 border-amber-400 dark:bg-amber-950/20'
+                        }`}>
+                            <div className="p-4 cursor-pointer group" onClick={() => navigateToProperty(group.bcId, group.type, group.items[0].message)}>
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{group.type}</span>
+                                        {group.items.length > 1 && (
+                                            <span className="text-[10px] bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold">
+                                                {group.items.length} alerts
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-500">{new Date(group.earliestDueDate).toLocaleDateString('en-NZ')}</span>
+                                </div>
+                                <p className="font-bold text-slate-800 dark:text-white mt-1 flex items-center justify-between">
+                                    {group.bcName}
+                                    <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
+                                </p>
+                                {isSingle && <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{group.items[0].message}</p>}
                             </div>
+                            <div className="px-4 pb-3 pt-2 border-t border-amber-100/50 dark:border-amber-900/20 flex justify-between items-center gap-2">
+                                {!isSingle ? (
+                                    <button onClick={(e) => { e.stopPropagation(); setExpandedGroups(prev => { const s = new Set(prev); s.has(group.key) ? s.delete(group.key) : s.add(group.key); return s; }); }}
+                                        className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                        {isExpanded ? 'Hide' : `Show ${group.items.length} alerts`}
+                                    </button>
+                                ) : (
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter shrink-0">Click to Resolve</span>
+                                )}
+                                <div className="flex gap-1.5">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setSnoozeTarget(group.items[0]); setSnoozeGroupItems(group.items); }}
+                                        className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                                    >
+                                        <BellOff size={13} /> {group.items.length > 1 ? 'Snooze All' : 'Snooze'}
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setSelectedReminder(group.items[0]); }}
+                                        className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:text-pink-600 hover:border-pink-200 dark:hover:border-pink-900/50 transition-colors"
+                                    >
+                                        <MessageCircle size={13} /> Audit Trail
+                                    </button>
+                                </div>
+                            </div>
+                            {!isSingle && isExpanded && (
+                                <div className="px-4 pb-4 space-y-2">
+                                    {group.items.map(item => (
+                                        <div key={item.id} className="flex items-start justify-between gap-2 py-2 border-b border-amber-100 dark:border-amber-900/20 last:border-0">
+                                            <div className="flex-1">
+                                                <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{item.message}</p>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.dueDate).toLocaleDateString('en-NZ')}</p>
+                                            </div>
+                                            <div className="flex gap-1.5 shrink-0">
+                                                <button onClick={(e) => { e.stopPropagation(); setSnoozeTarget(item); setSnoozeGroupItems([item]); }}
+                                                    className="text-[10px] font-bold text-amber-600 flex items-center gap-0.5 px-2 py-1 rounded border border-amber-200 hover:bg-amber-50 transition-colors">
+                                                    <BellOff size={11} /> Snooze
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); setSelectedReminder(item); }}
+                                                    className="text-[10px] font-bold text-slate-500 flex items-center gap-0.5 px-2 py-1 rounded border border-slate-200 hover:text-pink-600 hover:border-pink-200 transition-colors">
+                                                    <MessageCircle size={11} /> Log
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                ))
+                    );
+                })
             )}
           </div>
 
@@ -667,8 +806,8 @@ const Dashboard: React.FC = () => {
           <SnoozeModal
             reminder={snoozeTarget}
             onClose={() => setSnoozeTarget(null)}
-            onSnooze={(remId, bcId, days, reason) => {
-              if (user) snoozeAlert(remId, bcId, days, reason, user);
+            onSnooze={(_remId, _bcId, days, reason) => {
+              if (user) snoozeGroupItems.forEach(item => snoozeAlert(item.id, item.bcId, days, reason, user));
             }}
           />
       )}
