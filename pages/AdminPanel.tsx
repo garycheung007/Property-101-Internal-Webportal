@@ -157,6 +157,7 @@ const InsuranceExpiryRow: React.FC<{ bc: BodyCorporate; onSave: (bc: BodyCorpora
     const [value, setValue] = useState(bc.insuranceExpiry || '');
     const [isSaving, setIsSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     useEffect(() => { setValue(bc.insuranceExpiry || ''); }, [bc.insuranceExpiry]);
 
@@ -164,10 +165,13 @@ const InsuranceExpiryRow: React.FC<{ bc: BodyCorporate; onSave: (bc: BodyCorpora
 
     const handleSave = async () => {
         setIsSaving(true);
+        setSaveError(null);
         try {
-            await onSave({ ...bc, insuranceExpiry: value });
+            await onSave({ ...bc, insuranceExpiry: value, insuranceWorkflowProgress: {} });
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
+        } catch (err: any) {
+            setSaveError(err?.message || 'Save failed — check your connection and try again.');
         } finally {
             setIsSaving(false);
         }
@@ -177,41 +181,46 @@ const InsuranceExpiryRow: React.FC<{ bc: BodyCorporate; onSave: (bc: BodyCorpora
     const isSoon = value && !isExpired && new Date(value) <= new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
 
     return (
-        <div className="flex items-center gap-4 px-6 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-            <div className="w-24 font-mono text-xs text-slate-400 shrink-0">{bc.bcNumber}</div>
-            <div className="flex-1 text-sm font-medium text-slate-800 dark:text-white truncate min-w-0">{bc.name}</div>
-            <div className="flex items-center gap-2 shrink-0">
-                {!isDirty && value && (
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                        isExpired ? 'bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400' :
-                        isSoon ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400' :
-                        'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400'
-                    }`}>
-                        {isExpired ? 'Expired' : isSoon ? 'Expiring soon' : 'Active'}
-                    </span>
-                )}
-                <input
-                    type="date"
-                    className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all"
-                    value={value}
-                    onChange={e => setValue(e.target.value)}
-                />
-                {isDirty && (
-                    <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                    >
-                        {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                        {isSaving ? 'Saving…' : 'Save'}
-                    </button>
-                )}
-                {saved && !isDirty && (
-                    <span className="text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Saved
-                    </span>
-                )}
+        <div className="px-6 py-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+            <div className="flex items-center gap-4">
+                <div className="w-24 font-mono text-xs text-slate-400 shrink-0">{bc.bcNumber}</div>
+                <div className="flex-1 text-sm font-medium text-slate-800 dark:text-white truncate min-w-0">{bc.name}</div>
+                <div className="flex items-center gap-2 shrink-0">
+                    {!isDirty && value && (
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            isExpired ? 'bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400' :
+                            isSoon ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400' :
+                            'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400'
+                        }`}>
+                            {isExpired ? 'Expired' : isSoon ? 'Expiring soon' : 'Active'}
+                        </span>
+                    )}
+                    <input
+                        type="date"
+                        className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all"
+                        value={value}
+                        onChange={e => { setValue(e.target.value); setSaveError(null); }}
+                    />
+                    {isDirty && (
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                        >
+                            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                            {isSaving ? 'Saving…' : 'Save'}
+                        </button>
+                    )}
+                    {saved && !isDirty && (
+                        <span className="text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Saved
+                        </span>
+                    )}
+                </div>
             </div>
+            {saveError && (
+                <p className="mt-1.5 ml-28 text-[11px] text-red-600 dark:text-red-400 font-medium">{saveError}</p>
+            )}
         </div>
     );
 };
