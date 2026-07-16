@@ -167,7 +167,7 @@ const InsuranceExpiryRow: React.FC<{ bc: BodyCorporate; onSave: (bc: BodyCorpora
         setIsSaving(true);
         setSaveError(null);
         try {
-            await onSave({ ...bc, insuranceExpiry: value, insuranceWorkflowProgress: {} });
+            await onSave({ ...bc, insuranceExpiry: value, insuranceWorkflowProgress: {}, insuranceCycleComplete: false });
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         } catch (err: any) {

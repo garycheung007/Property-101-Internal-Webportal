@@ -447,31 +447,34 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
             } 
         };
 
-        if (!currentIsCompleted) {
-            const activeSteps = workflowSteps.filter(s => !s.isBcOnly || form.type === 'Body Corporate');
-            const totalSteps = activeSteps.length;
-            const completedCount = activeSteps.filter(s => s.id === stepId || updatedProgress[s.id]?.completed).length;
+        const activeSteps = workflowSteps.filter(s => !s.isBcOnly || form.type === 'Body Corporate');
+        const totalSteps = activeSteps.length;
+        const allNowComplete = !currentIsCompleted &&
+            activeSteps.every(s => s.id === stepId || updatedProgress[s.id]?.completed);
 
-            if (completedCount === totalSteps) {
-                let nextExpiryStr = '';
-                const currentExpiry = parseDateSafe(form.insuranceExpiry);
-                if (currentExpiry) {
-                    const d = new Date(currentExpiry);
-                    d.setFullYear(d.getFullYear() + 1);
-                    nextExpiryStr = d.toISOString().split('T')[0];
-                }
-                setRenewalPrompt({ show: true, nextExpiry: nextExpiryStr });
+        if (allNowComplete) {
+            let nextExpiryStr = '';
+            const currentExpiry = parseDateSafe(form.insuranceExpiry);
+            if (currentExpiry) {
+                const d = new Date(currentExpiry);
+                d.setFullYear(d.getFullYear() + 1);
+                nextExpiryStr = d.toISOString().split('T')[0];
             }
+            setRenewalPrompt({ show: true, nextExpiry: nextExpiryStr });
         }
 
-        setForm({ ...form, insuranceWorkflowProgress: updatedProgress });
+        setForm({
+            ...form,
+            insuranceWorkflowProgress: updatedProgress,
+            insuranceCycleComplete: allNowComplete ? true : currentIsCompleted ? false : form.insuranceCycleComplete,
+        });
     };
 
     const confirmRenewal = async () => {
         if (!renewalPrompt.nextExpiry) return;
         const oldExpiry = form.insuranceExpiry;
         const newExpiry = renewalPrompt.nextExpiry;
-        const updatedForm = { ...form, insuranceExpiry: newExpiry, insuranceWorkflowProgress: {} };
+        const updatedForm = { ...form, insuranceExpiry: newExpiry, insuranceWorkflowProgress: {}, insuranceCycleComplete: false };
         if (currentUser) {
             await addActionComment(`ren-${Date.now()}`, form.id, `Insurance Renewal Completed. Portfolio advanced from ${oldExpiry} to ${newExpiry}. Workflow checklist reset for next cycle.`, currentUser);
         }

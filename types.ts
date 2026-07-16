@@ -174,6 +174,7 @@ export interface BodyCorporate {
   insuranceNote?: string;
 
   insuranceWorkflowProgress?: Record<string, InsuranceStepStatus>;
+  insuranceCycleComplete?: boolean;
 
   hasBwof?: boolean;
   bwofExpiry?: string;

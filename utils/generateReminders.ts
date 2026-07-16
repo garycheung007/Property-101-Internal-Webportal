@@ -40,7 +40,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
         }
       }
 
-      workflowSteps.forEach(step => {
+      if (!bc.insuranceCycleComplete) workflowSteps.forEach(step => {
         if (step.isBcOnly && bc.type !== 'Body Corporate') return;
         if (step.id && progress[step.id]?.completed) return;
 
@@ -131,6 +131,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
       (bc.meetings || []).forEach(meeting => {
         const mtgDate = new Date(meeting.date);
         if (isNaN(mtgDate.getTime())) return;
+        if (meeting.minutesIssued) return;
         const progress = meeting.checklistProgress || {};
         (['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).forEach(stage => {
           (stageTemplates[stage] || []).forEach(item => {
