@@ -12,6 +12,7 @@ export interface MeetingDateSettings {
   nomDeadlineDays: number;
   minutesPreferDays: number;
   minutesDeadlineDays: number;
+  noiResponseDueTime?: string;
 }
 
 export interface ConflictEntry {

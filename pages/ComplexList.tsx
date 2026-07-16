@@ -1347,7 +1347,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                             <div className="lg:col-span-1 bg-slate-100 dark:bg-slate-800/40 rounded-3xl p-5 border dark:border-slate-700/50 flex flex-col shadow-inner overflow-hidden">
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Scheduled Meetings</h3>
-                                    <button onClick={() => { setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {} }); setVenueOther(false); setSelectedMeetingId('new'); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm">
+                                    <button onClick={() => { const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc'; const defaultNOITime = systemSettings.meetingDateSettings?.[typeKey]?.noiResponseDueTime || ''; setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {}, noiResponseDueTime: defaultNOITime }); setVenueOther(false); setSelectedMeetingId('new'); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm">
                                         <Plus size={13} /> Schedule
                                     </button>
                                 </div>

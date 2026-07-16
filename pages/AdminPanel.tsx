@@ -1216,6 +1216,18 @@ const AdminPanel: React.FC = () => {
                                         </div>
                                     ))}
                                 </div>
+                                <div className="mt-4">
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">NOI Response Due Time (default)</label>
+                                    <input
+                                        type="time"
+                                        className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm font-mono"
+                                        value={localMeetingDateSettings[meetingDateTab].noiResponseDueTime || ''}
+                                        onChange={e => setLocalMeetingDateSettings(prev => ({
+                                            ...prev,
+                                            [meetingDateTab]: { ...prev[meetingDateTab], noiResponseDueTime: e.target.value }
+                                        }))}
+                                    />
+                                </div>
                             </div>
 
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-8">
