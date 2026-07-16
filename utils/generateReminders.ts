@@ -155,5 +155,32 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
     });
   }
 
+  // Levy debt collection reminders
+  complexes.filter(c => !c.isArchived).forEach(bc => {
+    if (!bc.levyDueDateSchedule || bc.levyDueDateSchedule.length === 0) return;
+    const lagDays = bc.debtCollectionReminderDays ?? 7;
+
+    bc.levyDueDateSchedule.forEach((entry, idx) => {
+      const dueDate = new Date(today.getFullYear(), entry.month - 1, entry.day);
+      const reminderDate = new Date(dueDate);
+      reminderDate.setDate(reminderDate.getDate() + lagDays);
+
+      if (today < reminderDate) return;
+
+      const lastDone = bc.lastDebtCollectionDate ? new Date(bc.lastDebtCollectionDate) : null;
+      if (lastDone && lastDone >= dueDate) return;
+
+      reminders.push({
+        id: `levy-${bc.id}-${entry.month}-${entry.day}`,
+        bcId: bc.id,
+        bcName: bc.name,
+        type: ReminderType.LEVY,
+        dueDate: dueDate.toISOString().split('T')[0],
+        message: `DEBT COLLECTION: Levy instalment ${idx + 1} was due ${dueDate.toLocaleDateString('en-NZ')}`,
+        severity: 'medium',
+      });
+    });
+  });
+
   return reminders;
 }

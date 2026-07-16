@@ -255,7 +255,14 @@ const DisclosureGenerator: React.FC = () => {
       bcAccountName:        selectedComplex.bcAccountName || '[Account Name]',
       bcAccountNumber:      selectedComplex.bcAccountNumber || '[Account Number]',
       levyInstalments:      selectedComplex.levyInstalments || '[Number]',
-      levyDueDates:         selectedComplex.levyDueDates || '[Due Dates]',
+      levyDueDates:         (() => {
+        const schedule = selectedComplex.levyDueDateSchedule;
+        if (schedule && schedule.length > 0) {
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          return schedule.map(e => `${e.day} ${months[e.month - 1]}`).join(', ');
+        }
+        return selectedComplex.levyDueDates || '[Due Dates]';
+      })(),
       instalmentAmount:     formatNZD(instalmentAmount, '[Instalment Amount]'),
       levyOutstanding:      formatNZD(levyOutstanding, '[Outstanding Amount]'),
       legalProceedings:     legalProceedings ? 'has been' : 'has not been',

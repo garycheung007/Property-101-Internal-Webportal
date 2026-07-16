@@ -57,9 +57,10 @@ const Dashboard: React.FC = () => {
   const activeSnoozedIds = new Set(
     snoozedAlerts.filter(s => new Date(s.snoozedUntil) >= today).map(s => s.reminderId)
   );
-  const criticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && !activeSnoozedIds.has(r.id));
-  const snoozedCriticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && activeSnoozedIds.has(r.id));
+  const criticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && !activeSnoozedIds.has(r.id));
+  const snoozedCriticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && activeSnoozedIds.has(r.id));
   const upcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION);
+  const levyReminders = filteredReminders.filter(r => r.type === ReminderType.LEVY);
 
   const upcomingMeetings = filteredComplexes
     .flatMap(c => {
@@ -327,6 +328,12 @@ const Dashboard: React.FC = () => {
       };
   };
 
+  const handleLevyMarkDone = async (bcId: string) => {
+      const bc = complexes.find(c => c.id === bcId);
+      if (!bc) return;
+      await updateComplex({ ...bc, lastDebtCollectionDate: new Date().toISOString().split('T')[0] });
+  };
+
   const navigateToProperty = (bcId: string, reminderType: ReminderType, message: string) => {
       // Determine tab based on type or message content
       const isMeeting = reminderType === ReminderType.AGM || message.includes('Notice') || message.includes('NOI') || message.includes('NOM');
@@ -376,7 +383,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: 'Active Complexes', val: filteredComplexes.length, icon: <FileCheck />, color: 'pink', onClick: () => navigate('/complexes') },
-          { label: 'Upcoming Actions', val: upcomingActions.length + meetingChecklistItems.length, icon: <ClipboardList />, color: 'pink', onClick: () => upcomingActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
+          { label: 'Upcoming Actions', val: upcomingActions.length + meetingChecklistItems.length + levyReminders.length, icon: <ClipboardList />, color: 'pink', onClick: () => upcomingActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
           { label: 'Critical Alerts', val: criticalAlerts.length, icon: <AlertTriangle />, color: 'amber', onClick: () => criticalAlertsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
         ].map((stat, i) => (
           <div key={i} onClick={stat.onClick} className="cursor-pointer hover:shadow-md bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all text-left group">
@@ -408,13 +415,33 @@ const Dashboard: React.FC = () => {
           <p className="text-xs text-slate-400 mb-4">Task issuance for portolios</p>
 
           <div className="overflow-y-auto max-h-[420px] space-y-3 pr-2 custom-scrollbar">
-            {groupedUpcomingActions.length === 0 && groupedChecklistGroups.length === 0 ? (
+            {groupedUpcomingActions.length === 0 && groupedChecklistGroups.length === 0 && levyReminders.length === 0 ? (
                 <div className="text-slate-400 text-center py-10 flex flex-col items-center">
                     <CheckCircle2 size={32} className="mb-2 opacity-50 text-emerald-500" />
                     <span>All actions complete.</span>
                 </div>
             ) : (
                 <>
+                {levyReminders.map(rem => (
+                    <div key={rem.id} className="rounded-xl border-l-4 bg-amber-50 border-amber-400 dark:bg-amber-950/20 transition-all hover:shadow-md">
+                        <div className="p-4">
+                            <div className="flex justify-between items-start mb-1">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Debt Collection</span>
+                                <span className="text-[10px] font-mono text-slate-500 shrink-0">{new Date(rem.dueDate).toLocaleDateString('en-NZ')}</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-800 dark:text-white mt-1">{rem.bcName}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{rem.message}</p>
+                        </div>
+                        <div className="px-4 pb-3 pt-2 border-t border-amber-100/50 dark:border-amber-900/20">
+                            <button
+                                onClick={() => handleLevyMarkDone(rem.bcId)}
+                                className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-900/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                            >
+                                <CheckCircle2 size={13} /> Mark Done
+                            </button>
+                        </div>
+                    </div>
+                ))}
                 {groupedUpcomingActions.map(group => {
                     const isOverdue = new Date(group.earliestDueDate) < new Date();
                     const isExpanded = expandedGroups.has(group.key);

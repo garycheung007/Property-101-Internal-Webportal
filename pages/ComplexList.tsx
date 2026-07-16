@@ -901,12 +901,71 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t dark:border-slate-800">
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Levy Instalments (per year)</label>
-                                    <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.levyInstalments || ''} onChange={e => setForm({...form, levyInstalments: e.target.value})} placeholder="e.g. 4" />
+                                    <select
+                                        className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500"
+                                        value={form.levyInstalments || ''}
+                                        onChange={e => {
+                                            const count = e.target.value;
+                                            const n = parseInt(count) || 0;
+                                            const existing = form.levyDueDateSchedule || [];
+                                            const newSchedule = Array.from({ length: n }, (_, i) => existing[i] || { month: 1, day: 1 });
+                                            setForm({ ...form, levyInstalments: count, levyDueDateSchedule: n > 0 ? newSchedule : undefined });
+                                        }}
+                                    >
+                                        <option value="">Select</option>
+                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                                            <option key={n} value={String(n)}>{n}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Levy Due Dates</label>
-                                    <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.levyDueDates || ''} onChange={e => setForm({...form, levyDueDates: e.target.value})} placeholder="e.g. 1 Jan, 1 Apr, 1 Jul, 1 Oct" />
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Debt Collection Reminder (days after due date)</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500"
+                                        value={form.debtCollectionReminderDays ?? ''}
+                                        onChange={e => setForm({ ...form, debtCollectionReminderDays: e.target.value ? parseInt(e.target.value) : undefined })}
+                                        placeholder="7 (default)"
+                                    />
                                 </div>
+                                {(form.levyDueDateSchedule || []).length > 0 && (
+                                    <div className="col-span-full">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Levy Due Dates</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                            {(form.levyDueDateSchedule || []).map((entry, idx) => (
+                                                <div key={idx} className="flex items-center gap-2 border dark:border-slate-700 rounded-xl px-3 py-2">
+                                                    <span className="text-[11px] font-bold text-slate-400 w-16 shrink-0">Instal. {idx + 1}</span>
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={31}
+                                                        className="w-14 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center"
+                                                        value={entry.day}
+                                                        onChange={e => {
+                                                            const schedule = [...(form.levyDueDateSchedule || [])];
+                                                            schedule[idx] = { ...schedule[idx], day: parseInt(e.target.value) || 1 };
+                                                            setForm({ ...form, levyDueDateSchedule: schedule });
+                                                        }}
+                                                    />
+                                                    <select
+                                                        className="flex-1 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500"
+                                                        value={entry.month}
+                                                        onChange={e => {
+                                                            const schedule = [...(form.levyDueDateSchedule || [])];
+                                                            schedule[idx] = { ...schedule[idx], month: parseInt(e.target.value) };
+                                                            setForm({ ...form, levyDueDateSchedule: schedule });
+                                                        }}
+                                                    >
+                                                        {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, mi) => (
+                                                            <option key={mi + 1} value={mi + 1}>{m}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         {currentUser?.role === 'admin' && (

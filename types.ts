@@ -237,6 +237,8 @@ export interface BodyCorporate {
   bcAccountNumber?: string;
   levyInstalments?: string;
   levyDueDates?: string;
+  levyDueDateSchedule?: Array<{ month: number; day: number }>;
+  debtCollectionReminderDays?: number;
 
   notes?: string;
   meetingDateSettings?: Partial<MeetingDateSettings>;
@@ -305,7 +307,8 @@ export enum ReminderType {
   LTMP = 'LTMP',
   FINANCIAL = 'FINANCIAL',
   COMPLIANCE = 'COMPLIANCE',
-  UPCOMING_ACTION = 'UPCOMING_ACTION'
+  UPCOMING_ACTION = 'UPCOMING_ACTION',
+  LEVY = 'LEVY'
 }
 
 export interface Reminder {
