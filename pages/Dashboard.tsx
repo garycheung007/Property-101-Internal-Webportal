@@ -427,7 +427,7 @@ const Dashboard: React.FC = () => {
                         <div className="p-4">
                             <div className="flex justify-between items-start mb-1">
                                 <span className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Debt Collection</span>
-                                <span className="text-[10px] font-mono text-slate-500 shrink-0">{new Date(rem.dueDate).toLocaleDateString('en-NZ')}</span>
+                                <span className="text-[10px] font-mono text-slate-500 shrink-0">{new Date(rem.dueDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                             </div>
                             <p className="text-sm font-bold text-slate-800 dark:text-white mt-1">{rem.bcName}</p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{rem.message}</p>
