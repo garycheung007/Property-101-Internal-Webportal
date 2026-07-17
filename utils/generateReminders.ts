@@ -1,6 +1,16 @@
 import { BodyCorporate, Reminder, ReminderType, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings } from '../types';
 import { DEFAULT_INSURANCE_SETTINGS, DEFAULT_WORKFLOW, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
+const subtractWorkingDays = (date: Date, n: number): Date => {
+  const result = new Date(date);
+  let count = 0;
+  while (count < n) {
+    result.setDate(result.getDate() - 1);
+    if (result.getDay() !== 0 && result.getDay() !== 6) count++;
+  }
+  return result;
+};
+
 type StageTemplates = { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]; PRIOR_TO_MEETING: MeetingChecklistItem[]; AFTER_MEETING: MeetingChecklistItem[]; };
 type ChecklistTemplates = { bc: StageTemplates; rs: StageTemplates; };
 type MeetingDateConfig = { bc: MeetingDateSettings; rs: MeetingDateSettings; };
@@ -155,6 +165,29 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
       });
     });
   }
+
+  // NOI response due reminders — fires N working days before response due date
+  complexes.filter(c => !c.isArchived).forEach(bc => {
+    (bc.meetings || []).forEach(meeting => {
+      if (!meeting.noiResponseDueDate || meeting.minutesIssued) return;
+      const responseDue = new Date(meeting.noiResponseDueDate + 'T00:00:00');
+      const reminderDays = meeting.noiResponseReminderDays ?? 2;
+      const triggerDate = reminderDays > 0 ? subtractWorkingDays(responseDue, reminderDays) : responseDue;
+      if (today < triggerDate) return;
+      const isOverdue = today > responseDue;
+      const formattedDate = responseDue.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+      const timeStr = meeting.noiResponseDueTime ? ` at ${new Date('1970-01-01T' + meeting.noiResponseDueTime).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}` : '';
+      reminders.push({
+        id: `noi-resp-${bc.id}-${meeting.id}`,
+        bcId: bc.id,
+        bcName: bc.name,
+        type: isOverdue ? ReminderType.AGM : ReminderType.UPCOMING_ACTION,
+        dueDate: meeting.noiResponseDueDate,
+        message: `${isOverdue ? 'OVERDUE' : 'ACTION'}: Check nominations for ${meeting.type} — response due ${formattedDate}${timeStr}`,
+        severity: isOverdue ? 'high' : 'medium',
+      });
+    });
+  });
 
   // Levy debt collection reminders
   complexes.filter(c => !c.isArchived).forEach(bc => {

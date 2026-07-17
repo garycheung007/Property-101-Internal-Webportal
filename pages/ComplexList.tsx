@@ -1291,6 +1291,17 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                         onChange={e => setMeetingForm({...meetingForm, noiResponseDueTime: e.target.value})}
                                                                     />
                                                                 </div>
+                                                                <div className="mt-2 flex items-center gap-2">
+                                                                    <label className="text-[10px] text-slate-400 whitespace-nowrap">Reminder (working days before)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        min={0}
+                                                                        max={30}
+                                                                        className="w-20 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-2 py-1.5 text-xs font-mono"
+                                                                        value={meetingForm.noiResponseReminderDays ?? 2}
+                                                                        onChange={e => setMeetingForm({...meetingForm, noiResponseReminderDays: parseInt(e.target.value) || 0})}
+                                                                    />
+                                                                </div>
                                                             </div>
                                                             <div className="p-3 bg-pink-50 dark:bg-pink-900/10 rounded-xl border border-pink-200 dark:border-pink-900/30">
                                                                 <div className="text-[9px] font-bold uppercase tracking-widest text-pink-400 mb-1">Meeting Date</div>
@@ -1358,6 +1369,15 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             <div key={m.id} onClick={() => { setMeetingForm({ ...m }); setSelectedMeetingId(m.id); }} className={`p-3 bg-white dark:bg-slate-900 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${selectedMeetingId === m.id ? 'border-pink-500 shadow-pink-100 dark:shadow-none' : passed ? 'border-transparent opacity-70' : 'border-transparent dark:border-slate-800 hover:border-pink-200'}`}>
                                                 <div className="flex justify-between text-[10px] font-bold uppercase mb-1.5"><span className={passed ? 'text-slate-500' : 'text-pink-600'}>{m.type}</span><span className="text-slate-500 font-mono">{m.date ? formatDateNZ(m.date) : 'TBC'}</span></div>
                                                 <div className="flex items-center gap-1.5"><MapPinHouse size={12} className="text-slate-400" /><p className="text-xs font-bold dark:text-white truncate">{m.venue || 'TBC'}</p></div>
+                                                {!passed && m.noiResponseDueDate && (
+                                                    <div className="mt-1.5 flex items-center gap-1.5">
+                                                        <Clock size={12} className="text-pink-400" />
+                                                        <p className="text-xs text-pink-600 dark:text-pink-400 font-mono">
+                                                            Response due: {new Date(m.noiResponseDueDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            {m.noiResponseDueTime ? `, ${new Date('1970-01-01T' + m.noiResponseDueTime).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}` : ''}
+                                                        </p>
+                                                    </div>
+                                                )}
                                                 <div className="mt-2 flex items-center justify-between">
                                                     <div className="flex gap-1">
                                                         {m.noiIssued && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="NOI Done"></div>}
