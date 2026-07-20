@@ -38,6 +38,7 @@ export interface Meeting {
   noiResponseDueDate?: string;
   noiResponseDueTime?: string;
   noiResponseReminderDays?: number;
+  noiResponseReceived?: boolean;
   nomDueDate?: string;
   agendaSentDate?: string;
   minutesSentDate?: string;

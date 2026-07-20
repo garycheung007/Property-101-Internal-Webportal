@@ -1315,18 +1315,28 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                     <div className="text-[10px] mt-0.5">{meetingForm.noiIssued ? <span className="text-emerald-600">✓ Met</span> : isPast(dates.noiDead) ? <span className="text-red-400">Passed</span> : <span className="text-amber-500">{daysUntil(dates.noiDead)}d remaining</span>}</div>
                                                 </div>
                                                 {/* NOI Response Due — editable */}
-                                                <div className={`p-3 rounded-xl border ${meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
-                                                    <div className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate) ? 'text-red-500' : 'text-slate-400'}`}>NOI Response Due</div>
-                                                    <div className="grid grid-cols-2 gap-1 mb-1.5">
-                                                        <input type="date" className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-1.5 py-1 text-[10px] font-mono ${meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate) ? 'text-red-500 border-red-300 dark:border-red-800' : 'dark:text-white'}`} value={meetingForm.noiResponseDueDate || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})} />
-                                                        <input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-1.5 py-1 text-[10px] font-mono" value={meetingForm.noiResponseDueTime || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueTime: e.target.value})} />
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-[9px] text-slate-400 whitespace-nowrap">Remind</span>
-                                                        <input type="number" min={0} max={30} className="w-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded px-1 py-0.5 text-[10px] font-mono text-center" value={meetingForm.noiResponseReminderDays ?? 2} onChange={e => setMeetingForm({...meetingForm, noiResponseReminderDays: parseInt(e.target.value) || 0})} />
-                                                        <span className="text-[9px] text-slate-400 whitespace-nowrap">days before</span>
-                                                    </div>
-                                                </div>
+                                                {(() => {
+                                                    const responseReceived = !!meetingForm.noiResponseReceived;
+                                                    const responseOverdue = !responseReceived && !!meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate);
+                                                    return (
+                                                        <div className={`p-3 rounded-xl border ${responseReceived ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : responseOverdue ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
+                                                            <div className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${responseReceived ? 'text-emerald-600' : responseOverdue ? 'text-red-500' : 'text-slate-400'}`}>NOI Response Due</div>
+                                                            <div className="grid grid-cols-2 gap-1 mb-1.5">
+                                                                <input type="date" className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-1.5 py-1 text-[10px] font-mono ${responseOverdue ? 'text-red-500 border-red-300 dark:border-red-800' : 'dark:text-white'}`} value={meetingForm.noiResponseDueDate || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})} />
+                                                                <input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-1.5 py-1 text-[10px] font-mono" value={meetingForm.noiResponseDueTime || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueTime: e.target.value})} />
+                                                            </div>
+                                                            <div className="flex items-center gap-1 mb-1.5">
+                                                                <span className="text-[9px] text-slate-400 whitespace-nowrap">Remind</span>
+                                                                <input type="number" min={0} max={30} className="w-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded px-1 py-0.5 text-[10px] font-mono text-center" value={meetingForm.noiResponseReminderDays ?? 2} onChange={e => setMeetingForm({...meetingForm, noiResponseReminderDays: parseInt(e.target.value) || 0})} />
+                                                                <span className="text-[9px] text-slate-400 whitespace-nowrap">days before</span>
+                                                            </div>
+                                                            <label className="flex items-center gap-1.5 cursor-pointer">
+                                                                <input type="checkbox" className="accent-emerald-600 w-3 h-3" checked={responseReceived} onChange={e => setMeetingForm({...meetingForm, noiResponseReceived: e.target.checked})} />
+                                                                <span className={`text-[9px] font-semibold ${responseReceived ? 'text-emerald-600' : 'text-slate-400'}`}>Response received</span>
+                                                            </label>
+                                                        </div>
+                                                    );
+                                                })()}
                                                 {/* NOM Preferred */}
                                                 <div className={`p-3 rounded-xl border ${meetingForm.nomIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.nomPref) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
                                                     <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomPref) ? 'text-red-500' : 'text-slate-400'}`}>NOM Preferred</div>
