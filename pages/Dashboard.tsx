@@ -28,12 +28,13 @@ const Dashboard: React.FC = () => {
   const upcomingActionsRef = useRef<HTMLDivElement>(null);
   const criticalAlertsRef = useRef<HTMLDivElement>(null);
   const hasInitializedFilter = useRef(false);
+  const hasInitializedSections = useRef(false);
 
   const [selectedManager, setSelectedManager] = useState<string>('all');
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
   const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
   const [showSnoozed, setShowSnoozed] = useState(false);
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(ALL_CATS));
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [snoozeGroupItems, setSnoozeGroupItems] = useState<Reminder[]>([]);
 
   useEffect(() => {
@@ -43,6 +44,21 @@ const Dashboard: React.FC = () => {
       hasInitializedFilter.current = true;
     }
   }, [complexes, user]);
+
+  useEffect(() => {
+    if (hasInitializedSections.current || reminders.length === 0) return;
+    hasInitializedSections.current = true;
+    const toOpen = new Set<string>(reminders
+      .filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY)
+      .map(r => {
+        if (r.type === ReminderType.INSURANCE || r.type === ReminderType.INSURANCE_VALUATION) return 'INSURANCE';
+        if (r.type === ReminderType.BWOF || r.type === ReminderType.COMPLIANCE) return 'COMPLIANCE';
+        if (r.type === ReminderType.AGM || r.message.includes('NOI') || r.message.includes('NOM') || r.message.toLowerCase().includes('notice') || r.message.toLowerCase().includes('minutes')) return 'MEETING';
+        return 'OTHER';
+      })
+    );
+    setOpenSections(toOpen);
+  }, [reminders]);
 
   const activeComplexes = complexes.filter(c => !c.isArchived);
 
@@ -132,6 +148,11 @@ const Dashboard: React.FC = () => {
     .slice(0, 15);
 
   const totalUnits = filteredComplexes.reduce((sum, c) => sum + c.units, 0);
+  const currentYear = today.getFullYear();
+  const agmsRemainingThisYear = filteredComplexes.reduce((count, c) =>
+    count + (c.meetings || []).filter(m =>
+      m.type === 'AGM' && new Date(m.date) >= today && new Date(m.date).getFullYear() === currentYear
+    ).length, 0);
 
   const meetingChecklistItems = filteredComplexes.flatMap(c => {
     const tplKey = c.type === 'Incorporated Society' ? 'rs' : 'bc';
@@ -388,15 +409,16 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: 'Active Complexes', val: filteredComplexes.length, icon: <FileCheck />, color: 'pink', onClick: () => navigate('/complexes') },
           { label: 'Upcoming Actions', val: upcomingActions.length + meetingChecklistItems.length + levyReminders.length, icon: <ClipboardList />, color: 'pink', onClick: () => upcomingActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
-          { label: 'Critical Alerts', val: criticalAlerts.length, icon: <AlertTriangle />, color: 'amber', onClick: () => criticalAlertsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+          { label: 'Critical Alerts', val: criticalAlerts.length, icon: <AlertTriangle />, color: 'amber', onClick: () => criticalAlertsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
+          { label: 'AGMs Remaining This Year', val: agmsRemainingThisYear, icon: <Calendar />, color: 'blue', onClick: () => navigate('/complexes') }
         ].map((stat, i) => (
           <div key={i} onClick={stat.onClick} className="cursor-pointer hover:shadow-md bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all text-left group">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-lg ${
                 stat.color === 'pink' ? 'bg-pink-50 text-pink-600 dark:bg-pink-900/20' :
                 stat.color === 'emerald' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' :
+                stat.color === 'blue' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20' :
                 'bg-amber-50 text-amber-600 dark:bg-amber-900/20'
               }`}>
                 {stat.icon}
@@ -411,11 +433,11 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
         {/* Category Work Sections */}
         <div
-          className="lg:col-span-2 space-y-3"
+          className="lg:col-span-3 lg:order-2 space-y-3"
           ref={(el) => {
             (upcomingActionsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
             (criticalAlertsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
@@ -463,18 +485,14 @@ const Dashboard: React.FC = () => {
 
                   {/* Section body */}
                   {isOpen && (
-                    <div className="border-t border-slate-100 dark:border-slate-800 grid grid-cols-2">
+                    <div className="border-t border-slate-100 dark:border-slate-800">
 
-                      {/* Alert zone (left) */}
-                      <div className="border-r border-slate-100 dark:border-slate-800 bg-red-50/30 dark:bg-red-950/10">
-                        <div className="px-4 py-1.5 border-b border-red-100/60 dark:border-red-900/20">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-red-500">⚠ Critical Alerts</span>
-                        </div>
-                        {alerts.length === 0 ? (
-                          <div className="px-4 py-3 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 size={13} /> All clear
+                      {/* Alert zone (top) — only rendered when alerts exist */}
+                      {alerts.length > 0 && (
+                        <div className="bg-red-50/30 dark:bg-red-950/10 border-b border-slate-100 dark:border-slate-800">
+                          <div className="px-4 py-1.5 border-b border-red-100/60 dark:border-red-900/20">
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-red-500">⚠ Critical Alerts</span>
                           </div>
-                        ) : (
                           <div className="divide-y divide-red-50 dark:divide-red-900/20">
                             {Object.entries(
                               alerts.reduce((acc: Record<string, { bcName: string; items: typeof alerts }>, a) => {
@@ -492,14 +510,14 @@ const Dashboard: React.FC = () => {
                                   return (
                                     <div
                                       key={alert.id}
-                                      className="flex items-center gap-2 px-4 py-2.5 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors"
+                                      className="flex items-start gap-2 px-4 py-2.5 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors"
                                       onClick={() => navigateToProperty(alert.bcId, alert.type, alert.message)}
                                     >
                                       <div className="flex-1 min-w-0">
-                                        <div className="text-[11px] text-slate-600 dark:text-slate-300 truncate leading-snug">{alert.message}</div>
+                                        <div className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-snug">{alert.message}</div>
                                       </div>
-                                      <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
-                                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                      <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
+                                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
                                         <button
                                           onClick={e => { e.stopPropagation(); setSnoozeTarget(alert); setSnoozeGroupItems([alert]); }}
                                           className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
@@ -517,81 +535,81 @@ const Dashboard: React.FC = () => {
                               </div>
                             ))}
                           </div>
-                        )}
-                      </div>
-
-                      {/* Action zone (right) */}
-                      <div>
-                        <div className="px-4 py-1.5 border-b border-slate-100 dark:border-slate-800">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">↗ Upcoming Actions</span>
                         </div>
-                        {totalActions === 0 ? (
-                          <div className="px-4 py-3 text-xs text-slate-400">Nothing pending</div>
-                        ) : (() => {
-                          type ActionEntry =
-                            | { kind: 'levy'; id: string; bcId: string; bcName: string; rem: Reminder }
-                            | { kind: 'action'; id: string; bcId: string; bcName: string; rem: Reminder }
-                            | { kind: 'checklist'; id: string; bcId: string; bcName: string; ci: any };
-                          const allEntries: ActionEntry[] = [
-                            ...actions.filter(r => r.type === ReminderType.LEVY).map(rem => ({ kind: 'levy' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
-                            ...actions.filter(r => r.type !== ReminderType.LEVY).map(rem => ({ kind: 'action' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
-                            ...checklistItems.map(ci => ({ kind: 'checklist' as const, id: ci.key, bcId: ci.bcId, bcName: ci.bcName, ci })),
-                          ];
-                          const groupedMap: Record<string, { bcName: string; entries: ActionEntry[] }> = {};
-                          allEntries.forEach(e => {
-                            if (!groupedMap[e.bcId]) groupedMap[e.bcId] = { bcName: e.bcName, entries: [] };
-                            groupedMap[e.bcId].entries.push(e);
-                          });
-                          return (
-                            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                              {Object.entries(groupedMap).map(([bcId, { bcName, entries }]) => (
-                                <div key={bcId}>
-                                  <div className="px-4 py-1 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">{bcName}</span>
+                      )}
+
+                      {/* Action zone (bottom) — only rendered when actions exist */}
+                      {totalActions > 0 && (
+                        <div>
+                          <div className="px-4 py-1.5 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">↗ Upcoming Actions</span>
+                          </div>
+                          {(() => {
+                            type ActionEntry =
+                              | { kind: 'levy'; id: string; bcId: string; bcName: string; rem: Reminder }
+                              | { kind: 'action'; id: string; bcId: string; bcName: string; rem: Reminder }
+                              | { kind: 'checklist'; id: string; bcId: string; bcName: string; ci: any };
+                            const allEntries: ActionEntry[] = [
+                              ...actions.filter(r => r.type === ReminderType.LEVY).map(rem => ({ kind: 'levy' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
+                              ...actions.filter(r => r.type !== ReminderType.LEVY).map(rem => ({ kind: 'action' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
+                              ...checklistItems.map(ci => ({ kind: 'checklist' as const, id: ci.key, bcId: ci.bcId, bcName: ci.bcName, ci })),
+                            ];
+                            const groupedMap: Record<string, { bcName: string; entries: ActionEntry[] }> = {};
+                            allEntries.forEach(e => {
+                              if (!groupedMap[e.bcId]) groupedMap[e.bcId] = { bcName: e.bcName, entries: [] };
+                              groupedMap[e.bcId].entries.push(e);
+                            });
+                            return (
+                              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {Object.entries(groupedMap).map(([bcId, { bcName, entries }]) => (
+                                  <div key={bcId}>
+                                    <div className="px-4 py-1 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">{bcName}</span>
+                                    </div>
+                                    {entries.map(entry => {
+                                      if (entry.kind === 'levy') {
+                                        const chip = getDueChip(entry.rem.dueDate);
+                                        return (
+                                          <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
+                                            </div>
+                                            <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
+                                            <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 mt-0.5" title="Mark Done"><CheckCircle2 size={12} /></button>
+                                          </div>
+                                        );
+                                      }
+                                      if (entry.kind === 'action') {
+                                        const chip = getDueChip(entry.rem.dueDate);
+                                        return (
+                                          <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
+                                            </div>
+                                            <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
+                                            <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 mt-0.5" title="Log Details"><MessageCircle size={12} /></button>
+                                          </div>
+                                        );
+                                      }
+                                      const chip = getDueChip(entry.ci.dueDate);
+                                      const stageLabel = entry.ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
+                                      return (
+                                        <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigate(`/complexes?id=${entry.ci.bcId}&tab=meetings&from=dashboard`)}>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{stageLabel}: {entry.ci.item.label}</div>
+                                          </div>
+                                          <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
+                                          <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0 mt-0.5" />
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                  {entries.map(entry => {
-                                    if (entry.kind === 'levy') {
-                                      const chip = getDueChip(entry.rem.dueDate);
-                                      return (
-                                        <div key={entry.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
-                                          <div className="flex-1 min-w-0">
-                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{entry.rem.message}</div>
-                                          </div>
-                                          <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
-                                          <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" title="Mark Done"><CheckCircle2 size={12} /></button>
-                                        </div>
-                                      );
-                                    }
-                                    if (entry.kind === 'action') {
-                                      const chip = getDueChip(entry.rem.dueDate);
-                                      return (
-                                        <div key={entry.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
-                                          <div className="flex-1 min-w-0">
-                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{entry.rem.message}</div>
-                                          </div>
-                                          <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
-                                          <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20" title="Log Details"><MessageCircle size={12} /></button>
-                                        </div>
-                                      );
-                                    }
-                                    const chip = getDueChip(entry.ci.dueDate);
-                                    const stageLabel = entry.ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
-                                    return (
-                                      <div key={entry.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigate(`/complexes?id=${entry.ci.bcId}&tab=meetings&from=dashboard`)}>
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{stageLabel}: {entry.ci.item.label}</div>
-                                        </div>
-                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
-                                        <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0" />
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                      </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
 
                     </div>
                   )}
@@ -640,15 +658,15 @@ const Dashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Upcoming Meetings Section (unchanged) */}
-        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
+        {/* Meetings Section */}
+        <div className="lg:col-span-2 lg:order-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
             <Clock className="text-pink-500" size={20} />
             Meetings
           </h2>
           <p className="text-xs text-slate-400 mb-4">Upcoming schedule & pending minutes</p>
 
-          <div className="overflow-y-auto max-h-[420px] pr-2 custom-scrollbar">
+          <div className="overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
               {upcomingMeetings.length === 0 ? (
                   <div className="text-center text-slate-400 py-10 flex flex-col items-center">
                       <Calendar size={32} className="mb-2 opacity-50" />
