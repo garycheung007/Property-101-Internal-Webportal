@@ -476,34 +476,46 @@ const Dashboard: React.FC = () => {
                           </div>
                         ) : (
                           <div className="divide-y divide-red-50 dark:divide-red-900/20">
-                            {alerts.map(alert => {
-                              const chip = getDueChip(alert.dueDate);
-                              return (
-                                <div
-                                  key={alert.id}
-                                  className="flex items-center gap-2 px-4 py-2.5 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors"
-                                  onClick={() => navigateToProperty(alert.bcId, alert.type, alert.message)}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{alert.bcName}</div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{alert.message}</div>
-                                  </div>
-                                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
-                                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                    <button
-                                      onClick={e => { e.stopPropagation(); setSnoozeTarget(alert); setSnoozeGroupItems([alert]); }}
-                                      className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
-                                      title="Snooze"
-                                    ><BellOff size={12} /></button>
-                                    <button
-                                      onClick={e => { e.stopPropagation(); setSelectedReminder(alert); }}
-                                      className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
-                                      title="Audit Trail"
-                                    ><MessageCircle size={12} /></button>
-                                  </div>
+                            {Object.entries(
+                              alerts.reduce((acc: Record<string, { bcName: string; items: typeof alerts }>, a) => {
+                                if (!acc[a.bcId]) acc[a.bcId] = { bcName: a.bcName, items: [] };
+                                acc[a.bcId].items.push(a);
+                                return acc;
+                              }, {})
+                            ).map(([bcId, { bcName, items }]) => (
+                              <div key={bcId}>
+                                <div className="px-4 py-1 bg-red-100/30 dark:bg-red-900/20 border-b border-red-100/60 dark:border-red-900/20">
+                                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">{bcName}</span>
                                 </div>
-                              );
-                            })}
+                                {items.map(alert => {
+                                  const chip = getDueChip(alert.dueDate);
+                                  return (
+                                    <div
+                                      key={alert.id}
+                                      className="flex items-center gap-2 px-4 py-2.5 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors"
+                                      onClick={() => navigateToProperty(alert.bcId, alert.type, alert.message)}
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-[11px] text-slate-600 dark:text-slate-300 truncate leading-snug">{alert.message}</div>
+                                      </div>
+                                      <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
+                                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                        <button
+                                          onClick={e => { e.stopPropagation(); setSnoozeTarget(alert); setSnoozeGroupItems([alert]); }}
+                                          className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                                          title="Snooze"
+                                        ><BellOff size={12} /></button>
+                                        <button
+                                          onClick={e => { e.stopPropagation(); setSelectedReminder(alert); }}
+                                          className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                                          title="Audit Trail"
+                                        ><MessageCircle size={12} /></button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -515,66 +527,70 @@ const Dashboard: React.FC = () => {
                         </div>
                         {totalActions === 0 ? (
                           <div className="px-4 py-3 text-xs text-slate-400">Nothing pending</div>
-                        ) : (
-                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {actions.filter(r => r.type === ReminderType.LEVY).map(rem => {
-                              const chip = getDueChip(rem.dueDate);
-                              return (
-                                <div key={rem.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{rem.bcName}</div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{rem.message}</div>
+                        ) : (() => {
+                          type ActionEntry =
+                            | { kind: 'levy'; id: string; bcId: string; bcName: string; rem: Reminder }
+                            | { kind: 'action'; id: string; bcId: string; bcName: string; rem: Reminder }
+                            | { kind: 'checklist'; id: string; bcId: string; bcName: string; ci: any };
+                          const allEntries: ActionEntry[] = [
+                            ...actions.filter(r => r.type === ReminderType.LEVY).map(rem => ({ kind: 'levy' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
+                            ...actions.filter(r => r.type !== ReminderType.LEVY).map(rem => ({ kind: 'action' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
+                            ...checklistItems.map(ci => ({ kind: 'checklist' as const, id: ci.key, bcId: ci.bcId, bcName: ci.bcName, ci })),
+                          ];
+                          const groupedMap: Record<string, { bcName: string; entries: ActionEntry[] }> = {};
+                          allEntries.forEach(e => {
+                            if (!groupedMap[e.bcId]) groupedMap[e.bcId] = { bcName: e.bcName, entries: [] };
+                            groupedMap[e.bcId].entries.push(e);
+                          });
+                          return (
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {Object.entries(groupedMap).map(([bcId, { bcName, entries }]) => (
+                                <div key={bcId}>
+                                  <div className="px-4 py-1 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">{bcName}</span>
                                   </div>
-                                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
-                                  <button
-                                    onClick={() => handleLevyMarkDone(rem.bcId)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                    title="Mark Done"
-                                  ><CheckCircle2 size={12} /></button>
+                                  {entries.map(entry => {
+                                    if (entry.kind === 'levy') {
+                                      const chip = getDueChip(entry.rem.dueDate);
+                                      return (
+                                        <div key={entry.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{entry.rem.message}</div>
+                                          </div>
+                                          <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
+                                          <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" title="Mark Done"><CheckCircle2 size={12} /></button>
+                                        </div>
+                                      );
+                                    }
+                                    if (entry.kind === 'action') {
+                                      const chip = getDueChip(entry.rem.dueDate);
+                                      return (
+                                        <div key={entry.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{entry.rem.message}</div>
+                                          </div>
+                                          <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
+                                          <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20" title="Log Details"><MessageCircle size={12} /></button>
+                                        </div>
+                                      );
+                                    }
+                                    const chip = getDueChip(entry.ci.dueDate);
+                                    const stageLabel = entry.ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
+                                    return (
+                                      <div key={entry.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigate(`/complexes?id=${entry.ci.bcId}&tab=meetings&from=dashboard`)}>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{stageLabel}: {entry.ci.item.label}</div>
+                                        </div>
+                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
+                                        <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0" />
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              );
-                            })}
-                            {actions.filter(r => r.type !== ReminderType.LEVY).map(rem => {
-                              const chip = getDueChip(rem.dueDate);
-                              return (
-                                <div
-                                  key={rem.id}
-                                  className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors"
-                                  onClick={() => navigateToProperty(rem.bcId, rem.type, rem.message)}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{rem.bcName}</div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{rem.message}</div>
-                                  </div>
-                                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
-                                  <button
-                                    onClick={e => { e.stopPropagation(); setSelectedReminder(rem); }}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20"
-                                    title="Log Details"
-                                  ><MessageCircle size={12} /></button>
-                                </div>
-                              );
-                            })}
-                            {checklistItems.map(ci => {
-                              const chip = getDueChip(ci.dueDate);
-                              const stageLabel = ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
-                              return (
-                                <div
-                                  key={ci.key}
-                                  className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors"
-                                  onClick={() => navigate(`/complexes?id=${ci.bcId}&tab=meetings&from=dashboard`)}
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{ci.bcName}</div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{stageLabel}: {ci.item.label}</div>
-                                  </div>
-                                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
-                                  <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0" />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                     </div>

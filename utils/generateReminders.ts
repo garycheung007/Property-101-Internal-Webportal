@@ -155,7 +155,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
             const msg = `CHECKLIST: "${item.label}" — ${meeting.type} on ${mtgDate.toLocaleDateString('en-NZ')}`;
             reminders.push({
               id, bcId: bc.id, bcName: bc.name,
-              type: daysUntilDue <= 1 ? ReminderType.COMPLIANCE : ReminderType.UPCOMING_ACTION,
+              type: daysUntilDue < 0 ? ReminderType.AGM : ReminderType.UPCOMING_ACTION,
               dueDate: dueDateStr,
               message: msg,
               severity: daysUntilDue <= 1 ? 'high' : 'medium',
@@ -169,7 +169,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
   // NOI response due reminders — fires N working days before response due date
   complexes.filter(c => !c.isArchived).forEach(bc => {
     (bc.meetings || []).forEach(meeting => {
-      if (!meeting.noiResponseDueDate || meeting.minutesIssued) return;
+      if (!meeting.noiResponseDueDate || meeting.nomIssued || meeting.minutesIssued) return;
       const responseDue = new Date(meeting.noiResponseDueDate + 'T00:00:00');
       const reminderDays = meeting.noiResponseReminderDays ?? 2;
       const triggerDate = reminderDays > 0 ? subtractWorkingDays(responseDue, reminderDays) : responseDue;
