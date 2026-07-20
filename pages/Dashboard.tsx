@@ -86,6 +86,8 @@ const Dashboard: React.FC = () => {
                 noiIssued: nextMtg.noiIssued,
                 nomIssued: nextMtg.nomIssued,
                 noiDueDate: nextMtg.noiDueDate,
+                noiResponseDueDate: nextMtg.noiResponseDueDate,
+                noiResponseDueTime: nextMtg.noiResponseDueTime,
                 complexType: c.type,
                 nomDaysPrior: c.isocNomDaysPrior,
                 noiNotApplicable: nextMtg.noiNotApplicable,
@@ -735,10 +737,17 @@ const Dashboard: React.FC = () => {
                                     </div>
                                     <p className="text-xs text-slate-600 dark:text-slate-400 truncate mb-2">{m.bcName}</p>
 
-                                    <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-3">
+                                    <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-1">
                                         <Calendar size={12} />
                                         <span>{m.isPastMeeting ? 'Mtg: ' : ''}{new Date(m.date).toLocaleDateString('en-NZ')}{!m.isPastMeeting ? ` at ${m.time}` : ''}</span>
                                     </div>
+                                    {!m.isPastMeeting && m.noiResponseDueDate && (
+                                        <div className="flex items-center gap-2 text-[10px] text-pink-500 dark:text-pink-400 mb-3">
+                                            <Clock size={12} />
+                                            <span>Response due: {new Date(m.noiResponseDueDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}{m.noiResponseDueTime ? `, ${new Date('1970-01-01T' + m.noiResponseDueTime).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}` : ''}</span>
+                                        </div>
+                                    )}
+                                    {(m.isPastMeeting || !m.noiResponseDueDate) && <div className="mb-3" />}
 
                                     <div className={`text-[10px] p-2.5 rounded-xl border flex flex-col gap-1 transition-colors ${
                                         isUrgent ? 'bg-red-50 text-red-700 border-red-100 dark:bg-red-950/20 dark:border-red-900/30' :
