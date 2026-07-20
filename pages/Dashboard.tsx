@@ -7,6 +7,9 @@ import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, S
 import { Reminder, ReminderType } from '../types';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
+type DashboardCat = 'MEETING' | 'COMPLIANCE' | 'INSURANCE' | 'DEBT' | 'OTHER';
+const ALL_CATS: DashboardCat[] = ['MEETING', 'COMPLIANCE', 'INSURANCE', 'DEBT', 'OTHER'];
+
 const subtractWorkingDays = (date: Date, days: number): Date => {
   const result = new Date(date);
   let remaining = days;
@@ -30,7 +33,7 @@ const Dashboard: React.FC = () => {
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
   const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
   const [showSnoozed, setShowSnoozed] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(ALL_CATS));
   const [snoozeGroupItems, setSnoozeGroupItems] = useState<Reminder[]>([]);
 
   useEffect(() => {
@@ -173,57 +176,54 @@ const Dashboard: React.FC = () => {
   }
   );
 
-  const getActionCategory = (message: string): string => {
-    const match = message.match(/^([A-Z][A-Z\s&]+):/);
-    if (match) return match[1].trim();
-    if (message.toLowerCase().includes('insurance') || message.toLowerCase().includes('valuation')) return 'INSURANCE';
-    if (message.includes('NOI') || message.includes('NOM') || message.includes('Notice')) return 'MEETING';
-    return 'GENERAL';
-  };
-
-  // Group upcoming actions by complex + category derived from message prefix
-  const groupedUpcomingActionsMap = new Map<string, { key: string; bcId: string; bcName: string; category: string; items: Reminder[]; earliestDueDate: string }>();
-  upcomingActions.forEach(r => {
-    const category = getActionCategory(r.message);
-    const key = `${r.bcId}-${category}`;
-    if (!groupedUpcomingActionsMap.has(key)) groupedUpcomingActionsMap.set(key, { key, bcId: r.bcId, bcName: r.bcName, category, items: [], earliestDueDate: r.dueDate });
-    const g = groupedUpcomingActionsMap.get(key)!;
-    g.items.push(r);
-    if (new Date(r.dueDate) < new Date(g.earliestDueDate)) g.earliestDueDate = r.dueDate;
-  });
-  const groupedUpcomingActions = Array.from(groupedUpcomingActionsMap.values())
-    .sort((a, b) => new Date(a.earliestDueDate).getTime() - new Date(b.earliestDueDate).getTime());
-
-  const getAlertCategory = (type: ReminderType): string => {
+  const getCatForAlert = (type: ReminderType, message: string): DashboardCat => {
     if (type === ReminderType.INSURANCE || type === ReminderType.INSURANCE_VALUATION) return 'INSURANCE';
-    return type;
+    if (type === ReminderType.BWOF || type === ReminderType.COMPLIANCE) return 'COMPLIANCE';
+    if (type === ReminderType.AGM || message.includes('NOI') || message.includes('NOM') || message.toLowerCase().includes('notice') || message.toLowerCase().includes('minutes')) return 'MEETING';
+    return 'OTHER';
   };
 
-  // Group critical alerts by complex + category (INSURANCE + INSURANCE_VALUATION merged)
-  const groupedCriticalAlertsMap = new Map<string, { key: string; bcId: string; bcName: string; type: ReminderType; category: string; items: Reminder[]; earliestDueDate: string; severity: 'high' | 'medium' | 'low' }>();
-  criticalAlerts.forEach(r => {
-    const category = getAlertCategory(r.type);
-    const key = `${r.bcId}-${category}`;
-    if (!groupedCriticalAlertsMap.has(key)) groupedCriticalAlertsMap.set(key, { key, bcId: r.bcId, bcName: r.bcName, type: r.type, category, items: [], earliestDueDate: r.dueDate, severity: r.severity });
-    const g = groupedCriticalAlertsMap.get(key)!;
-    g.items.push(r);
-    if (new Date(r.dueDate) < new Date(g.earliestDueDate)) g.earliestDueDate = r.dueDate;
-    if (r.severity === 'high') g.severity = 'high';
-    else if (r.severity === 'medium' && g.severity !== 'high') g.severity = 'medium';
-  });
-  const groupedCriticalAlerts = Array.from(groupedCriticalAlertsMap.values())
-    .sort((a, b) => new Date(a.earliestDueDate).getTime() - new Date(b.earliestDueDate).getTime());
+  const getCatForAction = (message: string): DashboardCat => {
+    const prefix = message.match(/^([A-Z][A-Z\s&]+):/);
+    if (prefix) {
+      const p = prefix[1].trim();
+      if (p === 'INSURANCE' || p.includes('VALUATION')) return 'INSURANCE';
+      if (p === 'MEETING' || p.includes('NOI') || p.includes('NOM')) return 'MEETING';
+      if (p === 'COMPLIANCE' || p.includes('BWOF')) return 'COMPLIANCE';
+      if (p.includes('DEBT') || p.includes('LEVY')) return 'DEBT';
+    }
+    if (message.toLowerCase().includes('insurance') || message.toLowerCase().includes('valuation')) return 'INSURANCE';
+    if (message.includes('NOI') || message.includes('NOM') || message.toLowerCase().includes('notice') || message.toLowerCase().includes('minutes')) return 'MEETING';
+    if (message.toLowerCase().includes('bwof') || message.toLowerCase().includes('compliance')) return 'COMPLIANCE';
+    return 'OTHER';
+  };
 
-  // Group checklist items by complex + meeting + stage
-  const groupedChecklistMap = new Map<string, any[]>();
-  meetingChecklistItems.forEach(ci => {
-    const key = `${ci.bcId}-${ci.meetingId}-${ci.stage}`;
-    if (!groupedChecklistMap.has(key)) groupedChecklistMap.set(key, []);
-    groupedChecklistMap.get(key)!.push(ci);
-  });
-  const groupedChecklistGroups = Array.from(groupedChecklistMap.entries())
-    .map(([key, items]) => ({ key, items, bcId: items[0].bcId, bcName: items[0].bcName, meetingId: items[0].meetingId, stage: items[0].stage, dueDate: items[0].dueDate }))
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  const getDueChip = (dueDate: string) => {
+    const due = new Date(dueDate + 'T00:00:00');
+    const todayMs = new Date(); todayMs.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((due.getTime() - todayMs.getTime()) / 86400000);
+    if (diffDays < 0) return { label: `${Math.abs(diffDays)}d overdue`, cls: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50' };
+    if (diffDays === 0) return { label: 'Due today', cls: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50' };
+    if (diffDays <= 7) return { label: `${diffDays}d`, cls: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50' };
+    return { label: new Date(dueDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }), cls: 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
+  };
+
+  const categorySections = ALL_CATS.map(cat => {
+    const catAlerts = criticalAlerts.filter(r => getCatForAlert(r.type, r.message) === cat);
+    const catActions = cat === 'DEBT'
+      ? levyReminders
+      : upcomingActions.filter(r => getCatForAction(r.message) === cat);
+    const catChecklist = cat === 'MEETING' ? meetingChecklistItems : [];
+    return { cat, alerts: catAlerts, actions: catActions, checklistItems: catChecklist };
+  }).filter(s => s.alerts.length > 0 || s.actions.length > 0 || s.checklistItems.length > 0);
+
+  const CAT_CONFIG: Record<DashboardCat, { label: string; icon: React.ReactNode; bgColor: string; textColor: string; borderColor: string }> = {
+    MEETING:    { label: 'Meetings',        icon: <Calendar size={15} />,      bgColor: 'bg-blue-50 dark:bg-blue-900/20',       textColor: 'text-blue-600 dark:text-blue-400',       borderColor: '#3B82F6' },
+    COMPLIANCE: { label: 'Compliance',      icon: <FileCheck size={15} />,     bgColor: 'bg-amber-50 dark:bg-amber-900/20',     textColor: 'text-amber-600 dark:text-amber-400',     borderColor: '#D97706' },
+    INSURANCE:  { label: 'Insurance',       icon: <AlertTriangle size={15} />, bgColor: 'bg-emerald-50 dark:bg-emerald-900/20', textColor: 'text-emerald-600 dark:text-emerald-400', borderColor: '#10B981' },
+    DEBT:       { label: 'Debt Collection', icon: <DollarSign size={15} />,   bgColor: 'bg-red-50 dark:bg-red-900/20',         textColor: 'text-red-600 dark:text-red-400',         borderColor: '#EF4444' },
+    OTHER:      { label: 'Other',           icon: <ClipboardList size={15} />, bgColor: 'bg-slate-100 dark:bg-slate-800',       textColor: 'text-slate-500 dark:text-slate-400',     borderColor: '#94A3B8' },
+  };
 
   const getNextDocumentStatus = (meeting: any) => {
       const mDate = new Date(meeting.date);
@@ -336,6 +336,10 @@ const Dashboard: React.FC = () => {
       await updateComplex({ ...bc, lastDebtCollectionDate: new Date().toISOString().split('T')[0] });
   };
 
+  const toggleSection = (cat: string) => {
+    setOpenSections(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n; });
+  };
+
   const navigateToProperty = (bcId: string, reminderType: ReminderType, message: string) => {
       // Determine tab based on type or message content
       const isMeeting = reminderType === ReminderType.AGM || message.includes('Notice') || message.includes('NOI') || message.includes('NOM');
@@ -408,288 +412,209 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Upcoming Actions Section */}
-        <div ref={upcomingActionsRef} className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
-            <ClipboardList className="text-pink-500" size={20} />
-            Upcoming Actions
-          </h2>
-          <p className="text-xs text-slate-400 mb-4">Task issuance for portolios</p>
 
-          <div className="overflow-y-auto max-h-[420px] space-y-3 pr-2 custom-scrollbar">
-            {groupedUpcomingActions.length === 0 && groupedChecklistGroups.length === 0 && levyReminders.length === 0 ? (
-                <div className="text-slate-400 text-center py-10 flex flex-col items-center">
-                    <CheckCircle2 size={32} className="mb-2 opacity-50 text-emerald-500" />
-                    <span>All actions complete.</span>
-                </div>
-            ) : (
-                <>
-                {levyReminders.map(rem => (
-                    <div key={rem.id} className="rounded-xl border-l-4 bg-amber-50 border-amber-400 dark:bg-amber-950/20 transition-all hover:shadow-md">
-                        <div className="p-4">
-                            <div className="flex justify-between items-start mb-1">
-                                <span className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Debt Collection</span>
-                                <span className="text-[10px] font-mono text-slate-500 shrink-0">{new Date(rem.dueDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                            </div>
-                            <p className="text-sm font-bold text-slate-800 dark:text-white mt-1">{rem.bcName}</p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{rem.message}</p>
-                        </div>
-                        <div className="px-4 pb-3 pt-2 border-t border-amber-100/50 dark:border-amber-900/20">
-                            <button
-                                onClick={() => handleLevyMarkDone(rem.bcId)}
-                                className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-900/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                            >
-                                <CheckCircle2 size={13} /> Mark Done
-                            </button>
-                        </div>
+        {/* Category Work Sections */}
+        <div
+          className="lg:col-span-2 space-y-3"
+          ref={(el) => {
+            (upcomingActionsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+            (criticalAlertsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+          }}
+        >
+          {categorySections.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-10 text-center flex flex-col items-center gap-2 shadow-sm transition-colors">
+              <CheckCircle2 size={32} className="text-emerald-400 opacity-60" />
+              <p className="text-sm text-slate-400">No pending actions or alerts.</p>
+            </div>
+          ) : (
+            categorySections.map(({ cat, alerts, actions, checklistItems }) => {
+              const cfg = CAT_CONFIG[cat as DashboardCat];
+              const isOpen = openSections.has(cat);
+              const totalActions = actions.length + checklistItems.length;
+              return (
+                <div
+                  key={cat}
+                  className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm transition-all"
+                  style={{ borderLeft: `4px solid ${cfg.borderColor}` }}
+                >
+                  {/* Section header */}
+                  <div
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors select-none"
+                    onClick={() => toggleSection(cat)}
+                  >
+                    <div className={`p-1.5 rounded-lg ${cfg.bgColor}`}>
+                      <span className={cfg.textColor}>{cfg.icon}</span>
                     </div>
-                ))}
-                {groupedUpcomingActions.map(group => {
-                    const isOverdue = new Date(group.earliestDueDate) < new Date();
-                    const isExpanded = expandedGroups.has(group.key);
-                    const isSingle = group.items.length === 1;
-                    const catColor = group.category === 'INSURANCE'
-                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                        : 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400';
-                    return (
-                        <div key={group.key} className={`rounded-xl border-l-4 transition-all hover:shadow-md ${
-                            isOverdue ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-slate-50 border-slate-300 dark:bg-slate-800/50 dark:border-slate-700'
-                        }`}>
-                            <div className="p-4 cursor-pointer group" onClick={() => navigateToProperty(group.bcId, group.items[0].type, group.items[0].message)}>
-                                <div className="flex justify-between items-start mb-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isOverdue ? 'text-red-600' : 'text-slate-400'}`}>
-                                            {isOverdue ? 'Overdue' : 'Scheduled'}
-                                        </span>
-                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${catColor}`}>{group.category}</span>
-                                        {group.items.length > 1 && (
-                                            <span className="text-[10px] bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold">
-                                                {group.items.length} tasks
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-[10px] font-mono text-slate-500 shrink-0">{new Date(group.earliestDueDate).toLocaleDateString('en-NZ')}</span>
-                                </div>
-                                <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center justify-between">
-                                    {group.bcName}
-                                    <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
-                                </p>
-                                {isSingle && <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{group.items[0].message}</p>}
-                            </div>
-                            <div className="px-4 pb-3 pt-2 border-t border-slate-100 dark:border-slate-700/50">
-                                {isSingle ? (
-                                    <button onClick={(e) => { e.stopPropagation(); setSelectedReminder(group.items[0]); }}
-                                        className="text-xs font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-pink-200 dark:border-pink-900/50 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors">
-                                        <MessageCircle size={13} /> Log Details
-                                    </button>
-                                ) : (
-                                    <button onClick={(e) => { e.stopPropagation(); setExpandedGroups(prev => { const s = new Set(prev); s.has(group.key) ? s.delete(group.key) : s.add(group.key); return s; }); }}
-                                        className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                                        {isExpanded ? 'Hide tasks' : `Show ${group.items.length} tasks`}
-                                    </button>
-                                )}
-                            </div>
-                            {!isSingle && isExpanded && (
-                                <div className="px-4 pb-4 space-y-1.5">
-                                    {group.items.map(item => (
-                                        <div key={item.id} className="flex items-start justify-between gap-2 py-2 border-b border-slate-100 dark:border-slate-700/30 last:border-0">
-                                            <p className="text-xs text-slate-600 dark:text-slate-400 flex-1 leading-snug">{item.message}</p>
-                                            <button onClick={() => setSelectedReminder(item)}
-                                                className="text-[10px] font-bold text-pink-600 dark:text-pink-400 flex items-center gap-1 px-2 py-1 rounded border border-pink-200 dark:border-pink-900/50 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors shrink-0">
-                                                <MessageCircle size={11} /> Log
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-                {groupedChecklistGroups.map(group => {
-                    const dueDate = new Date(group.dueDate);
-                    const isOverdue = dueDate < today;
-                    const isExpanded = expandedGroups.has(group.key);
-                    const isSingle = group.items.length === 1;
-                    const stageLabel = group.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
-                    return (
-                        <div key={group.key} className={`rounded-xl border-l-4 transition-all hover:shadow-md ${
-                            isOverdue ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-slate-50 border-slate-300 dark:bg-slate-800/50 dark:border-slate-700'
-                        }`}>
-                            <div className="p-4 cursor-pointer group" onClick={() => navigate(`/complexes?id=${group.bcId}&tab=meetings&from=dashboard`)}>
-                                <div className="flex justify-between items-start mb-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`text-[10px] font-bold uppercase tracking-widest ${isOverdue ? 'text-red-600' : 'text-slate-400'}`}>
-                                            {isOverdue ? 'Overdue' : 'Scheduled'}
-                                        </span>
-                                        <span className="text-[10px] bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 px-1.5 py-0.5 rounded font-bold uppercase">Meeting Task</span>
-                                        {group.items.length > 1 && (
-                                            <span className="text-[10px] bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold">
-                                                {group.items.length} tasks
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-[10px] font-mono text-slate-500 shrink-0">{dueDate.toLocaleDateString('en-NZ')}</span>
-                                </div>
-                                <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center justify-between">
-                                    {group.bcName}
-                                    <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
-                                </p>
-                                {isSingle && <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{stageLabel}: {group.items[0].item.label}</p>}
-                            </div>
-                            {group.items.length > 1 && (
-                                <div className="px-4 pb-3 pt-2 border-t border-slate-100 dark:border-slate-700/50">
-                                    <button onClick={(e) => { e.stopPropagation(); setExpandedGroups(prev => { const s = new Set(prev); s.has(group.key) ? s.delete(group.key) : s.add(group.key); return s; }); }}
-                                        className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                                        {isExpanded ? 'Hide tasks' : `Show ${group.items.length} tasks`}
-                                    </button>
-                                </div>
-                            )}
-                            {isExpanded && (
-                                <div className="px-4 pb-4 space-y-1.5">
-                                    {group.items.map(ci => (
-                                        <div key={ci.key} className="text-xs text-slate-600 dark:text-slate-400 py-1.5 border-b border-slate-100 dark:border-slate-700/30 last:border-0 leading-snug">
-                                            {stageLabel}: {ci.item.label}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-                </>
-            )}
-          </div>
-        </div>
+                    <span className="font-bold text-slate-800 dark:text-white text-sm">{cfg.label}</span>
+                    {alerts.length > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50">
+                        {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {totalActions > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
+                        {totalActions} upcoming
+                      </span>
+                    )}
+                    <div className="ml-auto text-slate-300 dark:text-slate-600">
+                      {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </div>
+                  </div>
 
-        {/* Critical Alerts Section (Overdue tasks move here) */}
-        <div ref={criticalAlertsRef} className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
-            <AlertTriangle className="text-amber-500" size={20} />
-            Critical Alerts
-          </h2>
-          <p className="text-xs text-slate-400 mb-4">Compliance risk summary</p>
+                  {/* Section body */}
+                  {isOpen && (
+                    <div className="border-t border-slate-100 dark:border-slate-800 grid grid-cols-2">
 
-          <div className="overflow-y-auto max-h-[420px] space-y-3 pr-2 custom-scrollbar">
-            {criticalAlerts.length === 0 ? (
-                <div className="text-slate-400 text-center py-10 flex flex-col items-center">
-                    <FileCheck size={32} className="mb-2 opacity-50" />
-                    <span>No critical risks identified.</span>
+                      {/* Alert zone (left) */}
+                      <div className="border-r border-slate-100 dark:border-slate-800 bg-red-50/30 dark:bg-red-950/10">
+                        <div className="px-4 py-1.5 border-b border-red-100/60 dark:border-red-900/20">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-red-500">⚠ Critical Alerts</span>
+                        </div>
+                        {alerts.length === 0 ? (
+                          <div className="px-4 py-3 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 size={13} /> All clear
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-red-50 dark:divide-red-900/20">
+                            {alerts.map(alert => {
+                              const chip = getDueChip(alert.dueDate);
+                              return (
+                                <div
+                                  key={alert.id}
+                                  className="flex items-center gap-2 px-4 py-2.5 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors"
+                                  onClick={() => navigateToProperty(alert.bcId, alert.type, alert.message)}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{alert.bcName}</div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{alert.message}</div>
+                                  </div>
+                                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
+                                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setSnoozeTarget(alert); setSnoozeGroupItems([alert]); }}
+                                      className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                                      title="Snooze"
+                                    ><BellOff size={12} /></button>
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setSelectedReminder(alert); }}
+                                      className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                                      title="Audit Trail"
+                                    ><MessageCircle size={12} /></button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action zone (right) */}
+                      <div>
+                        <div className="px-4 py-1.5 border-b border-slate-100 dark:border-slate-800">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">↗ Upcoming Actions</span>
+                        </div>
+                        {totalActions === 0 ? (
+                          <div className="px-4 py-3 text-xs text-slate-400">Nothing pending</div>
+                        ) : (
+                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {actions.filter(r => r.type === ReminderType.LEVY).map(rem => {
+                              const chip = getDueChip(rem.dueDate);
+                              return (
+                                <div key={rem.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{rem.bcName}</div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{rem.message}</div>
+                                  </div>
+                                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
+                                  <button
+                                    onClick={() => handleLevyMarkDone(rem.bcId)}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                    title="Mark Done"
+                                  ><CheckCircle2 size={12} /></button>
+                                </div>
+                              );
+                            })}
+                            {actions.filter(r => r.type !== ReminderType.LEVY).map(rem => {
+                              const chip = getDueChip(rem.dueDate);
+                              return (
+                                <div
+                                  key={rem.id}
+                                  className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors"
+                                  onClick={() => navigateToProperty(rem.bcId, rem.type, rem.message)}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{rem.bcName}</div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{rem.message}</div>
+                                  </div>
+                                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
+                                  <button
+                                    onClick={e => { e.stopPropagation(); setSelectedReminder(rem); }}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                                    title="Log Details"
+                                  ><MessageCircle size={12} /></button>
+                                </div>
+                              );
+                            })}
+                            {checklistItems.map(ci => {
+                              const chip = getDueChip(ci.dueDate);
+                              const stageLabel = ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
+                              return (
+                                <div
+                                  key={ci.key}
+                                  className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors"
+                                  onClick={() => navigate(`/complexes?id=${ci.bcId}&tab=meetings&from=dashboard`)}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{ci.bcName}</div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-snug">{stageLabel}: {ci.item.label}</div>
+                                  </div>
+                                  <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 ${chip.cls}`}>{chip.label}</span>
+                                  <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0" />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  )}
                 </div>
-            ) : (
-                groupedCriticalAlerts.map(group => {
-                    const isExpanded = expandedGroups.has(group.key);
-                    const isSingle = group.items.length === 1;
-                    return (
-                        <div key={group.key} className={`rounded-xl border-l-4 transition-all hover:shadow-md ${
-                            group.severity === 'high' ? 'bg-red-50 border-red-500 dark:bg-red-950/20' : 'bg-amber-50 border-amber-400 dark:bg-amber-950/20'
-                        }`}>
-                            <div className="p-4 cursor-pointer group" onClick={() => navigateToProperty(group.bcId, group.type, group.items[0].message)}>
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{group.category}</span>
-                                        {group.items.length > 1 && (
-                                            <span className="text-[10px] bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-bold">
-                                                {group.items.length} alerts
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-[10px] font-mono text-slate-500">{new Date(group.earliestDueDate).toLocaleDateString('en-NZ')}</span>
-                                </div>
-                                <p className="font-bold text-slate-800 dark:text-white mt-1 flex items-center justify-between">
-                                    {group.bcName}
-                                    <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
-                                </p>
-                                {isSingle && <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{group.items[0].message}</p>}
-                            </div>
-                            <div className="px-4 pb-3 pt-2 border-t border-amber-100/50 dark:border-amber-900/20 flex justify-between items-center gap-2">
-                                {!isSingle ? (
-                                    <button onClick={(e) => { e.stopPropagation(); setExpandedGroups(prev => { const s = new Set(prev); s.has(group.key) ? s.delete(group.key) : s.add(group.key); return s; }); }}
-                                        className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                                        {isExpanded ? 'Hide' : `Show ${group.items.length} alerts`}
-                                    </button>
-                                ) : (
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter shrink-0">Click to Resolve</span>
-                                )}
-                                <div className="flex gap-1.5">
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setSnoozeTarget(group.items[0]); setSnoozeGroupItems(group.items); }}
-                                        className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
-                                    >
-                                        <BellOff size={13} /> {group.items.length > 1 ? 'Snooze All' : 'Snooze'}
-                                    </button>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setSelectedReminder(group.items[0]); }}
-                                        className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:text-pink-600 hover:border-pink-200 dark:hover:border-pink-900/50 transition-colors"
-                                    >
-                                        <MessageCircle size={13} /> Audit Trail
-                                    </button>
-                                </div>
-                            </div>
-                            {!isSingle && isExpanded && (
-                                <div className="px-4 pb-4 space-y-2">
-                                    {group.items.map(item => (
-                                        <div key={item.id} className="flex items-start justify-between gap-2 py-2 border-b border-amber-100 dark:border-amber-900/20 last:border-0">
-                                            <div className="flex-1">
-                                                <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{item.message}</p>
-                                                <p className="text-[10px] text-slate-400 mt-0.5">{new Date(item.dueDate).toLocaleDateString('en-NZ')}</p>
-                                            </div>
-                                            <div className="flex gap-1.5 shrink-0">
-                                                <button onClick={(e) => { e.stopPropagation(); setSnoozeTarget(item); setSnoozeGroupItems([item]); }}
-                                                    className="text-[10px] font-bold text-amber-600 flex items-center gap-0.5 px-2 py-1 rounded border border-amber-200 hover:bg-amber-50 transition-colors">
-                                                    <BellOff size={11} /> Snooze
-                                                </button>
-                                                <button onClick={(e) => { e.stopPropagation(); setSelectedReminder(item); }}
-                                                    className="text-[10px] font-bold text-slate-500 flex items-center gap-0.5 px-2 py-1 rounded border border-slate-200 hover:text-pink-600 hover:border-pink-200 transition-colors">
-                                                    <MessageCircle size={11} /> Log
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })
-            )}
-          </div>
+              );
+            })
+          )}
 
+          {/* Snoozed alerts */}
           {snoozedCriticalAlerts.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm transition-colors">
               <button
                 onClick={() => setShowSnoozed(!showSnoozed)}
-                className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors py-1"
+                className="w-full flex items-center gap-2 px-4 py-3 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
               >
-                <span className="flex items-center gap-1.5">
-                  <BellOff size={12} />
-                  {snoozedCriticalAlerts.length} snoozed alert{snoozedCriticalAlerts.length !== 1 ? 's' : ''}
-                </span>
-                <span className="text-[10px]">{showSnoozed ? 'Hide' : 'Show'}</span>
+                <BellOff size={13} />
+                <span className="font-bold">{snoozedCriticalAlerts.length} snoozed alert{snoozedCriticalAlerts.length !== 1 ? 's' : ''}</span>
+                <span className="ml-auto">{showSnoozed ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
               </button>
               {showSnoozed && (
-                <div className="mt-2 space-y-2">
+                <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
                   {snoozedCriticalAlerts.map(rem => {
                     const snooze = snoozedAlerts.find(s => s.reminderId === rem.id);
                     return (
-                      <div key={rem.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{rem.bcName}</p>
-                            {snooze && (
-                              <p className="text-[10px] text-amber-500 mt-0.5 flex items-center gap-1">
-                                <BellOff size={9} /> Wakes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ')}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => unsnoozeAlert(rem.id)}
-                            className="text-[10px] px-2 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900/50 transition-colors shrink-0"
-                          >
-                            Unsnooze
-                          </button>
+                      <div key={rem.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{rem.bcName}</p>
+                          {snooze && (
+                            <p className="text-[10px] text-amber-500 flex items-center gap-1 mt-0.5">
+                              <BellOff size={9} /> Wakes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ')}
+                            </p>
+                          )}
                         </div>
+                        <button
+                          onClick={() => unsnoozeAlert(rem.id)}
+                          className="text-[10px] px-2 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900/50 transition-colors"
+                        >
+                          Unsnooze
+                        </button>
                       </div>
                     );
                   })}
@@ -699,7 +624,7 @@ const Dashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Upcoming Meetings Section (Maintains chronological schedule) */}
+        {/* Upcoming Meetings Section (unchanged) */}
         <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
             <Clock className="text-pink-500" size={20} />
