@@ -313,6 +313,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
     const [adminUnlocked, setAdminUnlocked] = useState(false);
     const [showAllMeetings, setShowAllMeetings] = useState(false);
+    const [meetingSwitchPrompt, setMeetingSwitchPrompt] = useState<{ target: string | 'new' | null } | null>(null);
     const hasAutoSelectedMeeting = useRef(false);
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
@@ -379,13 +380,43 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         if (upcoming) { setMeetingForm({ ...upcoming }); setSelectedMeetingId(upcoming.id); }
     }, [activeTab, form.meetings]);
 
-    const openNewMeetingForm = () => {
-        const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc';
-        const defaultNOITime = systemSettings.meetingDateSettings?.[typeKey]?.noiResponseDueTime || '';
-        setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {}, noiResponseDueTime: defaultNOITime });
-        setVenueOther(false);
-        setSelectedMeetingId('new');
-        setShowAllMeetings(false);
+    const applyMeetingForm = (mId = selectedMeetingId, mForm = meetingForm) => {
+        if (!mId) return { updatedForm: form, resolvedId: null as string | null };
+        const currentMeetings = form.meetings || [];
+        const resolvedId = mId === 'new' ? `mtg_${Date.now()}` : mId;
+        const finalMeeting = { id: resolvedId, type: mForm.type || 'AGM', date: mForm.date || '', time: mForm.time || '10:00', venue: mForm.venue || 'TBC', ...mForm } as Meeting;
+        let updatedMeetings = [...currentMeetings];
+        if (mId === 'new') updatedMeetings.push(finalMeeting);
+        else updatedMeetings = currentMeetings.map(m => m.id === mId ? finalMeeting : m);
+        return { updatedForm: { ...form, meetings: updatedMeetings }, resolvedId };
+    };
+
+    const isMeetingDirty = () => {
+        if (!selectedMeetingId) return false;
+        if (selectedMeetingId === 'new') return !!(meetingForm.date || meetingForm.venue);
+        const orig = (form.meetings || []).find(m => m.id === selectedMeetingId);
+        return JSON.stringify(meetingForm) !== JSON.stringify(orig);
+    };
+
+    const doSwitch = (target: string | 'new' | null) => {
+        if (target === null) {
+            setSelectedMeetingId(null); setMeetingForm({}); setMeetingDeleteConfirm(null); setShowAllMeetings(false); hasAutoSelectedMeeting.current = false;
+        } else if (target === 'new') {
+            const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc';
+            const defaultNOITime = systemSettings.meetingDateSettings?.[typeKey]?.noiResponseDueTime || '';
+            setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {}, noiResponseDueTime: defaultNOITime });
+            setVenueOther(false); setSelectedMeetingId('new'); setShowAllMeetings(false);
+        } else {
+            const m = (form.meetings || []).find(x => x.id === target);
+            if (m) { setMeetingForm({ ...m }); setSelectedMeetingId(target); setShowAllMeetings(false); }
+        }
+        setMeetingSwitchPrompt(null);
+    };
+
+    const guardedSwitch = (target: string | 'new' | null) => {
+        if (target === selectedMeetingId) { setShowAllMeetings(false); return; }
+        if (isMeetingDirty()) setMeetingSwitchPrompt({ target });
+        else doSwitch(target);
     };
 
     const handleToggleChecklistItem = (itemId: string, stage: 'NOI' | 'NOM' | 'PRIOR_TO_MEETING' | 'AFTER_MEETING') => {
@@ -412,25 +443,6 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         else if (stage === 'NOM') { updates.nomIssued = issued; updates.nomIssuedDate = issued ? today : undefined; }
         else { updates.minutesIssued = issued; updates.minutesIssuedDate = issued ? today : undefined; }
         setMeetingForm({ ...meetingForm, ...updates });
-    };
-
-    const handleSaveMeetingForm = () => {
-        const currentMeetings = form.meetings || [];
-        let updatedMeetings = [...currentMeetings];
-        const savedId = selectedMeetingId === 'new' ? `mtg_${Date.now()}` : selectedMeetingId!;
-        const finalMeeting = {
-            id: savedId,
-            type: meetingForm.type || 'AGM',
-            date: meetingForm.date || '',
-            time: meetingForm.time || '10:00',
-            venue: meetingForm.venue || 'TBC',
-            ...meetingForm
-        } as Meeting;
-        if (selectedMeetingId === 'new') updatedMeetings.push(finalMeeting);
-        else updatedMeetings = currentMeetings.map(m => m.id === selectedMeetingId ? finalMeeting : m);
-        setForm({ ...form, meetings: updatedMeetings });
-        setSelectedMeetingId(savedId);
-        setMeetingForm({ ...finalMeeting });
     };
 
     const handleDeleteMeeting = (e: React.MouseEvent, id: string) => {
@@ -626,7 +638,8 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     };
 
     const handleSaveWithLogs = async () => {
-        if (!currentUser) { onSave(form); return; }
+        const { updatedForm } = applyMeetingForm();
+        if (!currentUser) { onSave(updatedForm); return; }
         const changes: string[] = [];
         if (form.managerName !== complex.managerName)
             changes.push(`Account Manager changed from "${complex.managerName || 'Unassigned'}" to "${form.managerName || 'Unassigned'}"`);
@@ -644,7 +657,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
             changes.push(`Number of Committee Members changed from ${complex.numberOfCommitteeMembers || 0} to ${form.numberOfCommitteeMembers || 0}`);
         if (changes.length > 0)
             await addActionComment(`edit-${Date.now()}`, form.id, changes.join(' | '), currentUser);
-        onSave(form);
+        onSave(updatedForm);
     };
 
     return (
@@ -1165,6 +1178,25 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
                     {activeTab === 'meetings' && (
                         <div className="space-y-4">
+                            {/* ── SWITCH PROMPT ── */}
+                            {meetingSwitchPrompt && (
+                                <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+                                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full border dark:border-slate-700">
+                                        <h4 className="font-bold text-slate-800 dark:text-white mb-1">Unsaved meeting changes</h4>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Save your changes to this meeting before switching?</p>
+                                        <div className="flex gap-3">
+                                            <button onClick={() => {
+                                                const { updatedForm, resolvedId } = applyMeetingForm();
+                                                setForm(updatedForm);
+                                                if (resolvedId && selectedMeetingId === 'new') setSelectedMeetingId(resolvedId);
+                                                doSwitch(meetingSwitchPrompt.target);
+                                            }} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-2.5 rounded-xl text-sm font-bold transition-colors">Save</button>
+                                            <button onClick={() => doSwitch(meetingSwitchPrompt.target)} className="flex-1 border dark:border-slate-700 text-slate-600 dark:text-slate-300 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Discard</button>
+                                            <button onClick={() => setMeetingSwitchPrompt(null)} className="px-4 py-2.5 text-slate-400 hover:text-slate-600 text-sm font-bold transition-colors">Cancel</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {/* ── NO MEETING SELECTED: empty state ── */}
                             {!selectedMeetingId && (
                                 <>
@@ -1174,7 +1206,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 ? 'Select an upcoming meeting or schedule a new one'
                                                 : 'No upcoming meetings scheduled'}
                                         </p>
-                                        <button onClick={openNewMeetingForm} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
+                                        <button onClick={() => guardedSwitch('new')} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
                                             <Plus size={15} /> Schedule a Meeting
                                         </button>
                                     </div>
@@ -1188,7 +1220,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 <h4 className="font-bold text-slate-600 dark:text-slate-300 mb-1">No upcoming meetings</h4>
                                                 <p className="text-xs text-slate-400 max-w-xs">Once a meeting is scheduled, the checklist and key deadlines will appear here — ready to track every step from NOI to minutes.</p>
                                             </div>
-                                            <button onClick={openNewMeetingForm} className="flex items-center gap-2 px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
+                                            <button onClick={() => guardedSwitch('new')} className="flex items-center gap-2 px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
                                                 <Plus size={15} /> Schedule a Meeting
                                             </button>
                                         </div>
@@ -1231,7 +1263,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border dark:border-slate-800 shadow-sm">
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-3">
-                                                <button onClick={() => { setSelectedMeetingId(null); setMeetingForm({}); setMeetingDeleteConfirm(null); setShowAllMeetings(false); hasAutoSelectedMeeting.current = false; }} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                                <button onClick={() => guardedSwitch(null)} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
                                                     <ArrowRightCircle size={13} className="rotate-180" /> Back
                                                 </button>
                                                 <span className="text-slate-300 dark:text-slate-700 select-none">|</span>
@@ -1247,7 +1279,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         <ListFilter size={13} /> All Meetings
                                                     </button>
                                                 )}
-                                                <button onClick={openNewMeetingForm} className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm">
+                                                <button onClick={() => guardedSwitch('new')} className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm">
                                                     <Plus size={13} /> Schedule
                                                 </button>
                                             </div>
@@ -1259,7 +1291,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 {sortedMeetings.map((m, i) => {
                                                     const passed = isMeetingPassed(m.date);
                                                     return (
-                                                        <div key={m.id} onClick={() => { setMeetingForm({ ...m }); setSelectedMeetingId(m.id); setShowAllMeetings(false); }} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors border-b dark:border-slate-700 last:border-b-0 ${selectedMeetingId === m.id ? 'bg-pink-50 dark:bg-pink-950/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'} ${passed ? 'opacity-70' : ''}`}>
+                                                        <div key={m.id} onClick={() => guardedSwitch(m.id)} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors border-b dark:border-slate-700 last:border-b-0 ${selectedMeetingId === m.id ? 'bg-pink-50 dark:bg-pink-950/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'} ${passed ? 'opacity-70' : ''}`}>
                                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${passed ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' : 'bg-pink-50 dark:bg-pink-900/20 text-pink-600'}`}>{m.type}</span>
                                                             <span className="text-xs font-medium text-slate-700 dark:text-slate-200 flex-1">{m.date ? formatDateNZ(m.date) : 'TBC'}</span>
                                                             <span className="text-xs text-slate-400 hidden sm:block">{m.venue || 'TBC'}</span>
@@ -1419,22 +1451,19 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         </div>
                                     </div>
 
-                                    {/* Save / Delete row */}
-                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border dark:border-slate-800 shadow-sm">
-                                        {meetingDeleteConfirm === selectedMeetingId && (
-                                            <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/30 mb-3">
-                                                <span className="text-xs text-red-700 dark:text-red-400 font-medium flex-1">Remove this meeting permanently?</span>
-                                                <button onClick={() => confirmDeleteMeeting(selectedMeetingId!)} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors">Delete</button>
-                                                <button onClick={() => setMeetingDeleteConfirm(null)} className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-                                            </div>
-                                        )}
-                                        <div className="flex gap-3">
-                                            {selectedMeetingId !== 'new' && !effectiveLocked && (
-                                                <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId!)} className="p-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 transition-colors"><Trash2 size={18} /></button>
+                                    {/* Delete row */}
+                                    {selectedMeetingId !== 'new' && !effectiveLocked && (
+                                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border dark:border-slate-800 shadow-sm">
+                                            {meetingDeleteConfirm === selectedMeetingId && (
+                                                <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/30 mb-3">
+                                                    <span className="text-xs text-red-700 dark:text-red-400 font-medium flex-1">Remove this meeting permanently?</span>
+                                                    <button onClick={() => confirmDeleteMeeting(selectedMeetingId!)} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors">Delete</button>
+                                                    <button onClick={() => setMeetingDeleteConfirm(null)} className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                                                </div>
                                             )}
-                                            <button onClick={handleSaveMeetingForm} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"><Save size={18} /> Save Meeting</button>
+                                            <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId!)} className="flex items-center gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 transition-colors text-xs font-bold"><Trash2 size={14} /> Delete Meeting</button>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
                         </div>
