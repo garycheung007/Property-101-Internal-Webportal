@@ -53,6 +53,8 @@ export interface Meeting {
 
   // Checklist Progress: map of itemId to boolean
   checklistProgress?: Record<string, boolean>;
+  // Date each checklist item was completed: map of itemId to ISO date string
+  checklistDates?: Record<string, string>;
 }
 
 export interface Invoice {

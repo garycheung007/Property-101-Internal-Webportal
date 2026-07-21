@@ -421,8 +421,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
     const handleToggleChecklistItem = (itemId: string, stage: 'NOI' | 'NOM' | 'PRIOR_TO_MEETING' | 'AFTER_MEETING') => {
         const currentProgress = meetingForm.checklistProgress || {};
-        const updatedProgress = { ...currentProgress, [itemId]: !currentProgress[itemId] };
-        const updatedMeeting = { ...meetingForm, checklistProgress: updatedProgress };
+        const nowDone = !currentProgress[itemId];
+        const updatedProgress = { ...currentProgress, [itemId]: nowDone };
+        const currentDates = meetingForm.checklistDates || {};
+        const updatedDates = nowDone
+            ? { ...currentDates, [itemId]: new Date().toISOString().split('T')[0] }
+            : Object.fromEntries(Object.entries(currentDates).filter(([k]) => k !== itemId));
+        const updatedMeeting = { ...meetingForm, checklistProgress: updatedProgress, checklistDates: updatedDates };
         const today = new Date().toISOString().split('T')[0];
         if (!updatedMeeting.noiIssuedDate && checkStageComplete('NOI', updatedMeeting)) {
             updatedMeeting.noiIssued = true; updatedMeeting.noiIssuedDate = today;
@@ -1388,16 +1393,57 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     })()}
 
                                     {/* Full-width checklist */}
-                                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border dark:border-slate-800 shadow-sm">
-                                        <div className="flex items-center gap-2 mb-4">
+                                    <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 shadow-sm overflow-hidden">
+                                        <div className="flex items-center gap-2 px-5 pt-5 pb-4">
                                             <ClipboardCheck size={16} className="text-pink-600" />
                                             <h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Meeting Checklist</h3>
                                         </div>
-                                        <div className="space-y-3">
+
+                                        {/* Key dates strip */}
+                                        {meetingForm.date && meetingForm.type !== 'Committee' && (() => {
+                                            const _today = new Date(); _today.setHours(0,0,0,0);
+                                            const isPast = (d: string) => new Date(d) < _today;
+                                            const fmt = (d: string) => new Date(d).toLocaleDateString('en-NZ');
+                                            const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - _today.getTime()) / (1000*60*60*24));
+                                            const dates = computeMeetingDates(meetingForm.date!);
+                                            const meetingPast = isPast(meetingForm.date!);
+                                            const chips = [
+                                                { label: 'NOI Preferred', date: dates.noiPref, done: !!meetingForm.noiIssued, status: meetingForm.noiIssued ? `✓ Issued ${meetingForm.noiIssuedDate ? fmt(meetingForm.noiIssuedDate) : ''}` : isPast(dates.noiPref) ? 'Passed' : `${daysUntil(dates.noiPref)}d away`, color: meetingForm.noiIssued ? 'emerald' : isPast(dates.noiPref) ? 'red' : 'slate' },
+                                                { label: 'NOI Statutory', date: dates.noiDead, done: !!meetingForm.noiIssued, status: meetingForm.noiIssued ? '✓ Met' : isPast(dates.noiDead) ? 'Passed' : `${daysUntil(dates.noiDead)}d remaining`, color: meetingForm.noiIssued ? 'emerald' : isPast(dates.noiDead) ? 'red' : 'amber' },
+                                                { label: 'NOI Response Due', date: meetingForm.noiResponseDueDate || '—', done: false, status: meetingForm.noiResponseDueDate ? (!meetingPast && isPast(meetingForm.noiResponseDueDate) ? 'Overdue' : meetingPast ? 'Closed' : `${daysUntil(meetingForm.noiResponseDueDate)}d away`) : 'Not set', color: meetingForm.noiResponseDueDate && !meetingPast && isPast(meetingForm.noiResponseDueDate) ? 'red' : 'slate' },
+                                                { label: 'NOM Preferred', date: dates.nomPref, done: !!meetingForm.nomIssued, status: meetingForm.nomIssued ? `✓ Issued ${meetingForm.nomIssuedDate ? fmt(meetingForm.nomIssuedDate) : ''}` : isPast(dates.nomPref) ? 'Passed' : `${daysUntil(dates.nomPref)}d away`, color: meetingForm.nomIssued ? 'emerald' : isPast(dates.nomPref) ? 'red' : 'slate' },
+                                                { label: 'NOM Statutory', date: dates.nomDead, done: !!meetingForm.nomIssued, status: meetingForm.nomIssued ? '✓ Met' : isPast(dates.nomDead) ? 'Passed' : `${daysUntil(dates.nomDead)}d remaining`, color: meetingForm.nomIssued ? 'emerald' : isPast(dates.nomDead) ? 'red' : 'amber' },
+                                                { label: 'Meeting Date', date: meetingForm.date, done: false, status: meetingPast ? 'Completed' : `${daysUntil(meetingForm.date)}d away`, color: 'pink' },
+                                            ] as const;
+                                            const colorMap = {
+                                                emerald: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400',
+                                                red:     'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400',
+                                                amber:   'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40 text-amber-700 dark:text-amber-400',
+                                                pink:    'bg-pink-50 dark:bg-pink-900/10 border-pink-200 dark:border-pink-900/30 text-pink-700 dark:text-pink-400',
+                                                slate:   'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400',
+                                            };
+                                            return (
+                                                <div className="mx-5 mb-4 border dark:border-slate-700 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/30">
+                                                    <div className="px-3 pt-2.5 pb-1 text-[8px] font-bold uppercase tracking-widest text-slate-400">Key Dates</div>
+                                                    <div className="flex overflow-x-auto px-3 pb-3 gap-2 scrollbar-thin">
+                                                        {chips.map(chip => (
+                                                            <div key={chip.label} className={`flex flex-col gap-0.5 px-2.5 py-2 rounded-lg border shrink-0 min-w-[96px] ${colorMap[chip.color]}`}>
+                                                                <span className="text-[8px] font-bold uppercase tracking-wide opacity-80 whitespace-nowrap">{chip.label}</span>
+                                                                <span className="text-[11px] font-bold font-mono whitespace-nowrap">{chip.date === '—' ? '—' : fmt(chip.date)}</span>
+                                                                <span className="text-[8px] font-semibold whitespace-nowrap opacity-90">{chip.status}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        <div className="space-y-3 px-5 pb-5">
                                             {(['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).map(stage => {
                                                 const stageLabel = { NOI: 'NOI', NOM: 'NOM', PRIOR_TO_MEETING: 'Prior to Meeting', AFTER_MEETING: 'After Meeting' }[stage];
                                                 const items = getChecklistStages(form.type)?.[stage] || [];
                                                 const progress = meetingForm.checklistProgress || {};
+                                                const completedDates = meetingForm.checklistDates || {};
                                                 const doneCount = items.filter(item => progress[item.id]).length;
                                                 const isIssued = stage === 'NOI' ? !!meetingForm.noiIssued : stage === 'NOM' ? !!meetingForm.nomIssued : stage === 'AFTER_MEETING' ? !!meetingForm.minutesIssued : false;
                                                 const issuedDate = stage === 'NOI' ? meetingForm.noiIssuedDate : stage === 'NOM' ? meetingForm.nomIssuedDate : stage === 'AFTER_MEETING' ? meetingForm.minutesIssuedDate : undefined;
@@ -1435,11 +1481,16 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                     const dueLabel = daysLeft < 0 ? `Overdue (${d.toLocaleDateString('en-NZ')})` : daysLeft === 0 ? 'Due today' : `Due ${d.toLocaleDateString('en-NZ')}`;
                                                                     dueBadge = <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${daysLeft <= 1 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : daysLeft <= 7 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>{dueLabel}</span>;
                                                                 }
+                                                                const completedOn = completedDates[item.id];
                                                                 return (
                                                                     <label key={item.id} className={`flex items-center gap-3 p-3 border-b dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors ${isDone ? 'opacity-60' : ''}`}>
                                                                         <input type="checkbox" className="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 shrink-0" checked={isDone} onChange={() => handleToggleChecklistItem(item.id, stage)} disabled={effectiveLocked} />
                                                                         <span className={`text-xs flex-1 ${isDone ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
-                                                                        {dueBadge}
+                                                                        {isDone && completedOn ? (
+                                                                            <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
+                                                                                ✓ Completed {new Date(completedOn).toLocaleDateString('en-NZ')}
+                                                                            </span>
+                                                                        ) : dueBadge}
                                                                     </label>
                                                                 );
                                                             })}
