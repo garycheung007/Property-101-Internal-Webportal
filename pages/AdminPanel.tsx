@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
-import { db } from '../firebase';
+import { db, firebaseConfig } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord, MeetingDateSettings, InvoicePricingTier } from '../types';
@@ -18,8 +20,12 @@ import { Navigate, useNavigate } from 'react-router-dom';
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'];
 
 const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: (u: User) => Promise<void> }> = ({ user, onClose, onSave }) => {
+    const isCreating = !user;
     const [form, setForm] = useState<Partial<User>>(user || { role: 'account_manager' });
     const [isSaving, setIsSaving] = useState(false);
+    const [password, setPassword] = useState('');
+    const [authError, setAuthError] = useState('');
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -28,6 +34,34 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
             reader.readAsDataURL(file);
         }
     };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        setAuthError('');
+        try {
+            let userId = user?.id || `user_${Date.now()}`;
+            if (isCreating) {
+                const secondaryApp = initializeApp(firebaseConfig, `secondary_${Date.now()}`);
+                try {
+                    const cred = await createUserWithEmailAndPassword(getAuth(secondaryApp), form.email!, password);
+                    userId = cred.user.uid;
+                } catch (err: any) {
+                    const msg = err?.code === 'auth/email-already-in-use' ? 'An account with this email already exists.'
+                        : err?.code === 'auth/weak-password' ? 'Password must be at least 6 characters.'
+                        : err?.code === 'auth/invalid-email' ? 'Invalid email address.'
+                        : `Failed to create login account: ${err?.message || 'unknown error'}`;
+                    setAuthError(msg);
+                    return;
+                } finally {
+                    await deleteApp(secondaryApp);
+                }
+            }
+            await onSave({ ...form as User, id: userId });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-md shadow-2xl border dark:border-slate-800 flex flex-col overflow-hidden">
@@ -36,6 +70,13 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Full Name</label><input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} /></div>
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Email</label><input type="email" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></div>
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Role</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm bg-white" value={form.role || 'account_manager'} onChange={e => setForm({...form, role: e.target.value as any})}><option value="admin">Admin</option><option value="account_manager">Manager</option><option value="support">Support</option></select></div>
+                    {isCreating && (
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Password</label>
+                            <input type="password" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={password} onChange={e => { setPassword(e.target.value); setAuthError(''); }} placeholder="Minimum 6 characters" />
+                            {authError && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 font-medium">{authError}</p>}
+                        </div>
+                    )}
                     <div className="pt-2 border-t dark:border-slate-800">
                         <label className="text-[10px] font-bold text-pink-600 uppercase block mb-2">Electronic Signature</label>
                         <div className="flex flex-col gap-3">
@@ -43,7 +84,7 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
                             <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed rounded-xl cursor-pointer hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 transition-all"><Upload size={16} className="text-slate-400" /><span className="text-xs font-bold text-slate-500 uppercase">Upload Signature</span><input type="file" className="hidden" accept="image/*" onChange={handleFileChange} /></label>
                         </div>
                     </div>
-                    <button onClick={() => { setIsSaving(true); onSave(form as User).finally(() => setIsSaving(false)); }} disabled={isSaving || !form.name || !form.email} className="w-full bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase text-xs shadow-lg flex items-center justify-center gap-2">{isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}{user ? 'Update Profile' : 'Create Staff Member'}</button>
+                    <button onClick={handleSave} disabled={isSaving || !form.name || !form.email || (isCreating && !password)} className="w-full bg-pink-600 hover:bg-pink-700 text-white py-4 rounded-2xl font-bold uppercase text-xs shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">{isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}{user ? 'Update Profile' : 'Create Staff Member'}</button>
                 </div>
             </div>
         </div>
@@ -1595,7 +1636,7 @@ const AdminPanel: React.FC = () => {
                 </div>
             )}
 
-            {isUserModalOpen && <UserEditModal user={editingUser} onClose={() => setIsUserModalOpen(false)} onSave={async (u) => { if (editingUser) await updateUser(u); else await addUser({ ...u, id: `user_${Date.now()}` }); setIsUserModalOpen(false); }} />}
+            {isUserModalOpen && <UserEditModal user={editingUser} onClose={() => setIsUserModalOpen(false)} onSave={async (u) => { if (editingUser) await updateUser(u); else await addUser(u); setIsUserModalOpen(false); }} />}
         </div>
     );
 };

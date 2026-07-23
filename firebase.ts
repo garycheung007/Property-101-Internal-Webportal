@@ -5,7 +5,7 @@ import { getAuth } from "firebase/auth";
 
 // Replace these placeholders with the config from your Firebase Console
 // Project Settings > General > Your Apps > Web App
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDHWrCNbPPL3f0v0l3qxrs0Zx0Rl9uI-hY",
   authDomain: "property-101-internal-portal.firebaseapp.com",
   projectId: "property-101-internal-portal",
