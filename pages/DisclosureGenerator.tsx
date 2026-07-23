@@ -259,7 +259,17 @@ const DisclosureGenerator: React.FC = () => {
         const schedule = selectedComplex.levyDueDateSchedule;
         if (schedule && schedule.length > 0) {
           const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          return schedule.map(e => `${e.day} ${months[e.month - 1]}`).join(', ');
+          const fyStartParsed = parseDayMonth(selectedComplex.financialYearStart || '1 April');
+          const today = new Date();
+          const cy = today.getFullYear();
+          const fyStartYear = fyStartParsed
+            ? (today >= new Date(cy, fyStartParsed.month, fyStartParsed.day) ? cy : cy - 1)
+            : cy;
+          const fyEndYear = fyStartYear + 1;
+          return schedule.map(e => {
+            const year = fyStartParsed && (e.month - 1) >= fyStartParsed.month ? fyStartYear : fyEndYear;
+            return `${e.day} ${months[e.month - 1]} ${year}`;
+          }).join(', ');
         }
         return selectedComplex.levyDueDates || '[Due Dates]';
       })(),
