@@ -323,7 +323,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     
     const relevantComments = actionComments.filter(c => c.bcId === complex.id || c.reminderId.endsWith(complex.id)).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    useEffect(() => { setForm(complex); }, [complex]);
+    useEffect(() => {
+        setForm({
+            ...complex,
+            waterRateDescription: complex.waterRateDescription || systemSettings.waterRateOptions?.[0] || '',
+        });
+    }, [complex]);
 
     const getChecklistStages = (complexType?: string) => {
         const key = complexType === 'Incorporated Society' ? 'rs' : 'bc';
