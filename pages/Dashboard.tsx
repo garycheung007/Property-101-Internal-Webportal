@@ -34,6 +34,7 @@ const Dashboard: React.FC = () => {
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null);
   const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
   const [showSnoozed, setShowSnoozed] = useState(false);
+  const [showSnoozedActions, setShowSnoozedActions] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [snoozeGroupItems, setSnoozeGroupItems] = useState<Reminder[]>([]);
 
@@ -78,7 +79,8 @@ const Dashboard: React.FC = () => {
   );
   const criticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && !activeSnoozedIds.has(r.id));
   const snoozedCriticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && activeSnoozedIds.has(r.id));
-  const upcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION);
+  const upcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION && !activeSnoozedIds.has(r.id));
+  const snoozedUpcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION && activeSnoozedIds.has(r.id));
   const levyReminders = filteredReminders.filter(r => r.type === ReminderType.LEVY);
 
   const upcomingMeetings = filteredComplexes
@@ -575,7 +577,10 @@ const Dashboard: React.FC = () => {
                                               <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
                                             </div>
                                             <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                            <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 mt-0.5" title="Mark Done"><CheckCircle2 size={12} /></button>
+                                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                                              <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze"><BellOff size={12} /></button>
+                                              <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Mark Done"><CheckCircle2 size={12} /></button>
+                                            </div>
                                           </div>
                                         );
                                       }
@@ -587,7 +592,10 @@ const Dashboard: React.FC = () => {
                                               <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
                                             </div>
                                             <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                            <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 mt-0.5" title="Log Details"><MessageCircle size={12} /></button>
+                                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                                              <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze"><BellOff size={12} /></button>
+                                              <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors" title="Log Details"><MessageCircle size={12} /></button>
+                                            </div>
                                           </div>
                                         );
                                       }
@@ -616,6 +624,45 @@ const Dashboard: React.FC = () => {
                 </div>
               );
             })
+          )}
+
+          {/* Snoozed upcoming actions */}
+          {snoozedUpcomingActions.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm transition-colors">
+              <button
+                onClick={() => setShowSnoozedActions(!showSnoozedActions)}
+                className="w-full flex items-center gap-2 px-4 py-3 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+              >
+                <BellOff size={13} />
+                <span className="font-bold">{snoozedUpcomingActions.length} snoozed action{snoozedUpcomingActions.length !== 1 ? 's' : ''}</span>
+                <span className="ml-auto">{showSnoozedActions ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
+              </button>
+              {showSnoozedActions && (
+                <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+                  {snoozedUpcomingActions.map(rem => {
+                    const snooze = snoozedAlerts.find(s => s.reminderId === rem.id);
+                    return (
+                      <div key={rem.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{rem.bcName}</p>
+                          {snooze && (
+                            <p className="text-[10px] text-amber-500 flex items-center gap-1 mt-0.5">
+                              <BellOff size={9} /> Wakes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ')}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => unsnoozeAlert(rem.id)}
+                          className="text-[10px] px-2 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900/50 transition-colors"
+                        >
+                          Unsnooze
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Snoozed alerts */}
