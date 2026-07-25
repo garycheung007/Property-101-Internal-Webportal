@@ -772,7 +772,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     })}
                 </div>
 
-                <div className={`flex-1 transition-colors relative ${activeTab === 'meetings' ? 'overflow-hidden flex' : 'overflow-y-auto p-8 bg-slate-50/30 dark:bg-slate-950/30'}`}>
+                <div className={`flex-1 min-h-0 transition-colors relative ${activeTab === 'meetings' ? 'overflow-hidden flex' : 'overflow-y-auto p-8 bg-slate-50/30 dark:bg-slate-950/30'}`}>
                     {activeTab === 'details' && (
                         <div className="space-y-6">
                         {currentUser?.role === 'admin' && (
