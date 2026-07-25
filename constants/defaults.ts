@@ -1,4 +1,4 @@
-import { WorkflowStepConfig, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings, InvoicePricingTier } from '../types';
+import { WorkflowStepConfig, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings, InvoicePricingTier, PostMeetingField } from '../types';
 
 export const DEFAULT_CATEGORIES: string[] = [
   'Insurance Broker',
@@ -83,6 +83,13 @@ export const DEFAULT_INVOICE_PRICING_TIERS: InvoicePricingTier[] = [
 ];
 
 export const DEFAULT_BWOF_MESSAGE = "Please confirm that you have received the signed BWOF 12A certificate from the compliance company and it has been uploaded to the complex OneDrive folder before advancing the expiry date.";
+
+export const DEFAULT_POST_MEETING_FIELDS: PostMeetingField[] = [
+  { id: 'pmf_levy',      label: 'No. of Levy Instalments', fieldKey: 'levyInstalments',           required: true },
+  { id: 'pmf_budget',    label: 'Annual Levy Budget',       fieldKey: 'approvedBudget' },
+  { id: 'pmf_operating', label: 'Operating Fund Balance',   fieldKey: 'operatingFundBalance' },
+  { id: 'pmf_reserve',   label: 'Reserve Fund Balance',     fieldKey: 'reserveFundBalance' },
+];
 
 export const DEFAULT_MEETING_DATE_SETTINGS: { bc: MeetingDateSettings; rs: MeetingDateSettings } = {
   bc: {

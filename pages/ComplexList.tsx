@@ -12,9 +12,9 @@ import {
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
     FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2
 } from 'lucide-react';
-import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry, MeetingDateSettings } from '../types';
+import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry, MeetingDateSettings, PostMeetingField } from '../types';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
-import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
+import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS, DEFAULT_POST_MEETING_FIELDS } from '../constants/defaults';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -315,6 +315,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [showAllMeetings, setShowAllMeetings] = useState(false);
     const [meetingSwitchPrompt, setMeetingSwitchPrompt] = useState<{ target: string | 'new' | null } | null>(null);
     const hasAutoSelectedMeeting = useRef(false);
+    const [postMeetingFormData, setPostMeetingFormData] = useState<Record<string, string>>({});
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
     const valuers = contractors.filter(c => c.category === 'Insurance Valuer');
@@ -384,6 +385,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
             .find(m => !isMeetingPassed(m.date));
         if (upcoming) { setMeetingForm({ ...upcoming }); setSelectedMeetingId(upcoming.id); }
     }, [activeTab, form.meetings]);
+
 
     const applyMeetingForm = (mId = selectedMeetingId, mForm = meetingForm) => {
         if (!mId) return { updatedForm: form, resolvedId: null as string | null };
@@ -473,6 +475,44 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const checklistProgress = meetingForm.checklistProgress || {};
     const isMeetingLocked = allChecklistItems.length > 0 && allChecklistItems.every(item => checklistProgress[item.id]);
     const effectiveLocked = isMeetingLocked && !adminUnlocked;
+
+    const postMeetingFields: PostMeetingField[] = systemSettings.postMeetingFields || DEFAULT_POST_MEETING_FIELDS;
+    const showPostMeetingCard = isMeetingLocked && !meetingForm.postMeetingUpdateSaved && !meetingForm.postMeetingUpdateDismissed;
+    const showPostMeetingBadge = isMeetingLocked && !meetingForm.postMeetingUpdateSaved && !!meetingForm.postMeetingUpdateDismissed;
+
+    useEffect(() => {
+        if (isMeetingLocked) {
+            const fields: PostMeetingField[] = systemSettings.postMeetingFields || DEFAULT_POST_MEETING_FIELDS;
+            const initial: Record<string, string> = {};
+            fields.forEach(f => { initial[f.id] = (form as any)[f.fieldKey] ?? ''; });
+            setPostMeetingFormData(initial);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMeetingLocked, selectedMeetingId]);
+
+    const handleSavePostMeeting = () => {
+        const requiredMissing = postMeetingFields.filter(f => f.required && !postMeetingFormData[f.id]?.trim());
+        if (requiredMissing.length > 0) {
+            alert(`Please fill in the required field(s): ${requiredMissing.map(f => f.label).join(', ')}`);
+            return;
+        }
+        let updatedComplex = { ...form };
+        postMeetingFields.forEach(f => {
+            const val = postMeetingFormData[f.id];
+            if (val !== undefined) (updatedComplex as any)[f.fieldKey] = val;
+        });
+        const updatedMeeting: Partial<Meeting> = { ...meetingForm, postMeetingUpdateSaved: true, postMeetingUpdateDismissed: false };
+        const currentMeetings = updatedComplex.meetings || [];
+        const resolvedId = selectedMeetingId === 'new' ? `mtg_${Date.now()}` : selectedMeetingId!;
+        const finalMeeting = { id: resolvedId, type: updatedMeeting.type || 'AGM', date: updatedMeeting.date || '', time: updatedMeeting.time || '10:00', venue: updatedMeeting.venue || 'TBC', ...updatedMeeting } as Meeting;
+        updatedComplex = {
+            ...updatedComplex,
+            meetings: selectedMeetingId === 'new'
+                ? [...currentMeetings, finalMeeting]
+                : currentMeetings.map(m => m.id === selectedMeetingId ? finalMeeting : m),
+        };
+        onSave(updatedComplex);
+    };
 
     const workflowSteps = systemSettings.insuranceSettings?.workflowSteps || [];
     const insuranceProgress: Record<string, InsuranceStepStatus> = form.insuranceWorkflowProgress || {};
@@ -1402,6 +1442,14 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         <div className="flex items-center gap-2 px-5 pt-5 pb-4">
                                             <ClipboardCheck size={16} className="text-pink-600" />
                                             <h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Meeting Checklist</h3>
+                                            {showPostMeetingBadge && (
+                                                <button
+                                                    onClick={() => setMeetingForm({ ...meetingForm, postMeetingUpdateDismissed: false })}
+                                                    className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 transition-colors"
+                                                >
+                                                    <AlertCircle size={11} /> Complex details not yet updated — click to update
+                                                </button>
+                                            )}
                                         </div>
 
                                         {/* Key dates strip */}
@@ -1506,6 +1554,51 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             })}
                                         </div>
                                     </div>
+
+                                    {/* Post-meeting update card */}
+                                    {showPostMeetingCard && (
+                                        <div className="border-2 border-blue-500 dark:border-blue-600 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+                                            <div className="flex items-center gap-2.5 px-5 py-3.5 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-100 dark:border-blue-900/40">
+                                                <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                                                <h3 className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-widest flex-1">Post-Meeting Update</h3>
+                                                <span className="text-[10px] text-slate-400">Updates the complex record</span>
+                                            </div>
+                                            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {postMeetingFields.map(field => (
+                                                    <div key={field.id} className="flex flex-col gap-1">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                            {field.label}
+                                                            {field.required && <span className="text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold normal-case tracking-normal">Required</span>}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-family-inherit"
+                                                            value={postMeetingFormData[field.id] ?? ''}
+                                                            onChange={e => setPostMeetingFormData(prev => ({ ...prev, [field.id]: e.target.value }))}
+                                                            placeholder={field.fieldKey.includes('Balance') || field.fieldKey.includes('Budget') ? 'e.g. $12,000' : ''}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center justify-between px-5 py-3.5 border-t dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                                                <span className="text-[10px] text-slate-400">Required fields must be filled before saving</span>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setMeetingForm({ ...meetingForm, postMeetingUpdateDismissed: true })}
+                                                        className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs font-bold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                    >
+                                                        Dismiss
+                                                    </button>
+                                                    <button
+                                                        onClick={handleSavePostMeeting}
+                                                        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
+                                                    >
+                                                        Save to Complex
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Delete row */}
                                     {selectedMeetingId !== 'new' && !effectiveLocked && (

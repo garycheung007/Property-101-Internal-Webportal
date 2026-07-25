@@ -4,11 +4,11 @@ import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
-import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
+import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS, DEFAULT_POST_MEETING_FIELDS } from '../constants/defaults';
 import { db, firebaseConfig } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord, MeetingDateSettings, InvoicePricingTier } from '../types';
+import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord, MeetingDateSettings, InvoicePricingTier, PostMeetingField } from '../types';
 import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
@@ -266,6 +266,15 @@ const InsuranceExpiryRow: React.FC<{ bc: BodyCorporate; onSave: (bc: BodyCorpora
     );
 };
 
+const POST_MEETING_FIELD_OPTIONS: Array<{ fieldKey: string; label: string }> = [
+    { fieldKey: 'levyInstalments',           label: 'No. of Levy Instalments' },
+    { fieldKey: 'approvedBudget',            label: 'Annual Levy Budget' },
+    { fieldKey: 'operatingFundBalance',      label: 'Operating Fund Balance' },
+    { fieldKey: 'reserveFundBalance',        label: 'Reserve Fund Balance' },
+    { fieldKey: 'lastFinancialStatementBalance', label: 'Financial Statement Balance' },
+    { fieldKey: 'notes',                     label: 'Meeting Notes' },
+];
+
 const AdminPanel: React.FC = () => {
     const navigate = useNavigate();
     const { user: currentUser } = useAuth();
@@ -298,6 +307,10 @@ const AdminPanel: React.FC = () => {
         bc: { ...(systemSettings.meetingDateSettings?.bc || DEFAULT_MEETING_DATE_SETTINGS.bc) },
         rs: { ...(systemSettings.meetingDateSettings?.rs || DEFAULT_MEETING_DATE_SETTINGS.rs) },
     });
+    const [localPostMeetingFields, setLocalPostMeetingFields] = useState<PostMeetingField[]>(
+        systemSettings.postMeetingFields || DEFAULT_POST_MEETING_FIELDS
+    );
+    const [newPmfFieldKey, setNewPmfFieldKey] = useState('');
     const [meetingDateTab, setMeetingDateTab] = useState<'bc' | 'rs'>('bc');
     const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
     const [newVenueInput, setNewVenueInput] = useState('');
@@ -357,6 +370,7 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.waterRateOptions) setLocalWaterRateOptions(systemSettings.waterRateOptions);
         if (systemSettings.conflictRegisterTemplate) setLocalConflictRegisterTemplate(systemSettings.conflictRegisterTemplate);
         if (systemSettings.invoicePricingTiers) setLocalPricingTiers(systemSettings.invoicePricingTiers);
+        if (systemSettings.postMeetingFields) setLocalPostMeetingFields(systemSettings.postMeetingFields);
     }, [systemSettings]);
 
     useEffect(() => {
@@ -641,6 +655,7 @@ const AdminPanel: React.FC = () => {
             waterRateOptions: localWaterRateOptions,
             conflictRegisterTemplate: localConflictRegisterTemplate,
             meetingDateSettings: localMeetingDateSettings,
+            postMeetingFields: localPostMeetingFields,
         });
         alert("System settings updated successfully.");
     };
@@ -1268,6 +1283,70 @@ const AdminPanel: React.FC = () => {
                                             [meetingDateTab]: { ...prev[meetingDateTab], noiResponseDueTime: e.target.value }
                                         }))}
                                     />
+                                </div>
+                            </div>
+
+                            {/* Post-Meeting Update Fields */}
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-4">
+                                <div className="border-b dark:border-slate-800 pb-4">
+                                    <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                        <CheckCircle2 size={18} className="text-pink-600" /> Post-Meeting Update Fields
+                                    </h2>
+                                    <p className="text-xs text-slate-400 mt-1.5">Fields staff fill in once all checklist items are ticked. Each value is saved directly to the complex record.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    {localPostMeetingFields.map((field, idx) => (
+                                        <div key={field.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-xl">
+                                            <span className="flex-1 text-sm font-medium dark:text-white">{field.label}</span>
+                                            <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded hidden sm:block">{field.fieldKey}</span>
+                                            {field.required && (
+                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 px-2 py-0.5 rounded">Required</span>
+                                            )}
+                                            <button
+                                                onClick={() => {
+                                                    const updated = [...localPostMeetingFields];
+                                                    updated[idx] = { ...field, required: !field.required };
+                                                    setLocalPostMeetingFields(updated);
+                                                }}
+                                                className="text-[10px] text-slate-400 hover:text-pink-600 underline transition-colors whitespace-nowrap"
+                                            >
+                                                {field.required ? 'Make optional' : 'Make required'}
+                                            </button>
+                                            <button
+                                                onClick={() => setLocalPostMeetingFields(localPostMeetingFields.filter((_, i) => i !== idx))}
+                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {localPostMeetingFields.length === 0 && (
+                                        <p className="text-xs text-slate-400 italic py-2">No fields configured. Add one below.</p>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 pt-2 border-t dark:border-slate-800">
+                                    <select
+                                        value={newPmfFieldKey}
+                                        onChange={e => setNewPmfFieldKey(e.target.value)}
+                                        className="flex-1 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500"
+                                    >
+                                        <option value="">— Select a field to add —</option>
+                                        {POST_MEETING_FIELD_OPTIONS.filter(o => !localPostMeetingFields.some(f => f.fieldKey === o.fieldKey)).map(o => (
+                                            <option key={o.fieldKey} value={o.fieldKey}>{o.label}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => {
+                                            const opt = POST_MEETING_FIELD_OPTIONS.find(o => o.fieldKey === newPmfFieldKey);
+                                            if (!opt) return;
+                                            setLocalPostMeetingFields([...localPostMeetingFields, { id: `pmf_${Date.now()}`, label: opt.label, fieldKey: opt.fieldKey }]);
+                                            setNewPmfFieldKey('');
+                                        }}
+                                        disabled={!newPmfFieldKey}
+                                        className="px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-sm disabled:opacity-40 transition-all whitespace-nowrap"
+                                    >
+                                        + Add
+                                    </button>
                                 </div>
                             </div>
 

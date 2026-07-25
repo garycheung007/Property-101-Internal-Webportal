@@ -5,6 +5,13 @@ export interface MeetingChecklistItem {
   dueDaysBeforeMeeting?: number;
 }
 
+export interface PostMeetingField {
+  id: string;
+  label: string;
+  fieldKey: string;
+  required?: boolean;
+}
+
 export interface MeetingDateSettings {
   noiPreferDays: number;
   noiDeadlineDays: number;
@@ -55,6 +62,8 @@ export interface Meeting {
   checklistProgress?: Record<string, boolean>;
   // Date each checklist item was completed: map of itemId to ISO date string
   checklistDates?: Record<string, string>;
+  postMeetingUpdateDismissed?: boolean;
+  postMeetingUpdateSaved?: boolean;
 }
 
 export interface Invoice {
@@ -282,6 +291,7 @@ export interface SystemSettings {
   conflictRegisterTemplate?: string;
   meetingDateSettings?: { bc: MeetingDateSettings; rs: MeetingDateSettings };
   invoicePricingTiers?: InvoicePricingTier[];
+  postMeetingFields?: PostMeetingField[];
 }
 
 export type ContractorCategory = string;
