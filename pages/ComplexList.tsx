@@ -6,8 +6,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     Search, ShieldCheck, ShieldAlert, X, Calendar, RefreshCw, Save,
     CheckCircle2, DollarSign, Clock, MapPin, History, Plus, Trash2,
-    Database, Lock, ListFilter, MessageSquareMore, ToggleRight,
-    ToggleLeft, ArrowRightCircle, Check, AlertCircle, MapPinHouse,
+    Database, Lock, MessageSquareMore, ToggleRight,
+    ToggleLeft, Check, AlertCircle, MapPinHouse,
     User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
     FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2
@@ -297,6 +297,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const { contractors, actionComments, addActionComment, systemSettings, managers } = useData();
     const { user: currentUser } = useAuth();
     const [form, setForm] = useState<BodyCorporate>(complex);
+    const [baseline, setBaseline] = useState<BodyCorporate>(complex);
     const [hasBuildingManager, setHasBuildingManager] = useState<boolean>(!!complex.buildingManagerName);
     const [activeTab, setActiveTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>(initialTab);
     const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
@@ -309,10 +310,11 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [balanceEditing, setBalanceEditing] = useState(false);
     const [aigEditing, setAigEditing] = useState(false);
     const [ltmpEditing, setLtmpEditing] = useState(false);
+    const [portfolioEditing, setPortfolioEditing] = useState(false);
+    const [complianceEditing, setComplianceEditing] = useState(false);
     const [venueOther, setVenueOther] = useState(false);
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
     const [adminUnlocked, setAdminUnlocked] = useState(false);
-    const [showAllMeetings, setShowAllMeetings] = useState(false);
     const [meetingSwitchPrompt, setMeetingSwitchPrompt] = useState<{ target: string | 'new' | null } | null>(null);
     const hasAutoSelectedMeeting = useRef(false);
     const [postMeetingFormData, setPostMeetingFormData] = useState<Record<string, string>>({});
@@ -325,10 +327,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const relevantComments = actionComments.filter(c => c.bcId === complex.id || c.reminderId.endsWith(complex.id)).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     useEffect(() => {
-        setForm({
+        const initialForm = {
             ...complex,
             waterRateDescription: complex.waterRateDescription || systemSettings.waterRateOptions?.[0] || '',
-        });
+        };
+        setForm(initialForm);
+        setBaseline(initialForm);
     }, [complex]);
 
     const getChecklistStages = (complexType?: string) => {
@@ -407,21 +411,21 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
     const doSwitch = (target: string | 'new' | null) => {
         if (target === null) {
-            setSelectedMeetingId(null); setMeetingForm({}); setMeetingDeleteConfirm(null); setShowAllMeetings(false); hasAutoSelectedMeeting.current = false;
+            setSelectedMeetingId(null); setMeetingForm({}); setMeetingDeleteConfirm(null); hasAutoSelectedMeeting.current = false;
         } else if (target === 'new') {
             const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc';
             const defaultNOITime = systemSettings.meetingDateSettings?.[typeKey]?.noiResponseDueTime || '';
             setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {}, noiResponseDueTime: defaultNOITime });
-            setVenueOther(false); setSelectedMeetingId('new'); setShowAllMeetings(false);
+            setVenueOther(false); setSelectedMeetingId('new');
         } else {
             const m = (form.meetings || []).find(x => x.id === target);
-            if (m) { setMeetingForm({ ...m }); setSelectedMeetingId(target); setShowAllMeetings(false); }
+            if (m) { setMeetingForm({ ...m }); setSelectedMeetingId(target); }
         }
         setMeetingSwitchPrompt(null);
     };
 
     const guardedSwitch = (target: string | 'new' | null) => {
-        if (target === selectedMeetingId) { setShowAllMeetings(false); return; }
+        if (target === selectedMeetingId) { return; }
         if (isMeetingDirty()) setMeetingSwitchPrompt({ target });
         else doSwitch(target);
     };
@@ -479,6 +483,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const postMeetingFields: PostMeetingField[] = systemSettings.postMeetingFields || DEFAULT_POST_MEETING_FIELDS;
     const showPostMeetingCard = isMeetingLocked && !meetingForm.postMeetingUpdateSaved && !meetingForm.postMeetingUpdateDismissed;
     const showPostMeetingBadge = isMeetingLocked && !meetingForm.postMeetingUpdateSaved && !!meetingForm.postMeetingUpdateDismissed;
+
+    const insuranceExpired = !isInsuranceValid(form.insuranceExpiry);
+    const upcomingMeetingsCount = (form.meetings || []).filter(m => !isMeetingPassed(m.date)).length;
+    const nextMeeting = [...(form.meetings || [])]
+        .filter(m => !isMeetingPassed(m.date))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+    const isDirty = JSON.stringify(form) !== JSON.stringify(baseline) || isMeetingDirty();
 
     useEffect(() => {
         if (isMeetingLocked) {
@@ -720,26 +731,48 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     </div>
                     <button onClick={onClose} className="p-2 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
                 </div>
-                
+
+                {/* Status strip */}
+                <div className="flex gap-2 flex-wrap items-center px-6 py-2.5 border-b dark:border-slate-800 bg-white dark:bg-slate-900">
+                    <button onClick={() => setActiveTab('insurance')} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${insuranceExpired ? 'bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/30 hover:bg-red-100' : 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/30'}`}>
+                        {insuranceExpired ? <ShieldAlert size={11} /> : <ShieldCheck size={11} />}
+                        {insuranceExpired ? `Insurance expired ${formatDateNZ(form.insuranceExpiry)}` : `Insurance valid to ${formatDateNZ(form.insuranceExpiry)}`}
+                    </button>
+                    {form.hasBwof && (
+                        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${isInsuranceValid(form.bwofExpiry) ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'}`}>
+                            <ShieldCheck size={11} />
+                            BWOF {isInsuranceValid(form.bwofExpiry) ? `valid to ${formatDateNZ(form.bwofExpiry)}` : `expired ${formatDateNZ(form.bwofExpiry)}`}
+                        </div>
+                    )}
+                    {nextMeeting && (
+                        <button onClick={() => setActiveTab('meetings')} className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-950/40 transition-colors">
+                            <Calendar size={11} />
+                            Next {nextMeeting.type}: {formatDateNZ(nextMeeting.date)}
+                        </button>
+                    )}
+                </div>
+
                 <div className="flex border-b dark:border-slate-800 px-6 overflow-x-auto bg-white dark:bg-slate-900 transition-colors">
-                    {[
-                        { id: 'details', label: 'Details', icon: Building },
-                        { id: 'insurance', label: 'Insurance', icon: ShieldCheck },
-                        { id: 'meetings', label: 'Meetings', icon: Calendar },
-                        { id: 'conflict', label: 'Conflict Register', icon: ClipboardCheck },
-                        { id: 'disclosure', label: 'Disclosure', icon: FileSignature },
-                        { id: 'logs', label: 'History', icon: History }
-                    ].map(tab => {
+                    {([
+                        { id: 'details', label: 'Overview', icon: Building },
+                        { id: 'insurance', label: 'Insurance', icon: ShieldCheck, alert: insuranceExpired },
+                        { id: 'meetings', label: 'Meetings', icon: Calendar, count: upcomingMeetingsCount },
+                        { id: 'conflict', label: 'Conflicts', icon: ClipboardCheck },
+                        { id: 'disclosure', label: 'Statutory', icon: FileSignature },
+                        { id: 'logs', label: 'Activity', icon: History }
+                    ] as Array<{ id: string; label: string; icon: React.ElementType; alert?: boolean; count?: number }>).map(tab => {
                         const Icon = tab.icon;
                         return (
                             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-3 mr-6 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${activeTab === tab.id ? 'border-pink-600 text-pink-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                                 <Icon size={13} />{tab.label}
+                                {tab.alert && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
+                                {!tab.alert && tab.count !== undefined && tab.count > 0 && <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400">{tab.count}</span>}
                             </button>
                         );
                     })}
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30 dark:bg-slate-950/30 transition-colors relative">
+                <div className={`flex-1 transition-colors relative ${activeTab === 'meetings' ? 'overflow-hidden flex' : 'overflow-y-auto p-8 bg-slate-50/30 dark:bg-slate-950/30'}`}>
                     {activeTab === 'details' && (
                         <div className="space-y-6">
                         {currentUser?.role === 'admin' && (
@@ -778,12 +811,16 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
                                     <Building size={16} className="text-pink-600" /> Portfolio & Statutory
-                                    {currentUser?.role !== 'admin' && <Lock size={12} className="text-slate-400 ml-auto" />}
+                                    {portfolioEditing ? (
+                                        <button onClick={() => setPortfolioEditing(false)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 uppercase tracking-wider transition-colors"><Check size={12} /> Done</button>
+                                    ) : (
+                                        <button onClick={() => setPortfolioEditing(true)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors"><Pencil size={12} /> Edit</button>
+                                    )}
                                 </h3>
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Account Manager</label>
-                                        {currentUser?.role === 'admin' ? (
+                                        {portfolioEditing && currentUser?.role === 'admin' ? (
                                             <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managerName || ''} onChange={e => setForm({...form, managerName: e.target.value})}>
                                                 <option value="">-- Choose Manager --</option>
                                                 {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
@@ -795,7 +832,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY Start</label>
-                                            {currentUser?.role === 'admin' ? (
+                                            {portfolioEditing && currentUser?.role === 'admin' ? (
                                                 <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearStart || ''} onChange={e => setForm({...form, financialYearStart: e.target.value})} placeholder="e.g. 1-May" />
                                             ) : (
                                                 <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearStart || 'N/A'}</p>
@@ -803,7 +840,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY End</label>
-                                            {currentUser?.role === 'admin' ? (
+                                            {portfolioEditing && currentUser?.role === 'admin' ? (
                                                 <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearEnd || ''} onChange={e => setForm({...form, financialYearEnd: e.target.value})} placeholder="e.g. 30-Apr" />
                                             ) : (
                                                 <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearEnd || 'N/A'}</p>
@@ -811,8 +848,8 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         </div>
                                     </div>
                                     <div
-                                        className="flex items-center justify-between p-3 rounded-2xl border dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 cursor-pointer select-none"
-                                        onClick={() => currentUser?.role === 'admin' && setForm(f => ({ ...f, isGstRegistered: !f.isGstRegistered }))}
+                                        className={`flex items-center justify-between p-3 rounded-2xl border dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 select-none ${portfolioEditing && currentUser?.role === 'admin' ? 'cursor-pointer' : 'cursor-default'}`}
+                                        onClick={() => portfolioEditing && currentUser?.role === 'admin' && setForm(f => ({ ...f, isGstRegistered: !f.isGstRegistered }))}
                                     >
                                         <div className="flex flex-col">
                                             <span className="text-xs font-medium text-slate-700 dark:text-slate-300">GST Registered</span>
@@ -847,7 +884,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contracted Committee Meetings</label>
-                                        {currentUser?.role === 'admin' ? (
+                                        {portfolioEditing && currentUser?.role === 'admin' ? (
                                             <div className="relative">
                                                 <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                                 <input type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.numberOfCommitteeMeetings || 0} onChange={e => setForm({...form, numberOfCommitteeMeetings: parseInt(e.target.value) || 0})} placeholder="0" />
@@ -868,10 +905,14 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="relative">
-                                            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                            <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.previousAgmDate || ''} onChange={e => setForm({...form, previousAgmDate: e.target.value})} />
-                                        </div>
+                                        {portfolioEditing ? (
+                                            <div className="relative">
+                                                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.previousAgmDate || ''} onChange={e => setForm({...form, previousAgmDate: e.target.value})} />
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.previousAgmDate ? formatDateNZ(form.previousAgmDate) : 'N/A'}</p>
+                                        )}
                                         <p className="text-[9px] text-slate-400 mt-1 italic leading-tight">Auto-fills from the most recent past AGM in scheduled meetings. Manual entry allowed.</p>
                                     </div>
                                 </div>
@@ -880,38 +921,58 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
                                     <Shield size={16} className="text-pink-600" /> Compliance Status
+                                    {complianceEditing ? (
+                                        <button onClick={() => setComplianceEditing(false)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 uppercase tracking-wider transition-colors"><Check size={12} /> Done</button>
+                                    ) : (
+                                        <button onClick={() => setComplianceEditing(true)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors"><Pencil size={12} /> Edit</button>
+                                    )}
                                 </h3>
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Insurance Expiry Date</label>
-                                        <div className={`relative rounded-xl border-2 transition-colors ${isInsuranceValid(form.insuranceExpiry) ? 'border-slate-200 dark:border-slate-700' : 'border-pink-500 bg-pink-50/30'}`}>
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
-                                                {isInsuranceValid(form.insuranceExpiry) ? null : <AlertCircle size={16} className="text-pink-600" />}
-                                                <span className={`text-sm font-bold ${!isInsuranceValid(form.insuranceExpiry) ? 'text-pink-600' : 'text-slate-700 dark:text-slate-200'}`}>
-                                                    {formatDateNZ(form.insuranceExpiry) || 'dd/mm/yyyy'}
-                                                </span>
+                                        {complianceEditing ? (
+                                            <div className={`relative rounded-xl border-2 transition-colors ${isInsuranceValid(form.insuranceExpiry) ? 'border-slate-200 dark:border-slate-700' : 'border-pink-500 bg-pink-50/30'}`}>
+                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
+                                                    {isInsuranceValid(form.insuranceExpiry) ? null : <AlertCircle size={16} className="text-pink-600" />}
+                                                    <span className={`text-sm font-bold ${!isInsuranceValid(form.insuranceExpiry) ? 'text-pink-600' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                        {formatDateNZ(form.insuranceExpiry) || 'dd/mm/yyyy'}
+                                                    </span>
+                                                </div>
+                                                <input type="date" className="w-full p-2.5 text-sm opacity-0 cursor-pointer" value={form.insuranceExpiry || ''} onChange={e => setForm({...form, insuranceExpiry: e.target.value})} />
                                             </div>
-                                            <input type="date" className="w-full p-2.5 text-sm opacity-0 cursor-pointer" value={form.insuranceExpiry || ''} onChange={e => setForm({...form, insuranceExpiry: e.target.value})} />
-                                        </div>
+                                        ) : (
+                                            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isInsuranceValid(form.insuranceExpiry) ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800' : 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900/30'}`}>
+                                                {isInsuranceValid(form.insuranceExpiry) ? <ShieldCheck size={15} className="text-emerald-500 flex-shrink-0" /> : <AlertCircle size={15} className="text-red-500 flex-shrink-0" />}
+                                                <span className={`text-sm font-bold ${isInsuranceValid(form.insuranceExpiry) ? 'text-slate-700 dark:text-slate-200' : 'text-red-600 dark:text-red-400'}`}>{formatDateNZ(form.insuranceExpiry) || 'Not set'}</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
                                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">BWOF Expiry Date</label>
-                                            {currentUser?.role === 'admin' && form.bwofExpiry && (
+                                            {complianceEditing && currentUser?.role === 'admin' && form.bwofExpiry && (
                                                 <button type="button" onClick={handleBwofRemove} className="text-[10px] font-bold text-pink-500 hover:text-pink-700 dark:hover:text-pink-300 transition-colors">Remove</button>
                                             )}
                                         </div>
-                                        <div className="relative">
-                                            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                            <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm cursor-pointer" value={form.bwofExpiry || ''} onChange={e => handleBwofDateChange(e.target.value)} />
-                                        </div>
+                                        {complianceEditing ? (
+                                            <div className="relative">
+                                                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm cursor-pointer" value={form.bwofExpiry || ''} onChange={e => handleBwofDateChange(e.target.value)} />
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bwofExpiry ? formatDateNZ(form.bwofExpiry) : 'Not set'}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Compliance Company</label>
-                                        <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.complianceCompany || ''} onChange={e => setForm({...form, complianceCompany: e.target.value})}>
-                                            <option value="">-- Choose Contractor --</option>
-                                            {bwofCos.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                        </select>
+                                        {complianceEditing ? (
+                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.complianceCompany || ''} onChange={e => setForm({...form, complianceCompany: e.target.value})}>
+                                                <option value="">-- Choose Contractor --</option>
+                                                {bwofCos.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                            </select>
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.complianceCompany || '—'}</p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1227,7 +1288,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     )}
 
                     {activeTab === 'meetings' && (
-                        <div className="space-y-4">
+                        <>
                             {/* ── SWITCH PROMPT ── */}
                             {meetingSwitchPrompt && (
                                 <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
@@ -1247,375 +1308,356 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     </div>
                                 </div>
                             )}
-                            {/* ── NO MEETING SELECTED: empty state ── */}
-                            {!selectedMeetingId && (
-                                <>
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm text-slate-400 dark:text-slate-500">
-                                            {sortedMeetings.filter(m => !isMeetingPassed(m.date)).length > 0
-                                                ? 'Select an upcoming meeting or schedule a new one'
-                                                : 'No upcoming meetings scheduled'}
-                                        </p>
-                                        <button onClick={() => guardedSwitch('new')} className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
-                                            <Plus size={15} /> Schedule a Meeting
-                                        </button>
-                                    </div>
 
-                                    {sortedMeetings.filter(m => !isMeetingPassed(m.date)).length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed dark:border-slate-800 rounded-3xl bg-white/40 dark:bg-slate-900/40 gap-4">
-                                            <div className="w-14 h-14 rounded-2xl bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
-                                                <Calendar size={28} className="text-pink-400" />
+                            {/* ── LEFT SIDEBAR ── */}
+                            <div className="w-52 flex-shrink-0 border-r dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-hidden">
+                                <div className="px-4 py-3 border-b dark:border-slate-800 flex justify-between items-center flex-shrink-0">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Meetings</span>
+                                    <button onClick={() => guardedSwitch('new')} className="flex items-center gap-1 px-2.5 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-[10px] font-bold transition-colors">
+                                        <Plus size={11} /> New
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto">
+                                    {selectedMeetingId === 'new' && (
+                                        <div className="p-3">
+                                            <div className="p-2.5 rounded-xl border-2 border-pink-500 bg-pink-50 dark:bg-pink-950/20">
+                                                <div className="text-[9px] font-bold text-pink-500 uppercase">New Meeting</div>
+                                                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">Unsaved</div>
                                             </div>
-                                            <div className="text-center">
-                                                <h4 className="font-bold text-slate-600 dark:text-slate-300 mb-1">No upcoming meetings</h4>
-                                                <p className="text-xs text-slate-400 max-w-xs">Once a meeting is scheduled, the checklist and key deadlines will appear here — ready to track every step from NOI to minutes.</p>
-                                            </div>
-                                            <button onClick={() => guardedSwitch('new')} className="flex items-center gap-2 px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
-                                                <Plus size={15} /> Schedule a Meeting
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 overflow-hidden">
-                                            {sortedMeetings.filter(m => !isMeetingPassed(m.date)).map((m, i, arr) => (
-                                                <div key={m.id} onClick={() => { setMeetingForm({ ...m }); setSelectedMeetingId(m.id); }} className={`flex items-center gap-4 p-4 cursor-pointer hover:bg-pink-50/40 dark:hover:bg-pink-950/10 transition-colors ${i < arr.length - 1 ? 'border-b dark:border-slate-800' : ''}`}>
-                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-50 dark:bg-pink-900/20 text-pink-600">{m.type}</span>
-                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{m.date ? formatDateNZ(m.date) : 'TBC'}</span>
-                                                    <span className="text-xs text-slate-400">{m.venue || 'TBC'}</span>
-                                                    <ChevronRight size={14} className="text-slate-300" />
-                                                </div>
-                                            ))}
                                         </div>
                                     )}
-
-                                    {sortedMeetings.filter(m => isMeetingPassed(m.date)).length > 0 && (
-                                        <div>
-                                            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Previous Meetings</h3>
-                                            <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 overflow-hidden">
-                                                {sortedMeetings.filter(m => isMeetingPassed(m.date)).map((m, i, arr) => (
-                                                    <div key={m.id} onClick={() => { setMeetingForm({ ...m }); setSelectedMeetingId(m.id); }} className={`flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors opacity-75 ${i < arr.length - 1 ? 'border-b dark:border-slate-800' : ''}`}>
-                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">{m.type}</span>
-                                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{m.date ? formatDateNZ(m.date) : 'TBC'}</span>
-                                                        <span className="text-xs text-slate-400">{m.venue || 'TBC'}</span>
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${m.minutesIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600'}`}>{m.minutesIssued ? '✓ Minutes issued' : 'Minutes pending'}</span>
-                                                        <ChevronRight size={14} className="text-slate-300" />
+                                    {sortedMeetings.filter(m => !isMeetingPassed(m.date)).length > 0 && (
+                                        <>
+                                            <div className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-800/50">Upcoming</div>
+                                            {sortedMeetings.filter(m => !isMeetingPassed(m.date)).map(m => {
+                                                const isSelected = selectedMeetingId === m.id;
+                                                return (
+                                                    <div key={m.id} onClick={() => guardedSwitch(m.id)} className={`px-3 py-2.5 cursor-pointer transition-colors border-l-2 ${isSelected ? 'bg-pink-50 dark:bg-pink-950/10 border-pink-500' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+                                                        <div className="text-[9px] font-bold text-pink-500 uppercase">{m.type}</div>
+                                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">{m.date ? formatDateNZ(m.date) : 'TBC'}</div>
+                                                        <div className="text-[9px] text-slate-400 truncate mt-0.5">{m.venue || 'No venue set'}</div>
                                                     </div>
-                                                ))}
-                                            </div>
+                                                );
+                                            })}
+                                        </>
+                                    )}
+                                    {sortedMeetings.filter(m => !isMeetingPassed(m.date)).length === 0 && selectedMeetingId !== 'new' && (
+                                        <div className="px-3 py-6 text-center">
+                                            <p className="text-[10px] text-slate-400 italic">No upcoming meetings</p>
                                         </div>
                                     )}
-                                </>
-                            )}
+                                    {sortedMeetings.filter(m => isMeetingPassed(m.date)).length > 0 && (
+                                        <div className="border-t dark:border-slate-800">
+                                            <div className="px-3 py-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-800/50">Past</div>
+                                            {sortedMeetings.filter(m => isMeetingPassed(m.date)).map(m => {
+                                                const isSelected = selectedMeetingId === m.id;
+                                                return (
+                                                    <div key={m.id} onClick={() => guardedSwitch(m.id)} className={`px-3 py-2.5 cursor-pointer transition-colors border-l-2 ${isSelected ? 'bg-pink-50 dark:bg-pink-950/10 border-pink-500' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50 opacity-60'}`}>
+                                                        <div className="text-[9px] font-bold text-slate-400 uppercase">{m.type}</div>
+                                                        <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">{m.date ? formatDateNZ(m.date) : 'TBC'}</div>
+                                                        <div className="text-[9px] text-slate-400 mt-0.5">{m.minutesIssued ? '✓ Minutes sent' : 'Minutes pending'}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
-                            {/* ── MEETING SELECTED ── */}
-                            {selectedMeetingId && (
-                                <div className="space-y-4">
-                                    {/* Header card: nav + fields */}
-                                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border dark:border-slate-800 shadow-sm">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <button onClick={() => guardedSwitch(null)} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                                    <ArrowRightCircle size={13} className="rotate-180" /> Back
-                                                </button>
-                                                <span className="text-slate-300 dark:text-slate-700 select-none">|</span>
-                                                <h3 className="font-bold text-xs uppercase tracking-widest text-slate-400 dark:text-white">{selectedMeetingId === 'new' ? 'Schedule New Meeting' : 'Meeting Details'}</h3>
-                                                {effectiveLocked && <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded uppercase flex items-center gap-1"><Lock size={10} /> Locked</span>}
-                                                {isMeetingLocked && !adminUnlocked && currentUser?.role === 'admin' && (
-                                                    <button onClick={() => setAdminUnlocked(true)} className="text-[9px] font-bold text-pink-600 hover:text-pink-700 px-2 py-0.5 rounded border border-pink-200 hover:border-pink-300 uppercase transition-colors">Unlock</button>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                {selectedMeetingId !== 'new' && (
-                                                    <button onClick={() => setShowAllMeetings(v => !v)} className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-bold transition-colors ${showAllMeetings ? 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                                                        <ListFilter size={13} /> All Meetings
-                                                    </button>
-                                                )}
+                            {/* ── RIGHT PANEL ── */}
+                            <div className="flex-1 overflow-y-auto bg-slate-50/30 dark:bg-slate-950/30">
+                                {!selectedMeetingId ? (
+                                    <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
+                                        <div className="w-14 h-14 rounded-2xl bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+                                            <Calendar size={28} className="text-pink-400" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-600 dark:text-slate-300 mb-1">Select a meeting</h4>
+                                            <p className="text-xs text-slate-400 max-w-xs">Choose a meeting from the list, or schedule a new one.</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-6 space-y-4">
+                                        {/* Header card: fields (no Back, no All Meetings) */}
+                                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border dark:border-slate-800 shadow-sm">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <h3 className="font-bold text-xs uppercase tracking-widest text-slate-400 dark:text-white">{selectedMeetingId === 'new' ? 'Schedule New Meeting' : 'Meeting Details'}</h3>
+                                                    {effectiveLocked && <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded uppercase flex items-center gap-1"><Lock size={10} /> Locked</span>}
+                                                    {isMeetingLocked && !adminUnlocked && currentUser?.role === 'admin' && (
+                                                        <button onClick={() => setAdminUnlocked(true)} className="text-[9px] font-bold text-pink-600 hover:text-pink-700 px-2 py-0.5 rounded border border-pink-200 hover:border-pink-300 uppercase transition-colors">Unlock</button>
+                                                    )}
+                                                </div>
                                                 <button onClick={() => guardedSwitch('new')} className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm">
                                                     <Plus size={13} /> Schedule
                                                 </button>
                                             </div>
+
+                                            {/* Type / Date / Time / Venue */}
+                                            <fieldset className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={effectiveLocked}>
+                                                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
+                                                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.date || ''} onChange={e => { const newDate = e.target.value; setMeetingForm({ ...meetingForm, date: newDate, noiResponseDueDate: calculateDefaultResponseDueDate(newDate) }); }} /></div>
+                                                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Time</label><input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.time || ''} onChange={e => setMeetingForm({...meetingForm, time: e.target.value})} /></div>
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Venue</label>
+                                                    {(systemSettings.meetingVenues?.length ?? 0) > 0 ? (
+                                                        <>
+                                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={venueOther ? '__other__' : (meetingForm.venue || '')} onChange={e => { if (e.target.value === '__other__') { setVenueOther(true); setMeetingForm({...meetingForm, venue: ''}); } else { setVenueOther(false); setMeetingForm({...meetingForm, venue: e.target.value}); } }}>
+                                                                <option value="">-- Select Venue --</option>
+                                                                {systemSettings.meetingVenues!.map(v => <option key={v} value={v}>{v}</option>)}
+                                                                <option value="__other__">Other...</option>
+                                                            </select>
+                                                            {venueOther && <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm mt-2" placeholder="Enter venue..." value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />}
+                                                        </>
+                                                    ) : (
+                                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />
+                                                    )}
+                                                </div>
+                                            </fieldset>
                                         </div>
 
-                                        {/* All meetings dropdown */}
-                                        {showAllMeetings && (
-                                            <div className="mb-4 border dark:border-slate-700 rounded-xl overflow-hidden">
-                                                {sortedMeetings.map((m, i) => {
-                                                    const passed = isMeetingPassed(m.date);
-                                                    return (
-                                                        <div key={m.id} onClick={() => guardedSwitch(m.id)} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors border-b dark:border-slate-700 last:border-b-0 ${selectedMeetingId === m.id ? 'bg-pink-50 dark:bg-pink-950/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'} ${passed ? 'opacity-70' : ''}`}>
-                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${passed ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' : 'bg-pink-50 dark:bg-pink-900/20 text-pink-600'}`}>{m.type}</span>
-                                                            <span className="text-xs font-medium text-slate-700 dark:text-slate-200 flex-1">{m.date ? formatDateNZ(m.date) : 'TBC'}</span>
-                                                            <span className="text-xs text-slate-400 hidden sm:block">{m.venue || 'TBC'}</span>
-                                                            <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${passed ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' : 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600'}`}>{passed ? 'Past' : 'Upcoming'}</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-
-                                        {/* Type / Date / Time / Venue */}
-                                        <fieldset className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={effectiveLocked}>
-                                            <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
-                                            <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.date || ''} onChange={e => { const newDate = e.target.value; setMeetingForm({ ...meetingForm, date: newDate, noiResponseDueDate: calculateDefaultResponseDueDate(newDate) }); }} /></div>
-                                            <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Time</label><input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.time || ''} onChange={e => setMeetingForm({...meetingForm, time: e.target.value})} /></div>
-                                            <div>
-                                                <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Venue</label>
-                                                {(systemSettings.meetingVenues?.length ?? 0) > 0 ? (
-                                                    <>
-                                                        <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={venueOther ? '__other__' : (meetingForm.venue || '')} onChange={e => { if (e.target.value === '__other__') { setVenueOther(true); setMeetingForm({...meetingForm, venue: ''}); } else { setVenueOther(false); setMeetingForm({...meetingForm, venue: e.target.value}); } }}>
-                                                            <option value="">-- Select Venue --</option>
-                                                            {systemSettings.meetingVenues!.map(v => <option key={v} value={v}>{v}</option>)}
-                                                            <option value="__other__">Other...</option>
-                                                        </select>
-                                                        {venueOther && <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm mt-2" placeholder="Enter venue..." value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />}
-                                                    </>
-                                                ) : (
-                                                    <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.venue || ''} onChange={e => setMeetingForm({...meetingForm, venue: e.target.value})} />
-                                                )}
-                                            </div>
-                                        </fieldset>
-                                    </div>
-
-                                    {/* Key deadlines strip */}
-                                    {meetingForm.date && meetingForm.type !== 'Committee' && (() => {
-                                        const dates = computeMeetingDates(meetingForm.date);
-                                        const today = new Date(); today.setHours(0,0,0,0);
-                                        const isPast = (d: string) => new Date(d) < today;
-                                        const fmt = (d: string) => new Date(d).toLocaleDateString('en-NZ');
-                                        const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - today.getTime()) / (1000*60*60*24));
-                                        return (
-                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                {/* NOI Preferred */}
-                                                <div className={`p-3 rounded-xl border ${meetingForm.noiIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.noiPref) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
-                                                    <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiPref) ? 'text-red-500' : 'text-slate-400'}`}>NOI Preferred</div>
-                                                    <div className={`text-sm font-bold font-mono ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiPref) ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>{fmt(dates.noiPref)}</div>
-                                                    <div className="text-[10px] mt-0.5">{meetingForm.noiIssued ? <span className="text-emerald-600">✓ Issued {meetingForm.noiIssuedDate ? fmt(meetingForm.noiIssuedDate) : ''}</span> : isPast(dates.noiPref) ? <span className="text-red-400">Passed</span> : <span className="text-slate-400">{daysUntil(dates.noiPref)}d away</span>}</div>
-                                                </div>
-                                                {/* NOI Statutory */}
-                                                <div className={`p-3 rounded-xl border ${meetingForm.noiIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.noiDead) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50'}`}>
-                                                    <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiDead) ? 'text-red-500' : 'text-amber-600'}`}>NOI Statutory</div>
-                                                    <div className={`text-sm font-bold font-mono ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiDead) ? 'text-red-500' : 'text-amber-600'}`}>{fmt(dates.noiDead)}</div>
-                                                    <div className="text-[10px] mt-0.5">{meetingForm.noiIssued ? <span className="text-emerald-600">✓ Met</span> : isPast(dates.noiDead) ? <span className="text-red-400">Passed</span> : <span className="text-amber-500">{daysUntil(dates.noiDead)}d remaining</span>}</div>
-                                                </div>
-                                                {/* NOI Response Due — editable */}
-                                                {(() => {
-                                                    const meetingPast = !!meetingForm.date && isPast(meetingForm.date);
-                                                    const responseOverdue = !meetingPast && !!meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate);
-                                                    return (
-                                                        <div className={`p-3 rounded-xl border ${responseOverdue ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
-                                                            <div className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${responseOverdue ? 'text-red-500' : 'text-slate-400'}`}>NOI Response Due</div>
-                                                            <div className="grid grid-cols-2 gap-1 mb-1.5">
-                                                                <input type="date" className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-1.5 py-1 text-[10px] font-mono ${responseOverdue ? 'text-red-500 border-red-300 dark:border-red-800' : 'dark:text-white'}`} value={meetingForm.noiResponseDueDate || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})} />
-                                                                <input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-1.5 py-1 text-[10px] font-mono" value={meetingForm.noiResponseDueTime || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueTime: e.target.value})} />
-                                                            </div>
-                                                            <div className="flex items-center gap-1">
-                                                                <span className="text-[9px] text-slate-400 whitespace-nowrap">Remind</span>
-                                                                <input type="number" min={0} max={30} className="w-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded px-1 py-0.5 text-[10px] font-mono text-center" value={meetingForm.noiResponseReminderDays ?? 2} onChange={e => setMeetingForm({...meetingForm, noiResponseReminderDays: parseInt(e.target.value) || 0})} />
-                                                                <span className="text-[9px] text-slate-400 whitespace-nowrap">days before</span>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })()}
-                                                {/* NOM Preferred */}
-                                                <div className={`p-3 rounded-xl border ${meetingForm.nomIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.nomPref) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
-                                                    <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomPref) ? 'text-red-500' : 'text-slate-400'}`}>NOM Preferred</div>
-                                                    <div className={`text-sm font-bold font-mono ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomPref) ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>{fmt(dates.nomPref)}</div>
-                                                    <div className="text-[10px] mt-0.5">{meetingForm.nomIssued ? <span className="text-emerald-600">✓ Issued {meetingForm.nomIssuedDate ? fmt(meetingForm.nomIssuedDate) : ''}</span> : isPast(dates.nomPref) ? <span className="text-red-400">Passed</span> : <span className="text-slate-400">{daysUntil(dates.nomPref)}d away</span>}</div>
-                                                </div>
-                                                {/* Meeting Date */}
-                                                <div className="p-3 rounded-xl border bg-pink-50 dark:bg-pink-900/10 border-pink-200 dark:border-pink-900/30">
-                                                    <div className="text-[9px] font-bold uppercase tracking-widest mb-1 text-pink-400">Meeting Date</div>
-                                                    <div className="text-sm font-bold font-mono text-pink-700 dark:text-pink-400">{fmt(meetingForm.date)}</div>
-                                                    <div className="text-[10px] mt-0.5">
-                                                        {isPast(meetingForm.date)
-                                                            ? meetingForm.minutesIssued
-                                                                ? <span className="text-emerald-600">✓ Minutes issued</span>
-                                                                : <span className="text-amber-500">Minutes due {fmt(dates.minutesDead)}</span>
-                                                            : <span className="text-pink-400">{daysUntil(meetingForm.date)}d away</span>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-
-                                    {/* Full-width checklist */}
-                                    <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 shadow-sm overflow-hidden">
-                                        <div className="flex items-center gap-2 px-5 pt-5 pb-4">
-                                            <ClipboardCheck size={16} className="text-pink-600" />
-                                            <h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Meeting Checklist</h3>
-                                            {showPostMeetingBadge && (
-                                                <button
-                                                    onClick={() => setMeetingForm({ ...meetingForm, postMeetingUpdateDismissed: false })}
-                                                    className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 transition-colors"
-                                                >
-                                                    <AlertCircle size={11} /> Complex details not yet updated — click to update
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        {/* Key dates strip */}
+                                        {/* Key deadlines strip */}
                                         {meetingForm.date && meetingForm.type !== 'Committee' && (() => {
-                                            const _today = new Date(); _today.setHours(0,0,0,0);
-                                            const isPast = (d: string) => new Date(d) < _today;
+                                            const dates = computeMeetingDates(meetingForm.date);
+                                            const today = new Date(); today.setHours(0,0,0,0);
+                                            const isPast = (d: string) => new Date(d) < today;
                                             const fmt = (d: string) => new Date(d).toLocaleDateString('en-NZ');
-                                            const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - _today.getTime()) / (1000*60*60*24));
-                                            const dates = computeMeetingDates(meetingForm.date!);
-                                            const meetingPast = isPast(meetingForm.date!);
-                                            const chips = [
-                                                { label: 'NOI Preferred', date: dates.noiPref, done: !!meetingForm.noiIssued, status: meetingForm.noiIssued ? `✓ Issued ${meetingForm.noiIssuedDate ? fmt(meetingForm.noiIssuedDate) : ''}` : isPast(dates.noiPref) ? 'Passed' : `${daysUntil(dates.noiPref)}d away`, color: meetingForm.noiIssued ? 'emerald' : isPast(dates.noiPref) ? 'red' : 'slate' },
-                                                { label: 'NOI Statutory', date: dates.noiDead, done: !!meetingForm.noiIssued, status: meetingForm.noiIssued ? '✓ Met' : isPast(dates.noiDead) ? 'Passed' : `${daysUntil(dates.noiDead)}d remaining`, color: meetingForm.noiIssued ? 'emerald' : isPast(dates.noiDead) ? 'red' : 'amber' },
-                                                { label: 'NOI Response Due', date: meetingForm.noiResponseDueDate || '—', done: false, status: meetingForm.noiResponseDueDate ? (!meetingPast && isPast(meetingForm.noiResponseDueDate) ? 'Overdue' : meetingPast ? 'Closed' : `${daysUntil(meetingForm.noiResponseDueDate)}d away`) : 'Not set', color: meetingForm.noiResponseDueDate && !meetingPast && isPast(meetingForm.noiResponseDueDate) ? 'red' : 'slate' },
-                                                { label: 'NOM Preferred', date: dates.nomPref, done: !!meetingForm.nomIssued, status: meetingForm.nomIssued ? `✓ Issued ${meetingForm.nomIssuedDate ? fmt(meetingForm.nomIssuedDate) : ''}` : isPast(dates.nomPref) ? 'Passed' : `${daysUntil(dates.nomPref)}d away`, color: meetingForm.nomIssued ? 'emerald' : isPast(dates.nomPref) ? 'red' : 'slate' },
-                                                { label: 'NOM Statutory', date: dates.nomDead, done: !!meetingForm.nomIssued, status: meetingForm.nomIssued ? '✓ Met' : isPast(dates.nomDead) ? 'Passed' : `${daysUntil(dates.nomDead)}d remaining`, color: meetingForm.nomIssued ? 'emerald' : isPast(dates.nomDead) ? 'red' : 'amber' },
-                                                { label: 'Meeting Date', date: meetingForm.date, done: false, status: meetingPast ? 'Completed' : `${daysUntil(meetingForm.date)}d away`, color: 'pink' },
-                                            ] as const;
-                                            const colorMap = {
-                                                emerald: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400',
-                                                red:     'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400',
-                                                amber:   'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40 text-amber-700 dark:text-amber-400',
-                                                pink:    'bg-pink-50 dark:bg-pink-900/10 border-pink-200 dark:border-pink-900/30 text-pink-700 dark:text-pink-400',
-                                                slate:   'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400',
-                                            };
+                                            const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - today.getTime()) / (1000*60*60*24));
                                             return (
-                                                <div className="mx-5 mb-4 border dark:border-slate-700 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/30">
-                                                    <div className="px-3 pt-2.5 pb-1 text-[8px] font-bold uppercase tracking-widest text-slate-400">Key Dates</div>
-                                                    <div className="flex overflow-x-auto px-3 pb-3 gap-2 scrollbar-thin">
-                                                        {chips.map(chip => (
-                                                            <div key={chip.label} className={`flex flex-col gap-0.5 px-2.5 py-2 rounded-lg border shrink-0 min-w-[96px] ${colorMap[chip.color]}`}>
-                                                                <span className="text-[8px] font-bold uppercase tracking-wide opacity-80 whitespace-nowrap">{chip.label}</span>
-                                                                <span className="text-[11px] font-bold font-mono whitespace-nowrap">{chip.date === '—' ? '—' : fmt(chip.date)}</span>
-                                                                <span className="text-[8px] font-semibold whitespace-nowrap opacity-90">{chip.status}</span>
+                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                                    {/* NOI Preferred */}
+                                                    <div className={`p-3 rounded-xl border ${meetingForm.noiIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.noiPref) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
+                                                        <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiPref) ? 'text-red-500' : 'text-slate-400'}`}>NOI Preferred</div>
+                                                        <div className={`text-sm font-bold font-mono ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiPref) ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>{fmt(dates.noiPref)}</div>
+                                                        <div className="text-[10px] mt-0.5">{meetingForm.noiIssued ? <span className="text-emerald-600">✓ Issued {meetingForm.noiIssuedDate ? fmt(meetingForm.noiIssuedDate) : ''}</span> : isPast(dates.noiPref) ? <span className="text-red-400">Passed</span> : <span className="text-slate-400">{daysUntil(dates.noiPref)}d away</span>}</div>
+                                                    </div>
+                                                    {/* NOI Statutory */}
+                                                    <div className={`p-3 rounded-xl border ${meetingForm.noiIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.noiDead) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50'}`}>
+                                                        <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiDead) ? 'text-red-500' : 'text-amber-600'}`}>NOI Statutory</div>
+                                                        <div className={`text-sm font-bold font-mono ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiDead) ? 'text-red-500' : 'text-amber-600'}`}>{fmt(dates.noiDead)}</div>
+                                                        <div className="text-[10px] mt-0.5">{meetingForm.noiIssued ? <span className="text-emerald-600">✓ Met</span> : isPast(dates.noiDead) ? <span className="text-red-400">Passed</span> : <span className="text-amber-500">{daysUntil(dates.noiDead)}d remaining</span>}</div>
+                                                    </div>
+                                                    {/* NOI Response Due — editable */}
+                                                    {(() => {
+                                                        const meetingPast = !!meetingForm.date && isPast(meetingForm.date);
+                                                        const responseOverdue = !meetingPast && !!meetingForm.noiResponseDueDate && isPast(meetingForm.noiResponseDueDate);
+                                                        return (
+                                                            <div className={`p-3 rounded-xl border ${responseOverdue ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
+                                                                <div className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${responseOverdue ? 'text-red-500' : 'text-slate-400'}`}>NOI Response Due</div>
+                                                                <div className="grid grid-cols-2 gap-1 mb-1.5">
+                                                                    <input type="date" className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-1.5 py-1 text-[10px] font-mono ${responseOverdue ? 'text-red-500 border-red-300 dark:border-red-800' : 'dark:text-white'}`} value={meetingForm.noiResponseDueDate || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})} />
+                                                                    <input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-1.5 py-1 text-[10px] font-mono" value={meetingForm.noiResponseDueTime || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueTime: e.target.value})} />
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-[9px] text-slate-400 whitespace-nowrap">Remind</span>
+                                                                    <input type="number" min={0} max={30} className="w-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded px-1 py-0.5 text-[10px] font-mono text-center" value={meetingForm.noiResponseReminderDays ?? 2} onChange={e => setMeetingForm({...meetingForm, noiResponseReminderDays: parseInt(e.target.value) || 0})} />
+                                                                    <span className="text-[9px] text-slate-400 whitespace-nowrap">days before</span>
+                                                                </div>
                                                             </div>
-                                                        ))}
+                                                        );
+                                                    })()}
+                                                    {/* NOM Preferred */}
+                                                    <div className={`p-3 rounded-xl border ${meetingForm.nomIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.nomPref) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
+                                                        <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomPref) ? 'text-red-500' : 'text-slate-400'}`}>NOM Preferred</div>
+                                                        <div className={`text-sm font-bold font-mono ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomPref) ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>{fmt(dates.nomPref)}</div>
+                                                        <div className="text-[10px] mt-0.5">{meetingForm.nomIssued ? <span className="text-emerald-600">✓ Issued {meetingForm.nomIssuedDate ? fmt(meetingForm.nomIssuedDate) : ''}</span> : isPast(dates.nomPref) ? <span className="text-red-400">Passed</span> : <span className="text-slate-400">{daysUntil(dates.nomPref)}d away</span>}</div>
+                                                    </div>
+                                                    {/* Meeting Date */}
+                                                    <div className="p-3 rounded-xl border bg-pink-50 dark:bg-pink-900/10 border-pink-200 dark:border-pink-900/30">
+                                                        <div className="text-[9px] font-bold uppercase tracking-widest mb-1 text-pink-400">Meeting Date</div>
+                                                        <div className="text-sm font-bold font-mono text-pink-700 dark:text-pink-400">{fmt(meetingForm.date)}</div>
+                                                        <div className="text-[10px] mt-0.5">
+                                                            {isPast(meetingForm.date)
+                                                                ? meetingForm.minutesIssued
+                                                                    ? <span className="text-emerald-600">✓ Minutes issued</span>
+                                                                    : <span className="text-amber-500">Minutes due {fmt(dates.minutesDead)}</span>
+                                                                : <span className="text-pink-400">{daysUntil(meetingForm.date)}d away</span>}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
                                         })()}
 
-                                        <div className="space-y-3 px-5 pb-5">
-                                            {(['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).map(stage => {
-                                                const stageLabel = { NOI: 'NOI', NOM: 'NOM', PRIOR_TO_MEETING: 'Prior to Meeting', AFTER_MEETING: 'After Meeting' }[stage];
-                                                const items = getChecklistStages(form.type)?.[stage] || [];
-                                                const progress = meetingForm.checklistProgress || {};
-                                                const completedDates = meetingForm.checklistDates || {};
-                                                const doneCount = items.filter(item => progress[item.id]).length;
-                                                const isIssued = stage === 'NOI' ? !!meetingForm.noiIssued : stage === 'NOM' ? !!meetingForm.nomIssued : stage === 'AFTER_MEETING' ? !!meetingForm.minutesIssued : false;
-                                                const issuedDate = stage === 'NOI' ? meetingForm.noiIssuedDate : stage === 'NOM' ? meetingForm.nomIssuedDate : stage === 'AFTER_MEETING' ? meetingForm.minutesIssuedDate : undefined;
+                                        {/* Full-width checklist */}
+                                        <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 shadow-sm overflow-hidden">
+                                            <div className="flex items-center gap-2 px-5 pt-5 pb-4">
+                                                <ClipboardCheck size={16} className="text-pink-600" />
+                                                <h3 className="text-xs font-bold uppercase tracking-widest dark:text-white">Meeting Checklist</h3>
+                                                {showPostMeetingBadge && (
+                                                    <button
+                                                        onClick={() => setMeetingForm({ ...meetingForm, postMeetingUpdateDismissed: false })}
+                                                        className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 transition-colors"
+                                                    >
+                                                        <AlertCircle size={11} /> Complex details not yet updated — click to update
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* Key dates strip */}
+                                            {meetingForm.date && meetingForm.type !== 'Committee' && (() => {
+                                                const _today = new Date(); _today.setHours(0,0,0,0);
+                                                const isPast = (d: string) => new Date(d) < _today;
+                                                const fmt = (d: string) => new Date(d).toLocaleDateString('en-NZ');
+                                                const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - _today.getTime()) / (1000*60*60*24));
+                                                const dates = computeMeetingDates(meetingForm.date!);
+                                                const meetingPast = isPast(meetingForm.date!);
+                                                const chips = [
+                                                    { label: 'NOI Preferred', date: dates.noiPref, done: !!meetingForm.noiIssued, status: meetingForm.noiIssued ? `✓ Issued ${meetingForm.noiIssuedDate ? fmt(meetingForm.noiIssuedDate) : ''}` : isPast(dates.noiPref) ? 'Passed' : `${daysUntil(dates.noiPref)}d away`, color: meetingForm.noiIssued ? 'emerald' : isPast(dates.noiPref) ? 'red' : 'slate' },
+                                                    { label: 'NOI Statutory', date: dates.noiDead, done: !!meetingForm.noiIssued, status: meetingForm.noiIssued ? '✓ Met' : isPast(dates.noiDead) ? 'Passed' : `${daysUntil(dates.noiDead)}d remaining`, color: meetingForm.noiIssued ? 'emerald' : isPast(dates.noiDead) ? 'red' : 'amber' },
+                                                    { label: 'NOI Response Due', date: meetingForm.noiResponseDueDate || '—', done: false, status: meetingForm.noiResponseDueDate ? (!meetingPast && isPast(meetingForm.noiResponseDueDate) ? 'Overdue' : meetingPast ? 'Closed' : `${daysUntil(meetingForm.noiResponseDueDate)}d away`) : 'Not set', color: meetingForm.noiResponseDueDate && !meetingPast && isPast(meetingForm.noiResponseDueDate) ? 'red' : 'slate' },
+                                                    { label: 'NOM Preferred', date: dates.nomPref, done: !!meetingForm.nomIssued, status: meetingForm.nomIssued ? `✓ Issued ${meetingForm.nomIssuedDate ? fmt(meetingForm.nomIssuedDate) : ''}` : isPast(dates.nomPref) ? 'Passed' : `${daysUntil(dates.nomPref)}d away`, color: meetingForm.nomIssued ? 'emerald' : isPast(dates.nomPref) ? 'red' : 'slate' },
+                                                    { label: 'NOM Statutory', date: dates.nomDead, done: !!meetingForm.nomIssued, status: meetingForm.nomIssued ? '✓ Met' : isPast(dates.nomDead) ? 'Passed' : `${daysUntil(dates.nomDead)}d remaining`, color: meetingForm.nomIssued ? 'emerald' : isPast(dates.nomDead) ? 'red' : 'amber' },
+                                                    { label: 'Meeting Date', date: meetingForm.date, done: false, status: meetingPast ? 'Completed' : `${daysUntil(meetingForm.date)}d away`, color: 'pink' },
+                                                ] as const;
+                                                const colorMap = {
+                                                    emerald: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400',
+                                                    red:     'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400',
+                                                    amber:   'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40 text-amber-700 dark:text-amber-400',
+                                                    pink:    'bg-pink-50 dark:bg-pink-900/10 border-pink-200 dark:border-pink-900/30 text-pink-700 dark:text-pink-400',
+                                                    slate:   'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400',
+                                                };
                                                 return (
-                                                    <div key={stage} className="border dark:border-slate-700 rounded-xl overflow-hidden">
-                                                        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-700">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stageLabel}</span>
-                                                                {items.length > 0 && (
-                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${doneCount === items.length ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-600' : doneCount === 0 ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-600'}`}>
-                                                                        {doneCount}/{items.length}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {(stage === 'NOI' || stage === 'NOM' || stage === 'AFTER_MEETING') && (
-                                                                isIssued ? (
-                                                                    <div className="flex items-center gap-1">
-                                                                        <CheckCircle2 size={10} className="text-emerald-500" />
-                                                                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">Issued {issuedDate ? new Date(issuedDate).toLocaleDateString('en-NZ') : ''}</span>
-                                                                        {!effectiveLocked && <button onClick={() => handleMarkIssued(stage as 'NOI' | 'NOM' | 'AFTER_MEETING', false)} className="ml-1 text-[8px] text-slate-400 hover:text-red-500 underline">Undo</button>}
-                                                                    </div>
-                                                                ) : (
-                                                                    <button onClick={() => handleMarkIssued(stage as 'NOI' | 'NOM' | 'AFTER_MEETING', true)} disabled={effectiveLocked} className="text-[9px] font-bold text-pink-600 hover:text-pink-700 border border-pink-200 hover:border-pink-300 px-2 py-0.5 rounded transition-colors disabled:opacity-40">{stage === 'AFTER_MEETING' ? 'Mark Minutes Issued' : 'Mark as Issued'}</button>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                        <div>
-                                                            {items.map(item => {
-                                                                const isDone = progress[item.id] || false;
-                                                                let dueBadge: React.ReactNode = null;
-                                                                if (item.dueDaysBeforeMeeting && meetingForm.date && !isDone) {
-                                                                    const d = new Date(meetingForm.date);
-                                                                    d.setDate(d.getDate() + (stage === 'AFTER_MEETING' ? item.dueDaysBeforeMeeting : -item.dueDaysBeforeMeeting));
-                                                                    const daysLeft = Math.ceil((d.getTime() - new Date().setHours(0,0,0,0)) / (1000*60*60*24));
-                                                                    const dueLabel = daysLeft < 0 ? `Overdue (${d.toLocaleDateString('en-NZ')})` : daysLeft === 0 ? 'Due today' : `Due ${d.toLocaleDateString('en-NZ')}`;
-                                                                    dueBadge = <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${daysLeft <= 1 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : daysLeft <= 7 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>{dueLabel}</span>;
-                                                                }
-                                                                const completedOn = completedDates[item.id];
-                                                                return (
-                                                                    <label key={item.id} className={`flex items-center gap-3 p-3 border-b dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors ${isDone ? 'opacity-60' : ''}`}>
-                                                                        <input type="checkbox" className="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 shrink-0" checked={isDone} onChange={() => handleToggleChecklistItem(item.id, stage)} disabled={effectiveLocked} />
-                                                                        <span className={`text-xs flex-1 ${isDone ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
-                                                                        {isDone && completedOn ? (
-                                                                            <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
-                                                                                ✓ Completed {new Date(completedOn).toLocaleDateString('en-NZ')}
-                                                                            </span>
-                                                                        ) : dueBadge}
-                                                                    </label>
-                                                                );
-                                                            })}
-                                                            {items.length === 0 && <div className="px-4 py-3 text-xs text-slate-400 italic">No items configured for this stage.</div>}
+                                                    <div className="mx-5 mb-4 border dark:border-slate-700 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/30">
+                                                        <div className="px-3 pt-2.5 pb-1 text-[8px] font-bold uppercase tracking-widest text-slate-400">Key Dates</div>
+                                                        <div className="flex overflow-x-auto px-3 pb-3 gap-2 scrollbar-thin">
+                                                            {chips.map(chip => (
+                                                                <div key={chip.label} className={`flex flex-col gap-0.5 px-2.5 py-2 rounded-lg border shrink-0 min-w-[96px] ${colorMap[chip.color]}`}>
+                                                                    <span className="text-[8px] font-bold uppercase tracking-wide opacity-80 whitespace-nowrap">{chip.label}</span>
+                                                                    <span className="text-[11px] font-bold font-mono whitespace-nowrap">{chip.date === '—' ? '—' : fmt(chip.date)}</span>
+                                                                    <span className="text-[8px] font-semibold whitespace-nowrap opacity-90">{chip.status}</span>
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     </div>
                                                 );
-                                            })}
-                                        </div>
-                                    </div>
+                                            })()}
 
-                                    {/* Post-meeting update card */}
-                                    {showPostMeetingCard && (
-                                        <div className="border-2 border-blue-500 dark:border-blue-600 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                                            <div className="flex items-center gap-2.5 px-5 py-3.5 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-100 dark:border-blue-900/40">
-                                                <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                                                <h3 className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-widest flex-1">Post-Meeting Update</h3>
-                                                <span className="text-[10px] text-slate-400">Updates the complex record</span>
+                                            <div className="space-y-3 px-5 pb-5">
+                                                {(['NOI', 'NOM', 'PRIOR_TO_MEETING', 'AFTER_MEETING'] as const).map(stage => {
+                                                    const stageLabel = { NOI: 'NOI', NOM: 'NOM', PRIOR_TO_MEETING: 'Prior to Meeting', AFTER_MEETING: 'After Meeting' }[stage];
+                                                    const items = getChecklistStages(form.type)?.[stage] || [];
+                                                    const progress = meetingForm.checklistProgress || {};
+                                                    const completedDates = meetingForm.checklistDates || {};
+                                                    const doneCount = items.filter(item => progress[item.id]).length;
+                                                    const isIssued = stage === 'NOI' ? !!meetingForm.noiIssued : stage === 'NOM' ? !!meetingForm.nomIssued : stage === 'AFTER_MEETING' ? !!meetingForm.minutesIssued : false;
+                                                    const issuedDate = stage === 'NOI' ? meetingForm.noiIssuedDate : stage === 'NOM' ? meetingForm.nomIssuedDate : stage === 'AFTER_MEETING' ? meetingForm.minutesIssuedDate : undefined;
+                                                    return (
+                                                        <div key={stage} className="border dark:border-slate-700 rounded-xl overflow-hidden">
+                                                            <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-700">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stageLabel}</span>
+                                                                    {items.length > 0 && (
+                                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${doneCount === items.length ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-600' : doneCount === 0 ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-600'}`}>
+                                                                            {doneCount}/{items.length}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {(stage === 'NOI' || stage === 'NOM' || stage === 'AFTER_MEETING') && (
+                                                                    isIssued ? (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <CheckCircle2 size={10} className="text-emerald-500" />
+                                                                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">Issued {issuedDate ? new Date(issuedDate).toLocaleDateString('en-NZ') : ''}</span>
+                                                                            {!effectiveLocked && <button onClick={() => handleMarkIssued(stage as 'NOI' | 'NOM' | 'AFTER_MEETING', false)} className="ml-1 text-[8px] text-slate-400 hover:text-red-500 underline">Undo</button>}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button onClick={() => handleMarkIssued(stage as 'NOI' | 'NOM' | 'AFTER_MEETING', true)} disabled={effectiveLocked} className="text-[9px] font-bold text-pink-600 hover:text-pink-700 border border-pink-200 hover:border-pink-300 px-2 py-0.5 rounded transition-colors disabled:opacity-40">{stage === 'AFTER_MEETING' ? 'Mark Minutes Issued' : 'Mark as Issued'}</button>
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                {items.map(item => {
+                                                                    const isDone = progress[item.id] || false;
+                                                                    let dueBadge: React.ReactNode = null;
+                                                                    if (item.dueDaysBeforeMeeting && meetingForm.date && !isDone) {
+                                                                        const d = new Date(meetingForm.date);
+                                                                        d.setDate(d.getDate() + (stage === 'AFTER_MEETING' ? item.dueDaysBeforeMeeting : -item.dueDaysBeforeMeeting));
+                                                                        const daysLeft = Math.ceil((d.getTime() - new Date().setHours(0,0,0,0)) / (1000*60*60*24));
+                                                                        const dueLabel = daysLeft < 0 ? `Overdue (${d.toLocaleDateString('en-NZ')})` : daysLeft === 0 ? 'Due today' : `Due ${d.toLocaleDateString('en-NZ')}`;
+                                                                        dueBadge = <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${daysLeft <= 1 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : daysLeft <= 7 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>{dueLabel}</span>;
+                                                                    }
+                                                                    const completedOn = completedDates[item.id];
+                                                                    return (
+                                                                        <label key={item.id} className={`flex items-center gap-3 p-3 border-b dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors ${isDone ? 'opacity-60' : ''}`}>
+                                                                            <input type="checkbox" className="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 shrink-0" checked={isDone} onChange={() => handleToggleChecklistItem(item.id, stage)} disabled={effectiveLocked} />
+                                                                            <span className={`text-xs flex-1 ${isDone ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
+                                                                            {isDone && completedOn ? (
+                                                                                <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap">
+                                                                                    ✓ Completed {new Date(completedOn).toLocaleDateString('en-NZ')}
+                                                                                </span>
+                                                                            ) : dueBadge}
+                                                                        </label>
+                                                                    );
+                                                                })}
+                                                                {items.length === 0 && <div className="px-4 py-3 text-xs text-slate-400 italic">No items configured for this stage.</div>}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                {postMeetingFields.map(field => (
-                                                    <div key={field.id} className="flex flex-col gap-1">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                                                            {field.label}
-                                                            {field.required && <span className="text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold normal-case tracking-normal">Required</span>}
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-family-inherit"
-                                                            value={postMeetingFormData[field.id] ?? ''}
-                                                            onChange={e => setPostMeetingFormData(prev => ({ ...prev, [field.id]: e.target.value }))}
-                                                            placeholder={field.fieldKey.includes('Balance') || field.fieldKey.includes('Budget') ? 'e.g. $12,000' : ''}
-                                                        />
+                                        </div>
+
+                                        {/* Post-meeting update card */}
+                                        {showPostMeetingCard && (
+                                            <div className="border-2 border-blue-500 dark:border-blue-600 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+                                                <div className="flex items-center gap-2.5 px-5 py-3.5 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-100 dark:border-blue-900/40">
+                                                    <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                                                    <h3 className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-widest flex-1">Post-Meeting Update</h3>
+                                                    <span className="text-[10px] text-slate-400">Updates the complex record</span>
+                                                </div>
+                                                <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    {postMeetingFields.map(field => (
+                                                        <div key={field.id} className="flex flex-col gap-1">
+                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                                {field.label}
+                                                                {field.required && <span className="text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold normal-case tracking-normal">Required</span>}
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-family-inherit"
+                                                                value={postMeetingFormData[field.id] ?? ''}
+                                                                onChange={e => setPostMeetingFormData(prev => ({ ...prev, [field.id]: e.target.value }))}
+                                                                placeholder={field.fieldKey.includes('Balance') || field.fieldKey.includes('Budget') ? 'e.g. $12,000' : ''}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="flex items-center justify-between px-5 py-3.5 border-t dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                                                    <span className="text-[10px] text-slate-400">Required fields must be filled before saving</span>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => setMeetingForm({ ...meetingForm, postMeetingUpdateDismissed: true })}
+                                                            className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs font-bold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                        >
+                                                            Dismiss
+                                                        </button>
+                                                        <button
+                                                            onClick={handleSavePostMeeting}
+                                                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
+                                                        >
+                                                            Save to Complex
+                                                        </button>
                                                     </div>
-                                                ))}
-                                            </div>
-                                            <div className="flex items-center justify-between px-5 py-3.5 border-t dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                                                <span className="text-[10px] text-slate-400">Required fields must be filled before saving</span>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => setMeetingForm({ ...meetingForm, postMeetingUpdateDismissed: true })}
-                                                        className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs font-bold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                                    >
-                                                        Dismiss
-                                                    </button>
-                                                    <button
-                                                        onClick={handleSavePostMeeting}
-                                                        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
-                                                    >
-                                                        Save to Complex
-                                                    </button>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {/* Delete row */}
-                                    {selectedMeetingId !== 'new' && !effectiveLocked && (
-                                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border dark:border-slate-800 shadow-sm">
-                                            {meetingDeleteConfirm === selectedMeetingId && (
-                                                <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/30 mb-3">
-                                                    <span className="text-xs text-red-700 dark:text-red-400 font-medium flex-1">Remove this meeting permanently?</span>
-                                                    <button onClick={() => confirmDeleteMeeting(selectedMeetingId!)} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors">Delete</button>
-                                                    <button onClick={() => setMeetingDeleteConfirm(null)} className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-                                                </div>
-                                            )}
-                                            <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId!)} className="flex items-center gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 transition-colors text-xs font-bold"><Trash2 size={14} /> Delete Meeting</button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                                        {/* Delete row */}
+                                        {selectedMeetingId !== 'new' && !effectiveLocked && (
+                                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border dark:border-slate-800 shadow-sm">
+                                                {meetingDeleteConfirm === selectedMeetingId && (
+                                                    <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-100 dark:border-red-900/30 mb-3">
+                                                        <span className="text-xs text-red-700 dark:text-red-400 font-medium flex-1">Remove this meeting permanently?</span>
+                                                        <button onClick={() => confirmDeleteMeeting(selectedMeetingId!)} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors">Delete</button>
+                                                        <button onClick={() => setMeetingDeleteConfirm(null)} className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                                                    </div>
+                                                )}
+                                                <button onClick={(e) => handleDeleteMeeting(e, selectedMeetingId!)} className="flex items-center gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-100 dark:border-red-900/30 transition-colors text-xs font-bold"><Trash2 size={14} /> Delete Meeting</button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
 
                     {activeTab === 'conflict' && (
@@ -2083,10 +2125,14 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                 </div>
 
                 <div className="p-5 border-t dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center transition-colors">
-                    <div className="text-[10px] font-bold text-amber-600 dark:text-amber-500 flex items-center gap-2"><AlertCircle size={14} /> Unsaved changes will be lost.</div>
+                    {isDirty ? (
+                        <div className="text-[10px] font-bold text-amber-600 dark:text-amber-500 flex items-center gap-2"><AlertCircle size={14} /> You have unsaved changes.</div>
+                    ) : (
+                        <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500 flex items-center gap-2"><CheckCircle2 size={14} /> No unsaved changes.</div>
+                    )}
                     <div className="flex gap-3">
                         <button onClick={onClose} className="px-6 py-2.5 text-slate-600 dark:text-slate-300 font-bold text-sm border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Discard</button>
-                        <button onClick={handleSaveWithLogs} className="px-8 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 transition-all"><Save size={18} /> Save Changes</button>
+                        <button onClick={handleSaveWithLogs} disabled={!isDirty} className={`px-8 py-2.5 rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 transition-all ${isDirty ? 'bg-pink-600 hover:bg-pink-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed shadow-none'}`}><Save size={18} /> Save Changes</button>
                     </div>
                 </div>
             </div>
