@@ -763,7 +763,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     ] as Array<{ id: string; label: string; icon: React.ElementType; alert?: boolean; count?: number }>).map(tab => {
                         const Icon = tab.icon;
                         return (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-3 mr-6 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${activeTab === tab.id ? 'border-pink-600 text-pink-600' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`py-3.5 mr-6 text-xs font-bold uppercase tracking-wider border-b-[3px] transition-colors whitespace-nowrap flex items-center gap-1.5 ${activeTab === tab.id ? 'border-pink-600 text-pink-600' : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}>
                                 <Icon size={13} />{tab.label}
                                 {tab.alert && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
                                 {!tab.alert && tab.count !== undefined && tab.count > 0 && <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400">{tab.count}</span>}
