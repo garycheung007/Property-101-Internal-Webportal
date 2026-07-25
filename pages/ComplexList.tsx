@@ -724,7 +724,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     return (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-900 w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-2xl">
-                <div className="p-5 border-b dark:border-slate-800 flex justify-between bg-slate-50 dark:bg-slate-950">
+                <div className="p-5 border-b dark:border-slate-800 flex justify-between bg-slate-50 dark:bg-slate-950 flex-shrink-0">
                     <div>
                         <h2 className="text-xl font-bold dark:text-white">{form.name}</h2>
                         <p className="text-slate-500 text-xs font-mono">{form.bcNumber} • {form.address}</p>
@@ -733,7 +733,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                 </div>
 
                 {/* Status strip */}
-                <div className="flex gap-2 flex-wrap items-center px-6 py-2.5 border-b dark:border-slate-800 bg-white dark:bg-slate-900">
+                <div className="flex gap-2 flex-wrap items-center px-6 py-2.5 border-b dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
                     <button onClick={() => setActiveTab('insurance')} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${insuranceExpired ? 'bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/30 hover:bg-red-100' : 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/30'}`}>
                         {insuranceExpired ? <ShieldAlert size={11} /> : <ShieldCheck size={11} />}
                         {insuranceExpired ? `Insurance expired ${formatDateNZ(form.insuranceExpiry)}` : `Insurance valid to ${formatDateNZ(form.insuranceExpiry)}`}
@@ -752,7 +752,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     )}
                 </div>
 
-                <div className="flex border-b dark:border-slate-800 px-6 overflow-x-auto bg-white dark:bg-slate-900 transition-colors">
+                <div className="flex border-b dark:border-slate-800 px-6 overflow-x-auto bg-white dark:bg-slate-900 transition-colors flex-shrink-0">
                     {([
                         { id: 'details', label: 'Overview', icon: Building },
                         { id: 'insurance', label: 'Insurance', icon: ShieldCheck, alert: insuranceExpired },
@@ -2124,7 +2124,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     )}
                 </div>
 
-                <div className="p-5 border-t dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center transition-colors">
+                <div className="p-5 border-t dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center transition-colors flex-shrink-0">
                     {isDirty ? (
                         <div className="text-[10px] font-bold text-amber-600 dark:text-amber-500 flex items-center gap-2"><AlertCircle size={14} /> You have unsaved changes.</div>
                     ) : (
