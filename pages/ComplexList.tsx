@@ -10,7 +10,7 @@ import {
     ToggleLeft, Check, AlertCircle, MapPinHouse,
     User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
-    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2
+    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2, Settings2
 } from 'lucide-react';
 import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry, MeetingDateSettings, PostMeetingField } from '../types';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
@@ -94,7 +94,7 @@ const ComplexList: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const hasInitializedFilter = useRef(false);
   const [selectedComplexId, setSelectedComplexId] = useState<string | null>(null);
-  const [initialModalTab, setInitialModalTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>('details');
+  const [initialModalTab, setInitialModalTab] = useState<'details' | 'settings' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>('details');
   const [showAddModal, setShowAddModal] = useState(false);
 
   const selectedComplex = complexes.find(c => c.id === selectedComplexId) || null;
@@ -117,7 +117,7 @@ const ComplexList: React.FC = () => {
     const tabParam = searchParams.get('tab');
     if (idParam) {
         setSelectedComplexId(idParam);
-        if (tabParam && ['details', 'insurance', 'meetings', 'disclosure', 'logs', 'conflict'].includes(tabParam)) setInitialModalTab(tabParam as any);
+        if (tabParam && ['details', 'settings', 'insurance', 'meetings', 'disclosure', 'logs', 'conflict'].includes(tabParam)) setInitialModalTab(tabParam as any);
     }
   }, [searchParams]);
 
@@ -410,14 +410,14 @@ const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: 
   );
 };
 
-const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; onSave: (bc: BodyCorporate) => void; initialTab?: 'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict' }> = ({ complex, onClose, onSave, initialTab = 'details' }) => {
+const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; onSave: (bc: BodyCorporate) => void; initialTab?: 'details' | 'settings' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict' }> = ({ complex, onClose, onSave, initialTab = 'details' }) => {
     const { contractors, actionComments, addActionComment, systemSettings, managers } = useData();
     const { user: currentUser } = useAuth();
     const { showToast } = useToast();
     const [form, setForm] = useState<BodyCorporate>(complex);
     const [baseline, setBaseline] = useState<BodyCorporate>(complex);
     const [hasBuildingManager, setHasBuildingManager] = useState<boolean>(!!complex.buildingManagerName);
-    const [activeTab, setActiveTab] = useState<'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'details' | 'settings' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>(initialTab);
     const [selectedConflictId, setSelectedConflictId] = useState<string | null>(null);
     const [conflictForm, setConflictForm] = useState<Partial<ConflictEntry>>({});
     const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
@@ -901,6 +901,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                 <div className="flex border-b dark:border-slate-800 px-6 overflow-x-auto bg-white dark:bg-slate-900 transition-colors flex-shrink-0">
                     {([
                         { id: 'details', label: 'Overview', icon: Building },
+                        { id: 'settings', label: 'Settings', icon: Settings2 },
                         { id: 'insurance', label: 'Insurance', icon: ShieldCheck, alert: insuranceExpired },
                         { id: 'meetings', label: 'Meetings', icon: Calendar, count: upcomingMeetingsCount },
                         { id: 'conflict', label: 'Conflicts', icon: ClipboardCheck },
@@ -1169,6 +1170,22 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 )}
                             </div>
                         </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-3">
+                            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
+                                <MessageSquareMore size={16} className="text-pink-600" /> Notes
+                            </h3>
+                            <textarea
+                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-1 focus:ring-pink-500 min-h-[120px]"
+                                placeholder="Add internal notes for this complex..."
+                                value={form.notes || ''}
+                                onChange={e => setForm({...form, notes: e.target.value})}
+                            />
+                        </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'settings' && (
+                        <div className="space-y-6">
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
                             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
                                 <DollarSign size={16} className="text-pink-600" /> Body Corporate Bank Account &amp; Levy
@@ -1308,18 +1325,6 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                             </div>
                         </div>
                         )}
-
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-3">
-                            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
-                                <MessageSquareMore size={16} className="text-pink-600" /> Notes
-                            </h3>
-                            <textarea
-                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-1 focus:ring-pink-500 min-h-[120px]"
-                                placeholder="Add internal notes for this complex..."
-                                value={form.notes || ''}
-                                onChange={e => setForm({...form, notes: e.target.value})}
-                            />
-                        </div>
                         </div>
                     )}
 
