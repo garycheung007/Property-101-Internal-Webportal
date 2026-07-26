@@ -13,13 +13,13 @@ import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar, DollarSign
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar, DollarSign, Bell
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'];
 
-const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: (u: User) => Promise<void> }> = ({ user, onClose, onSave }) => {
+const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: (u: User) => Promise<void>; allUsers: User[] }> = ({ user, onClose, onSave, allUsers }) => {
     const isCreating = !user;
     const [form, setForm] = useState<Partial<User>>(user || { role: 'account_manager' });
     const [isSaving, setIsSaving] = useState(false);
@@ -69,7 +69,17 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
                 <div className="p-6 space-y-4">
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Full Name</label><input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} /></div>
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Email</label><input type="email" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></div>
-                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Role</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm bg-white" value={form.role || 'account_manager'} onChange={e => setForm({...form, role: e.target.value as any})}><option value="admin">Admin</option><option value="account_manager">Manager</option><option value="support">Support</option></select></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Role</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm bg-white" value={form.role || 'account_manager'} onChange={e => setForm({...form, role: e.target.value as any, supportedManagerName: undefined})}><option value="admin">Admin</option><option value="account_manager">Manager</option><option value="support">Support</option></select></div>
+                    {form.role === 'support' && (
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Assigned Manager</label>
+                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm bg-white" value={form.supportedManagerName || ''} onChange={e => setForm({...form, supportedManagerName: e.target.value || undefined})}>
+                                <option value="">— Not assigned —</option>
+                                {allUsers.filter(u => u.role === 'account_manager').map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                            </select>
+                            <p className="text-[10px] text-slate-400 mt-1">Support staff will default to this manager's portfolio filter when they log in.</p>
+                        </div>
+                    )}
                     {isCreating && (
                         <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Password</label>
@@ -292,6 +302,7 @@ const AdminPanel: React.FC = () => {
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     
     const [bwofMessage, setBwofMessage] = useState(systemSettings.bwofConfirmationMessage || '');
+    const [localEmailDigestEnabled, setLocalEmailDigestEnabled] = useState(systemSettings.emailDigestEnabled ?? false);
 
     // Local configuration states for granular tabs
     const [localInsurance, setLocalInsurance] = useState<InsuranceSettings>(systemSettings.insuranceSettings || { valuationValidityYears: 2, workflowSteps: [] });
@@ -326,6 +337,7 @@ const AdminPanel: React.FC = () => {
     const [newTierName, setNewTierName] = useState('');
     const [newTierAmount, setNewTierAmount] = useState('');
     const [savingTiers, setSavingTiers] = useState(false);
+    const [tierAddError, setTierAddError] = useState('');
 
     // Data tab — CSV
     const [csvPreview, setCsvPreview] = useState<CsvPreviewRow[] | null>(null);
@@ -371,6 +383,7 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.conflictRegisterTemplate) setLocalConflictRegisterTemplate(systemSettings.conflictRegisterTemplate);
         if (systemSettings.invoicePricingTiers) setLocalPricingTiers(systemSettings.invoicePricingTiers);
         if (systemSettings.postMeetingFields) setLocalPostMeetingFields(systemSettings.postMeetingFields);
+        if (systemSettings.emailDigestEnabled !== undefined) setLocalEmailDigestEnabled(systemSettings.emailDigestEnabled);
     }, [systemSettings]);
 
     useEffect(() => {
@@ -656,6 +669,7 @@ const AdminPanel: React.FC = () => {
             conflictRegisterTemplate: localConflictRegisterTemplate,
             meetingDateSettings: localMeetingDateSettings,
             postMeetingFields: localPostMeetingFields,
+            emailDigestEnabled: localEmailDigestEnabled,
         });
         alert("System settings updated successfully.");
     };
@@ -807,6 +821,23 @@ const AdminPanel: React.FC = () => {
 
                     {activeTab === 'settings' && (
                         <div className="space-y-8 pb-24">
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <Bell size={18} className="text-pink-600" />
+                                        <div>
+                                            <h2 className="text-sm font-bold uppercase tracking-widest dark:text-white">Daily Email Digest</h2>
+                                            <p className="text-xs text-slate-400 mt-1">When enabled, a daily summary of high-priority alerts is sent to each account manager. Requires the Cloud Function to be deployed separately.</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setLocalEmailDigestEnabled(!localEmailDigestEnabled)}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${localEmailDigestEnabled ? 'bg-pink-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+                                    >
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${localEmailDigestEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                    </button>
+                                </div>
+                            </div>
                             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
                                 <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                                     <ShieldCheck size={18} className="text-pink-600" /> Insurance Configuration
@@ -1125,7 +1156,7 @@ const AdminPanel: React.FC = () => {
                                                 className="flex-1 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
                                                 placeholder="New tier name (e.g. Standard S146)"
                                                 value={newTierName}
-                                                onChange={e => setNewTierName(e.target.value)}
+                                                onChange={e => { setNewTierName(e.target.value); setTierAddError(''); }}
                                             />
                                             <div className="relative">
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
@@ -1136,21 +1167,24 @@ const AdminPanel: React.FC = () => {
                                                     className="w-28 pl-7 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg p-2 text-sm"
                                                     placeholder="0.00"
                                                     value={newTierAmount}
-                                                    onChange={e => setNewTierAmount(e.target.value)}
+                                                    onChange={e => { setNewTierAmount(e.target.value); setTierAddError(''); }}
                                                 />
                                             </div>
                                             <button
                                                 onClick={() => {
-                                                    if (!newTierName.trim() || !newTierAmount || parseFloat(newTierAmount) <= 0) return;
+                                                    if (!newTierName.trim()) { setTierAddError('Please enter a tier name.'); return; }
+                                                    if (!newTierAmount || parseFloat(newTierAmount) <= 0) { setTierAddError('Please enter a valid amount greater than $0.'); return; }
                                                     setLocalPricingTiers([...localPricingTiers, { id: `tier_${Date.now()}`, name: newTierName.trim(), amountExclGst: parseFloat(newTierAmount) }]);
                                                     setNewTierName('');
                                                     setNewTierAmount('');
+                                                    setTierAddError('');
                                                 }}
                                                 className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-bold uppercase transition-all"
                                             >
                                                 <Plus size={14} />
                                             </button>
                                         </div>
+                                        {tierAddError && <p className="text-xs text-red-500 dark:text-red-400 font-medium">{tierAddError}</p>}
                                         <button
                                             onClick={async () => { setSavingTiers(true); await updateInvoicePricingTiers(localPricingTiers); setSavingTiers(false); }}
                                             disabled={savingTiers}
@@ -1715,7 +1749,7 @@ const AdminPanel: React.FC = () => {
                 </div>
             )}
 
-            {isUserModalOpen && <UserEditModal user={editingUser} onClose={() => setIsUserModalOpen(false)} onSave={async (u) => { if (editingUser) await updateUser(u); else await addUser(u); setIsUserModalOpen(false); }} />}
+            {isUserModalOpen && <UserEditModal user={editingUser} onClose={() => setIsUserModalOpen(false)} onSave={async (u) => { if (editingUser) await updateUser(u); else await addUser(u); setIsUserModalOpen(false); }} allUsers={users} />}
         </div>
     );
 };

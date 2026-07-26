@@ -99,8 +99,13 @@ const ComplexList: React.FC = () => {
 
   useEffect(() => {
     if (!hasInitializedFilter.current && complexes.length > 0 && user) {
-      const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName === user.name);
-      if (hasOwnComplexes) setFilterManager(user.name);
+      if (user.role === 'support' && user.supportedManagerName) {
+        const managerHasComplexes = complexes.some(c => !c.isArchived && c.managerName === user.supportedManagerName);
+        if (managerHasComplexes) setFilterManager(user.supportedManagerName);
+      } else if (user.role === 'account_manager') {
+        const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName === user.name);
+        if (hasOwnComplexes) setFilterManager(user.name);
+      }
       hasInitializedFilter.current = true;
     }
   }, [complexes, user]);
@@ -483,6 +488,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const postMeetingFields: PostMeetingField[] = systemSettings.postMeetingFields || DEFAULT_POST_MEETING_FIELDS;
     const showPostMeetingCard = isMeetingLocked && !meetingForm.postMeetingUpdateSaved && !meetingForm.postMeetingUpdateDismissed;
     const showPostMeetingBadge = isMeetingLocked && !meetingForm.postMeetingUpdateSaved && !!meetingForm.postMeetingUpdateDismissed;
+    const hasRequiredPostMeetingMissing = postMeetingFields.some(f => f.required && !postMeetingFormData[f.id]?.trim());
 
     const insuranceExpired = !isInsuranceValid(form.insuranceExpiry);
     const upcomingMeetingsCount = (form.meetings || []).filter(m => !isMeetingPassed(m.date)).length;
@@ -1632,7 +1638,8 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         </button>
                                                         <button
                                                             onClick={handleSavePostMeeting}
-                                                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
+                                                            disabled={hasRequiredPostMeetingMissing}
+                                                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
                                                             Save to Complex
                                                         </button>

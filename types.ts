@@ -265,10 +265,11 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  password?: string; 
+  password?: string;
   title?: string;
   phone?: string;
   signatureUrl?: string;
+  supportedManagerName?: string;
 }
 
 export interface SystemSettings {
@@ -292,6 +293,7 @@ export interface SystemSettings {
   meetingDateSettings?: { bc: MeetingDateSettings; rs: MeetingDateSettings };
   invoicePricingTiers?: InvoicePricingTier[];
   postMeetingFields?: PostMeetingField[];
+  emailDigestEnabled?: boolean;
 }
 
 export type ContractorCategory = string;

@@ -179,6 +179,10 @@ const DocumentGenerator: React.FC = () => {
   
   const templates = systemSettings.documentTemplates || { noiLetter: '', responseForm: '' };
 
+  const isISOC = selectedComplex?.type === 'Incorporated Society';
+  const hasLetterTemplate = !!(isISOC ? (templates.noiLetterISOC || templates.noiLetter) : (templates.noiLetterBC || templates.noiLetter));
+  const hasFormTemplate = !!(isISOC ? (templates.responseFormISOC || templates.responseForm) : (templates.responseFormBC || templates.responseForm));
+
   const handleGenerate = () => {
     if (!selectedBcId) return;
     setLoading(true);
@@ -300,9 +304,12 @@ const DocumentGenerator: React.FC = () => {
                                 <button onClick={() => setPreviewMode('form')} className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${previewMode === 'form' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-50'}`}>Form</button>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                <button onClick={exportLetter} className="w-full bg-[#2b579a] hover:bg-[#1e3f72] text-white py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all shadow-lg text-xs uppercase tracking-tighter"><FileType size={18} /><span>Export Letter</span></button>
-                                <button onClick={exportForm} className="w-full bg-[#1e7242] hover:bg-[#155e34] text-white py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all shadow-lg text-xs uppercase tracking-tighter"><FileInput size={18} /><span>Export Form</span></button>
+                                <button onClick={exportLetter} disabled={!hasLetterTemplate} title={!hasLetterTemplate ? 'No letter template uploaded — go to Admin Panel → Templates' : undefined} className="w-full bg-[#2b579a] hover:bg-[#1e3f72] text-white py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all shadow-lg text-xs uppercase tracking-tighter disabled:opacity-40 disabled:cursor-not-allowed"><FileType size={18} /><span>Export Letter</span></button>
+                                <button onClick={exportForm} disabled={!hasFormTemplate} title={!hasFormTemplate ? 'No response form template uploaded — go to Admin Panel → Templates' : undefined} className="w-full bg-[#1e7242] hover:bg-[#155e34] text-white py-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition-all shadow-lg text-xs uppercase tracking-tighter disabled:opacity-40 disabled:cursor-not-allowed"><FileInput size={18} /><span>Export Form</span></button>
                             </div>
+                            {(!hasLetterTemplate || !hasFormTemplate) && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center">Templates missing — upload via Admin Panel → Templates</p>
+                            )}
                         </div>
                     )}
                 </div>
