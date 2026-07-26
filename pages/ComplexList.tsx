@@ -15,6 +15,7 @@ import {
 import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry, MeetingDateSettings, PostMeetingField } from '../types';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS, DEFAULT_POST_MEETING_FIELDS } from '../constants/defaults';
+import FieldHint from '../components/FieldHint';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -205,94 +206,193 @@ const ComplexList: React.FC = () => {
   );
 };
 
-const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: () => void; onSave: (bc: BodyCorporate) => Promise<void> }> = ({ managers, onClose, onSave }) => {
-  const [form, setForm] = useState({
-    name: '',
-    bcNumber: '',
-    address: '',
-    type: 'Body Corporate' as import('../types').ComplexType,
-    managerName: managers[0]?.name || '',
-    managementStartDate: '',
-    insuranceExpiry: '',
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+const WIZARD_STEPS = ['Identity', 'Portfolio', 'Insurance', 'First Meeting'];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name.trim() || !form.bcNumber.trim() || !form.address.trim()) {
-      setError('Name, BC Number, and Address are required.');
-      return;
+const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: () => void; onSave: (bc: BodyCorporate) => Promise<void> }> = ({ managers, onClose, onSave }) => {
+  const [step, setStep] = useState(0);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    // Step 1
+    name: '', bcNumber: '', type: 'Body Corporate' as import('../types').ComplexType, address: '',
+    // Step 2
+    managerName: managers[0]?.name || '', managementFee: '', managementStartDate: '',
+    financialYearStart: '1 April', financialYearEnd: '31 March',
+    // Step 3
+    insuranceExpiry: '', insuranceBroker: '',
+    // Step 4
+    meetingType: 'AGM' as 'AGM'|'EGM'|'SGM'|'Committee', meetingDate: '', meetingTime: '', meetingVenue: '', skipMeeting: false,
+  });
+
+  const input = (label: string, key: keyof typeof form, type = 'text', placeholder = '', required = false) => (
+    <div>
+      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">{label}{required && ' *'}</label>
+      <input type={type} value={form[key] as string} onChange={e => { setForm(f => ({ ...f, [key]: e.target.value })); setError(''); }}
+        className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-pink-500"
+        placeholder={placeholder} />
+    </div>
+  );
+
+  const validate = (): boolean => {
+    if (step === 0) {
+      if (!form.name.trim()) { setError('Complex name is required.'); return false; }
+      if (!form.bcNumber.trim()) { setError('BC / IS number is required.'); return false; }
+      if (!form.address.trim()) { setError('Address is required.'); return false; }
     }
+    if (step === 2 && !form.insuranceExpiry) { setError('Insurance expiry date is required.'); return false; }
+    return true;
+  };
+
+  const handleNext = () => { if (validate()) { setError(''); setStep(s => s + 1); } };
+  const handleBack = () => { setError(''); setStep(s => s - 1); };
+
+  const handleCreate = async () => {
+    if (!validate()) return;
     setSaving(true);
     const newBc: BodyCorporate = {
       id: `bc_${Date.now()}`,
-      bcNumber: form.bcNumber.trim(),
-      name: form.name.trim(),
-      address: form.address.trim(),
-      units: 0,
-      type: form.type,
-      managerName: form.managerName,
-      managementFee: 0,
+      bcNumber: form.bcNumber.trim(), name: form.name.trim(), address: form.address.trim(),
+      units: 0, type: form.type, managerName: form.managerName,
+      managementFee: parseFloat(form.managementFee) || 0,
       managementStartDate: form.managementStartDate || undefined,
-      financialYearEnd: '',
-      insuranceExpiry: form.insuranceExpiry || '',
+      financialYearStart: form.financialYearStart, financialYearEnd: form.financialYearEnd,
+      insuranceExpiry: form.insuranceExpiry, insuranceBroker: form.insuranceBroker || undefined,
       meetings: [],
     };
+    if (!form.skipMeeting && form.meetingDate) {
+      newBc.meetings = [{ id: `mtg_${Date.now()}`, type: form.meetingType, date: form.meetingDate, time: form.meetingTime, venue: form.meetingVenue }];
+    }
     await onSave(newBc);
     setSaving(false);
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between p-6 border-b dark:border-slate-700">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white">Add New Complex</h2>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b dark:border-slate-700 flex-shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Add New Complex</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Step {step + 1} of {WIZARD_STEPS.length} — {WIZARD_STEPS[step]}</p>
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Complex Name *</label>
-              <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" placeholder="e.g. Harbour View Apartments" />
+
+        {/* Step indicator */}
+        <div className="flex px-6 pt-4 gap-2 flex-shrink-0">
+          {WIZARD_STEPS.map((s, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-pink-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                {i < step ? '✓' : i + 1}
+              </div>
+              <span className={`text-[9px] font-bold uppercase tracking-wider ${i === step ? 'text-pink-600' : 'text-slate-400'}`}>{s}</span>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">BC / IS Number *</label>
-              <input type="text" value={form.bcNumber} onChange={e => setForm(f => ({ ...f, bcNumber: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" placeholder="e.g. BC12345" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Type</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as import('../types').ComplexType }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none">
-                <option value="Body Corporate">Body Corporate</option>
-                <option value="Incorporated Society">Incorporated Society</option>
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Address *</label>
-              <input type="text" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" placeholder="e.g. 123 Main Street, Auckland" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Manager</label>
-              <select value={form.managerName} onChange={e => setForm(f => ({ ...f, managerName: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none">
-                {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Management Start Date</label>
-              <input type="date" value={form.managementStartDate} onChange={e => setForm(f => ({ ...f, managementStartDate: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Insurance Expiry</label>
-              <input type="date" value={form.insuranceExpiry} onChange={e => setForm(f => ({ ...f, insuranceExpiry: e.target.value }))} className="w-full px-3 py-2 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none" />
-            </div>
-          </div>
-          <p className="text-xs text-slate-400">Other details (units, fees, financial year, etc.) can be filled in after creation.</p>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm rounded-lg border dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-medium transition-colors disabled:opacity-50">{saving ? 'Saving...' : 'Create Complex'}</button>
-          </div>
-        </form>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+          {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2">{error}</p>}
+
+          {step === 0 && (
+            <>
+              {input('Complex Name', 'name', 'text', 'e.g. Harbour View Apartments', true)}
+              <div className="grid grid-cols-2 gap-4">
+                {input('BC / IS Number', 'bcNumber', 'text', 'e.g. BC12345', true)}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Type</label>
+                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
+                    <option value="Body Corporate">Body Corporate</option>
+                    <option value="Incorporated Society">Incorporated Society</option>
+                  </select>
+                </div>
+              </div>
+              {input('Address', 'address', 'text', 'e.g. 123 Main Street, Auckland', true)}
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Account Manager</label>
+                <select value={form.managerName} onChange={e => setForm(f => ({ ...f, managerName: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
+                  {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                </select>
+              </div>
+              {input('Management Fee (NZD)', 'managementFee', 'number', 'e.g. 12500')}
+              {input('Management Start Date', 'managementStartDate', 'date')}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">FY Start</label>
+                  <select value={form.financialYearStart} onChange={e => setForm(f => ({ ...f, financialYearStart: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
+                    {['1 January','1 February','1 March','1 April','1 May','1 June','1 July','1 August','1 September','1 October','1 November','1 December'].map(m => <option key={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">FY End</label>
+                  <select value={form.financialYearEnd} onChange={e => setForm(f => ({ ...f, financialYearEnd: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
+                    {['31 January','28/29 February','31 March','30 April','31 May','30 June','31 July','31 August','30 September','31 October','30 November','31 December'].map(m => <option key={m}>{m}</option>)}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              {input('Insurance Expiry *', 'insuranceExpiry', 'date', '', true)}
+              {input('Insurance Broker', 'insuranceBroker', 'text', 'e.g. Crombie Lockwood')}
+              <p className="text-xs text-slate-400">Other insurance details (underwriter, valuer, workflow) can be filled in after creation.</p>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                <span className="text-sm font-medium dark:text-white">Schedule a first meeting now</span>
+                <button type="button" onClick={() => setForm(f => ({ ...f, skipMeeting: !f.skipMeeting }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!form.skipMeeting ? 'bg-pink-600' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${!form.skipMeeting ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              {!form.skipMeeting && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Meeting Type</label>
+                      <select value={form.meetingType} onChange={e => setForm(f => ({ ...f, meetingType: e.target.value as any }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
+                        {['AGM','EGM','SGM','Committee'].map(t => <option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    {input('Date', 'meetingDate', 'date')}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {input('Time', 'meetingTime', 'time')}
+                    {input('Venue', 'meetingVenue', 'text', 'e.g. Onsite')}
+                  </div>
+                </>
+              )}
+              {form.skipMeeting && <p className="text-xs text-slate-400">You can schedule meetings from the complex's Meetings tab after creation.</p>}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-between gap-3 p-6 border-t dark:border-slate-700 flex-shrink-0">
+          <button type="button" onClick={step === 0 ? onClose : handleBack}
+            className="px-4 py-2 text-sm rounded-xl border dark:border-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            {step === 0 ? 'Cancel' : '← Back'}
+          </button>
+          {step < WIZARD_STEPS.length - 1 ? (
+            <button type="button" onClick={handleNext} className="px-6 py-2 text-sm rounded-xl bg-pink-600 hover:bg-pink-700 text-white font-medium transition-colors">
+              Next →
+            </button>
+          ) : (
+            <button type="button" onClick={handleCreate} disabled={saving} className="px-6 py-2 text-sm rounded-xl bg-pink-600 hover:bg-pink-700 text-white font-medium transition-colors disabled:opacity-50">
+              {saving ? 'Creating...' : 'Create Complex'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1073,7 +1173,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Debt Collection Reminder (days after due date)</label>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Debt Collection Reminder (days after due date)<FieldHint text="Number of days after a levy due date before a debt collection reminder alert appears on the Dashboard. E.g. 14 = alert fires 14 days after the levy was due." /></label>
                                     <input
                                         type="number"
                                         min={1}
@@ -1135,18 +1235,18 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                             <p className="text-xs text-slate-400">Override system defaults for this complex. Leave blank to use system defaults.</p>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                 {([
-                                    { key: 'noiPreferDays', label: 'NOI Preferred (days before)' },
-                                    { key: 'noiDeadlineDays', label: 'NOI Deadline (days before)' },
-                                    { key: 'nomPreferDays', label: 'NOM Preferred (days before)' },
-                                    { key: 'nomDeadlineDays', label: 'NOM Deadline (days before)' },
-                                    { key: 'minutesPreferDays', label: 'Minutes Preferred (days after)' },
-                                    { key: 'minutesDeadlineDays', label: 'Minutes Deadline (days after)' },
-                                ] as { key: keyof MeetingDateSettings; label: string }[]).map(({ key, label }) => {
+                                    { key: 'noiPreferDays', label: 'NOI Preferred (days before)', hint: 'Notice of Intention — how many days before the meeting you aim to send the NOI. This sets your preferred send date.' },
+                                    { key: 'noiDeadlineDays', label: 'NOI Deadline (days before)', hint: 'Notice of Intention — the statutory minimum days before the meeting that the NOI must be sent. Used to calculate the legal deadline.' },
+                                    { key: 'nomPreferDays', label: 'NOM Preferred (days before)', hint: 'Notice of Meeting — how many days before the meeting you aim to send the NOM (agenda + papers).' },
+                                    { key: 'nomDeadlineDays', label: 'NOM Deadline (days before)', hint: 'Notice of Meeting — the statutory minimum days before the meeting that the NOM must be sent.' },
+                                    { key: 'minutesPreferDays', label: 'Minutes Preferred (days after)', hint: 'How many days after the meeting you aim to send the confirmed minutes to owners.' },
+                                    { key: 'minutesDeadlineDays', label: 'Minutes Deadline (days after)', hint: 'The maximum days after the meeting by which minutes must be distributed under the rules.' },
+                                ] as { key: keyof MeetingDateSettings; label: string; hint: string }[]).map(({ key, label, hint }) => {
                                     const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc';
                                     const sysDefault = systemSettings.meetingDateSettings?.[typeKey]?.[key] ?? DEFAULT_MEETING_DATE_SETTINGS[typeKey][key];
                                     return (
                                         <div key={key}>
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</label>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}<FieldHint text={hint} /></label>
                                             <input
                                                 type="number"
                                                 min={1}

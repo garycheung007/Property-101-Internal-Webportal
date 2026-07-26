@@ -5,7 +5,8 @@ import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS, DEFAULT_POST_MEETING_FIELDS } from '../constants/defaults';
-import { db, firebaseConfig } from '../firebase';
+import { db, firebaseConfig, storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord, MeetingDateSettings, InvoicePricingTier, PostMeetingField } from '../types';
@@ -13,9 +14,10 @@ import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar, DollarSign, Bell
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar, DollarSign, Bell, Wrench
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import FieldHint from '../components/FieldHint';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'];
 
@@ -80,6 +82,21 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
                             <p className="text-[10px] text-slate-400 mt-1">Support staff will default to this manager's portfolio filter when they log in.</p>
                         </div>
                     )}
+                    {(form.role === 'account_manager' || form.role === 'admin') && (
+                        <div className="flex items-center justify-between py-1">
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Email Digest</label>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Receive daily summary of high-priority alerts</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setForm({...form, emailDigestEnabled: !form.emailDigestEnabled})}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${form.emailDigestEnabled ? 'bg-pink-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.emailDigestEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
+                    )}
                     {isCreating && (
                         <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Password</label>
@@ -126,7 +143,7 @@ const CSV_COLUMNS: CsvColumnDef[] = [
     { key: 'insuranceBroker',            header: 'Insurance Broker' },
     { key: 'insuranceUnderwriter',       header: 'Insurance Underwriter' },
     { key: 'lastInsuranceValuationDate', header: 'Last Valuation Date',          type: 'date' },
-    { key: 'lastInsuranceValuer',        header: 'Last Valuer' },
+    { key: 'insuranceValuer',             header: 'Last Valuer' },
     { key: 'hasBwof',                    header: 'Has BWOF',                     type: 'boolean' },
     { key: 'bwofExpiry',                 header: 'BWOF Expiry',                  type: 'date' },
     { key: 'bwofLastCompletionDate',     header: 'BWOF Last Completion',         type: 'date' },
@@ -395,17 +412,18 @@ const AdminPanel: React.FC = () => {
         });
     }, []);
 
-    const handleDocxUpload = (key: string, file: File) => {
+    const handleDocxUpload = async (key: string, file: File) => {
         setUploadingDocx(key);
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const base64 = (e.target?.result as string).split(',')[1];
-            const record: TemplateFileRecord = { name: file.name, data: base64, uploadedAt: new Date().toISOString() };
+        try {
+            const storageRef = ref(storage, `templates/${key}.docx`);
+            await uploadBytes(storageRef, file);
+            const storageUrl = await getDownloadURL(storageRef);
+            const record: TemplateFileRecord = { name: file.name, storageUrl, uploadedAt: new Date().toISOString() };
             await setDoc(doc(db, 'templates_v2', key), record);
             setDocxTemplates(prev => ({ ...prev, [key]: record }));
+        } finally {
             setUploadingDocx(null);
-        };
-        reader.readAsDataURL(file);
+        }
     };
 
     const renderDocxCard = (key: string, label: string) => {
@@ -1206,7 +1224,7 @@ const AdminPanel: React.FC = () => {
                                 <button onClick={() => {setEditingUser(null); setIsUserModalOpen(true);}} className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2"><UserPlus size={16} /> Add Staff</button>
                             </div>
                             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border dark:border-slate-800 overflow-hidden">
-                                <table className="w-full text-left text-sm"><thead className="bg-slate-50 dark:bg-slate-800/50 text-xs uppercase font-bold text-slate-500"><tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Email</th><th className="px-6 py-4">Role</th><th className="px-6 py-4 text-right">Actions</th></tr></thead><tbody className="divide-y dark:divide-slate-800">{filteredUsers.map((u) => (<tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors text-slate-600 dark:text-slate-400"><td className="px-6 py-4 font-bold text-slate-800 dark:text-white">{u.name}</td><td className="px-6 py-4">{u.email}</td><td className="px-6 py-4 capitalize">{u.role}</td><td className="px-6 py-4 text-right"><button onClick={() => {setEditingUser(u); setIsUserModalOpen(true);}} className="p-1.5 hover:text-pink-600 transition-colors"><Edit2 size={16}/></button></td></tr>))}</tbody></table>
+                                <table className="w-full text-left text-sm"><thead className="bg-slate-50 dark:bg-slate-800/50 text-xs uppercase font-bold text-slate-500"><tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Email</th><th className="px-6 py-4">Role</th><th className="px-6 py-4">Digest</th><th className="px-6 py-4 text-right">Actions</th></tr></thead><tbody className="divide-y dark:divide-slate-800">{filteredUsers.map((u) => (<tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors text-slate-600 dark:text-slate-400"><td className="px-6 py-4 font-bold text-slate-800 dark:text-white">{u.name}</td><td className="px-6 py-4">{u.email}</td><td className="px-6 py-4 capitalize">{u.role}</td><td className="px-6 py-4">{(u.role === 'account_manager' || u.role === 'admin') ? (u.emailDigestEnabled ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400"><Bell size={11}/>On</span> : <span className="text-[10px] text-slate-400">Off</span>) : <span className="text-[10px] text-slate-300 dark:text-slate-600">—</span>}</td><td className="px-6 py-4 text-right"><button onClick={() => {setEditingUser(u); setIsUserModalOpen(true);}} className="p-1.5 hover:text-pink-600 transition-colors"><Edit2 size={16}/></button></td></tr>))}</tbody></table>
                             </div>
                         </div>
                     )}
@@ -1307,7 +1325,7 @@ const AdminPanel: React.FC = () => {
                                     ))}
                                 </div>
                                 <div className="mt-4">
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">NOI Response Due Time (default)</label>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">NOI Response Due Time (default)<FieldHint text="The default time of day that responses to the Notice of Intention are due. Shown on the meeting card and used for overdue calculations. Can be overridden per meeting." /></label>
                                     <input
                                         type="time"
                                         className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm font-mono"
@@ -1678,6 +1696,30 @@ const AdminPanel: React.FC = () => {
                                             </button>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+
+                            {/* One-time migration */}
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-4 lg:col-span-2">
+                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <Wrench size={18} className="text-pink-600" /> Data Migrations
+                                </h2>
+                                <div className="flex items-start justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700">
+                                    <div>
+                                        <p className="text-sm font-bold dark:text-white">Consolidate insurance valuer field</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">Copies any data stored in the old <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded text-[10px]">lastInsuranceValuer</code> field into <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded text-[10px]">insuranceValuer</code> for all complexes. Safe to run more than once.</p>
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            const toFix = complexes.filter(c => (c as any).lastInsuranceValuer && !c.insuranceValuer);
+                                            if (toFix.length === 0) { alert('Nothing to migrate — all complexes already use the current field.'); return; }
+                                            await Promise.all(toFix.map(c => updateComplex({ ...c, insuranceValuer: (c as any).lastInsuranceValuer })));
+                                            alert(`Migrated ${toFix.length} complex${toFix.length !== 1 ? 'es' : ''}.`);
+                                        }}
+                                        className="shrink-0 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl transition-colors"
+                                    >
+                                        Run Migration
+                                    </button>
                                 </div>
                             </div>
 

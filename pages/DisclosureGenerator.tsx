@@ -68,6 +68,14 @@ const toArrayBuffer = (base64: string): ArrayBuffer => {
     return bytes.buffer;
 };
 
+const resolveTemplate = async (tpl: TemplateFileRecord): Promise<ArrayBuffer> => {
+    if (tpl.storageUrl) {
+        const res = await fetch(tpl.storageUrl);
+        return res.arrayBuffer();
+    }
+    return toArrayBuffer(tpl.data!);
+};
+
 const dataUrlToBuffer = (dataUrl: string): ArrayBuffer => {
     const base64 = dataUrl.split(',')[1];
     return toArrayBuffer(base64);
@@ -402,7 +410,7 @@ const DisclosureGenerator: React.FC = () => {
     setPreviewing(true);
     try {
       const mammoth = await import('mammoth');
-      const buffer = toArrayBuffer(currentTemplate.data);
+      const buffer = await resolveTemplate(currentTemplate);
       const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
       const data = buildMergeData();
       let html = result.value;
@@ -421,7 +429,7 @@ const DisclosureGenerator: React.FC = () => {
     setPreviewing(false);
   };
 
-  const doDownloadDocx = () => {
+  const doDownloadDocx = async () => {
     if (!currentTemplate || !selectedComplex) return;
     try {
       const sigUrl = manager?.signatureUrl || TRANSPARENT_GIF;
@@ -431,7 +439,7 @@ const DisclosureGenerator: React.FC = () => {
         getImage: (tagValue: string) => dataUrlToBuffer(tagValue && tagValue.startsWith('data:') ? tagValue : TRANSPARENT_GIF),
         getSize: () => [200, 70] as [number, number],
       });
-      const zip = new PizZip(toArrayBuffer(currentTemplate.data));
+      const zip = new PizZip(await resolveTemplate(currentTemplate));
       const docTpl = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,

@@ -180,8 +180,7 @@ export interface BodyCorporate {
   insuranceBroker?: string;
   insuranceUnderwriter?: string;
   lastInsuranceValuationDate?: string;
-  lastInsuranceValuer?: string; 
-  insuranceValuer?: string; 
+  insuranceValuer?: string;
   nextValuationDue?: string; 
   insuranceQuestionnaire?: string; 
   insuranceNote?: string;
@@ -270,6 +269,7 @@ export interface User {
   phone?: string;
   signatureUrl?: string;
   supportedManagerName?: string;
+  emailDigestEnabled?: boolean;
 }
 
 export interface SystemSettings {
@@ -340,7 +340,8 @@ export interface Reminder {
 
 export interface TemplateFileRecord {
   name: string;
-  data: string; // base64-encoded .docx content
+  data?: string; // base64-encoded .docx content (legacy)
+  storageUrl?: string; // Firebase Storage download URL
   uploadedAt: string;
 }
 

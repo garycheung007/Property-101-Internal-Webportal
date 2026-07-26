@@ -92,6 +92,14 @@ const toArrayBuffer = (base64: string): ArrayBuffer => {
   return bytes.buffer;
 };
 
+const resolveTemplate = async (tpl: TemplateFileRecord): Promise<ArrayBuffer> => {
+  if (tpl.storageUrl) {
+    const res = await fetch(tpl.storageUrl);
+    return res.arrayBuffer();
+  }
+  return toArrayBuffer(tpl.data!);
+};
+
 const dataUrlToBuffer = (dataUrl: string): ArrayBuffer => {
   const base64 = dataUrl.split(',')[1];
   return toArrayBuffer(base64);
@@ -182,7 +190,7 @@ const MeetingDocsTest: React.FC = () => {
     setPreviewKey(key);
     try {
       const mammoth = await import('mammoth');
-      const buffer = toArrayBuffer(tpl.data);
+      const buffer = await resolveTemplate(tpl);
       const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
       const data = buildMergeData(selectedComplex, selectedMeeting, assignedManager);
       let html = result.value;
@@ -201,7 +209,7 @@ const MeetingDocsTest: React.FC = () => {
     setPreviewing(false);
   };
 
-  const handleDownloadDocx = (key: TemplateKey) => {
+  const handleDownloadDocx = async (key: TemplateKey) => {
     const tpl = templates[key];
     if (!tpl || !selectedComplex) return;
     try {
@@ -215,7 +223,7 @@ const MeetingDocsTest: React.FC = () => {
         },
         getSize: () => [200, 70],
       });
-      const zip = new PizZip(toArrayBuffer(tpl.data));
+      const zip = new PizZip(await resolveTemplate(tpl));
       const docTpl = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
