@@ -3,10 +3,10 @@ import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Contractor, ContractorCategory, NotingMethod, NotingRequirement } from '../types';
-import { HardHat, Search, Plus, Phone, Mail, Edit2, Trash2, X, Info, PlusCircle, MinusCircle, Loader2, Save, ArrowUpDown, ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { HardHat, Search, Plus, Phone, Mail, Edit2, Trash2, X, Info, PlusCircle, MinusCircle, Loader2, Save, ArrowUpDown, ChevronUp, ChevronDown, Star, Building, AlertCircle } from 'lucide-react';
 
 const ContractorList: React.FC = () => {
-    const { contractors, addContractor, updateContractor, deleteContractor, systemSettings } = useData();
+    const { contractors, addContractor, updateContractor, deleteContractor, systemSettings, complexes } = useData();
     const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
@@ -90,6 +90,20 @@ const ContractorList: React.FC = () => {
         handleCloseModal();
     };
 
+    const getCoverageCount = (contractor: Contractor) => complexes.filter(c => !c.isArchived && (
+        c.insuranceBroker === contractor.name ||
+        c.insuranceUnderwriter === contractor.name ||
+        c.insuranceValuer === contractor.name ||
+        c.bwofConsultant === contractor.name ||
+        c.complianceCompany === contractor.name ||
+        c.waterRateContractorId === contractor.id
+    )).length;
+
+    const coverageGaps = [
+        { label: 'Insurance Broker', filter: (bc: typeof complexes[0]) => !bc.insuranceBroker },
+        { label: 'Insurance Valuer', filter: (bc: typeof complexes[0]) => !bc.insuranceValuer },
+    ].map(g => ({ ...g, missing: complexes.filter(c => !c.isArchived && g.filter(c)) })).filter(g => g.missing.length > 0);
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -152,6 +166,7 @@ const ContractorList: React.FC = () => {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {filteredContractors.map((c) => {
                                 const isDeleting = deletingIds.has(c.id);
+                                const coverageCount = getCoverageCount(c);
                                 return (
                                     <tr key={c.id} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${isDeleting ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
                                         <td className="px-6 py-4">
@@ -163,11 +178,20 @@ const ContractorList: React.FC = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            {c.notingRequirements && c.notingRequirements.length > 0 && (
-                                                <div className="text-[10px] text-pink-600 dark:text-pink-400 font-bold mt-0.5 flex items-center gap-1 uppercase tracking-tight">
-                                                    <Info size={10} /> Noting Required
-                                                </div>
-                                            )}
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                {coverageCount > 0 ? (
+                                                    <span className="flex items-center gap-1 text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                                                        <Building size={10} /> {coverageCount} complex{coverageCount !== 1 ? 'es' : ''}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-slate-300 dark:text-slate-600">Unused</span>
+                                                )}
+                                                {c.notingRequirements && c.notingRequirements.length > 0 && (
+                                                    <span className="text-[10px] text-pink-600 dark:text-pink-400 font-bold flex items-center gap-1 uppercase tracking-tight">
+                                                        <Info size={10} /> Noting Required
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400`}>
@@ -220,10 +244,33 @@ const ContractorList: React.FC = () => {
                 </div>
             </div>
 
+            {coverageGaps.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b dark:border-slate-800 flex items-center gap-2">
+                        <AlertCircle size={16} className="text-amber-500" />
+                        <h2 className="text-sm font-bold text-slate-700 dark:text-white">Coverage Gaps</h2>
+                        <span className="ml-auto text-[10px] text-slate-400">Active complexes missing key contractor assignments</span>
+                    </div>
+                    {coverageGaps.map(g => (
+                        <div key={g.label} className="px-6 py-4 border-b dark:border-slate-800 last:border-b-0">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{g.label}</span>
+                                <span className="text-[10px] font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 px-1.5 py-0.5 rounded">{g.missing.length} missing</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                                {g.missing.map(bc => (
+                                    <span key={bc.id} className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded">{bc.bcNumber} · {bc.name}</span>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {isModalOpen && (
-                <ContractorModal 
-                    contractor={editingContractor} 
-                    onClose={handleCloseModal} 
+                <ContractorModal
+                    contractor={editingContractor}
+                    onClose={handleCloseModal}
                     onSave={handleSaveContractor}
                     categories={systemSettings.contractorCategories || []}
                 />

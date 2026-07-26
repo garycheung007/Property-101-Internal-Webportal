@@ -225,9 +225,9 @@ const Dashboard: React.FC = () => {
     const due = new Date(dueDate + 'T00:00:00');
     const todayMs = new Date(); todayMs.setHours(0, 0, 0, 0);
     const diffDays = Math.round((due.getTime() - todayMs.getTime()) / 86400000);
-    if (diffDays < 0) return { label: `${Math.abs(diffDays)}d overdue`, cls: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50' };
-    if (diffDays === 0) return { label: 'Due today', cls: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50' };
-    if (diffDays <= 7) return { label: `${diffDays}d`, cls: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50' };
+    if (diffDays < 0) return { label: `● ${Math.abs(diffDays)}d overdue`, cls: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50' };
+    if (diffDays === 0) return { label: '● Due today', cls: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50' };
+    if (diffDays <= 7) return { label: `▲ ${diffDays}d`, cls: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50' };
     return { label: new Date(dueDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }), cls: 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
   };
 
@@ -435,11 +435,11 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+      <div className="space-y-6">
 
         {/* Category Work Sections */}
         <div
-          className="lg:col-span-3 lg:order-2 space-y-3"
+          className="space-y-3"
           ref={(el) => {
             (upcomingActionsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
             (criticalAlertsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
@@ -578,8 +578,8 @@ const Dashboard: React.FC = () => {
                                             </div>
                                             <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
                                             <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                                              <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze"><BellOff size={12} /></button>
-                                              <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Mark Done"><CheckCircle2 size={12} /></button>
+                                              <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
+                                              <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Mark Done" aria-label="Mark Done"><CheckCircle2 size={12} /></button>
                                             </div>
                                           </div>
                                         );
@@ -593,8 +593,8 @@ const Dashboard: React.FC = () => {
                                             </div>
                                             <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
                                             <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                                              <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze"><BellOff size={12} /></button>
-                                              <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors" title="Log Details"><MessageCircle size={12} /></button>
+                                              <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
+                                              <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors" title="Log Details" aria-label="Log Details"><MessageCircle size={12} /></button>
                                             </div>
                                           </div>
                                         );
@@ -706,21 +706,21 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Meetings Section */}
-        <div className="lg:col-span-2 lg:order-1 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col transition-colors">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
             <Clock className="text-pink-500" size={20} />
             Meetings
           </h2>
           <p className="text-xs text-slate-400 mb-4">Upcoming schedule & pending minutes</p>
 
-          <div className="overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+          <div className="overflow-y-auto max-h-[640px] pr-2 custom-scrollbar">
               {upcomingMeetings.length === 0 ? (
                   <div className="text-center text-slate-400 py-10 flex flex-col items-center">
                       <Calendar size={32} className="mb-2 opacity-50" />
                       <span>No upcoming meetings or pending minutes.</span>
                   </div>
               ) : (
-                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                       {upcomingMeetings.map((m) => {
                           const docStatus = getNextDocumentStatus(m);
                           const isUrgent = docStatus.status === 'urgent';
@@ -729,7 +729,7 @@ const Dashboard: React.FC = () => {
                           const priorItems = meetingChecklistItems.filter(ci => ci.meetingId === m.id && ci.stage === 'PRIOR_TO_MEETING');
                           
                           return (
-                            <div key={`${m.bcId}-${m.id}`} className="py-4 first:pt-0 group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 -mx-2 transition-all"
+                            <div key={`${m.bcId}-${m.id}`} className="p-3 group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800 transition-all"
                             onClick={() => navigate(`/complexes?id=${m.bcId}&tab=meetings&from=dashboard`)}>
                                     <div className="flex justify-between items-start mb-1">
                                         <div className="flex items-center gap-2">
@@ -895,7 +895,7 @@ const CommentModal: React.FC<{
                         <h3 className="font-bold text-slate-800 dark:text-white">Action Log</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400">{reminder.bcName}</p>
                     </div>
-                    <button onClick={onClose}><X size={20} className="text-slate-400 hover:text-slate-600" /></button>
+                    <button onClick={onClose} aria-label="Close"><X size={20} className="text-slate-400 hover:text-slate-600" /></button>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 dark:bg-slate-950/50">
@@ -997,7 +997,7 @@ const SnoozeModal: React.FC<{
                         </h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400">{reminder.bcName}</p>
                     </div>
-                    <button onClick={onClose}><X size={20} className="text-slate-400 hover:text-slate-600" /></button>
+                    <button onClick={onClose} aria-label="Close"><X size={20} className="text-slate-400 hover:text-slate-600" /></button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-4 space-y-4">

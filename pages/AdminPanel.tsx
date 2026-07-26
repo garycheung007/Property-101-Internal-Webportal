@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import FieldHint from '../components/FieldHint';
+import { useToast } from '../contexts/ToastContext';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1', '#ec4899'];
 
@@ -27,10 +28,12 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
     const [isSaving, setIsSaving] = useState(false);
     const [password, setPassword] = useState('');
     const [authError, setAuthError] = useState('');
+    const [pendingSignatureFile, setPendingSignatureFile] = useState<File | null>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setPendingSignatureFile(file);
             const reader = new FileReader();
             reader.onloadend = () => setForm({ ...form, signatureUrl: reader.result as string });
             reader.readAsDataURL(file);
@@ -58,7 +61,14 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
                     await deleteApp(secondaryApp);
                 }
             }
-            await onSave({ ...form as User, id: userId });
+            let finalSignatureUrl = form.signatureUrl;
+            if (pendingSignatureFile) {
+                const ext = pendingSignatureFile.name.split('.').pop() || 'png';
+                const sigRef = ref(storage, `signatures/${userId}.${ext}`);
+                await uploadBytes(sigRef, pendingSignatureFile);
+                finalSignatureUrl = await getDownloadURL(sigRef);
+            }
+            await onSave({ ...form as User, id: userId, signatureUrl: finalSignatureUrl });
         } finally {
             setIsSaving(false);
         }
@@ -67,7 +77,7 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-md shadow-2xl border dark:border-slate-800 flex flex-col overflow-hidden">
-                <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950"><h3 className="font-bold text-xs uppercase tracking-widest dark:text-white">{user ? 'Edit Staff Profile' : 'New Staff Member'}</h3><button onClick={onClose} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button></div>
+                <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950"><h3 className="font-bold text-xs uppercase tracking-widest dark:text-white">{user ? 'Edit Staff Profile' : 'New Staff Member'}</h3><button onClick={onClose} aria-label="Close" className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button></div>
                 <div className="p-6 space-y-4">
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Full Name</label><input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} /></div>
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Email</label><input type="email" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} /></div>
@@ -312,6 +322,7 @@ const AdminPanel: React.FC = () => {
         pricingTiers, updateInvoicePricingTiers,
     } = useData();
     
+    const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<'properties' | 'contractors' | 'users' | 'settings' | 'meetings' | 'templates' | 'diagnostics' | 'data'>('properties');
     const [templateSubTab, setTemplateSubTab] = useState<'bc' | 'isoc' | 'disclosure' | 'conflict' | 'invoicePricing'>('bc');
     const [searchTerm, setSearchTerm] = useState('');
@@ -376,6 +387,13 @@ const AdminPanel: React.FC = () => {
     const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
     const [uploadingDocx, setUploadingDocx] = useState<string | null>(null);
     const docxInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+    // Properties tab — bulk reassignment
+    const [bulkFrom, setBulkFrom] = useState('');
+    const [bulkTo, setBulkTo] = useState('');
+    const [bulkConfirm, setBulkConfirm] = useState(false);
+    const [bulkLoading, setBulkLoading] = useState(false);
+    const [bulkResult, setBulkResult] = useState('');
 
     useEffect(() => {
         if (systemSettings.bwofConfirmationMessage) setBwofMessage(systemSettings.bwofConfirmationMessage);
@@ -608,13 +626,26 @@ const AdminPanel: React.FC = () => {
         }
     };
 
+    // ── Bulk reassignment ────────────────────────────────────────────────────
+    const handleBulkReassign = async () => {
+        const targets = complexes.filter(c => !c.isArchived && c.managerName === bulkFrom);
+        if (!targets.length) return;
+        setBulkLoading(true);
+        try {
+            await Promise.all(targets.map(bc => updateComplex({ ...bc, managerName: bulkTo })));
+            setBulkResult(`${targets.length} complex${targets.length !== 1 ? 'es' : ''} reassigned to ${bulkTo}.`);
+            setBulkFrom(''); setBulkTo(''); setBulkConfirm(false);
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
     // ── JSON backup handlers ─────────────────────────────────────────────────
     const handleJsonExport = () => {
         const backup = {
-            version: 1,
+            version: 2,
             exportedAt: new Date().toISOString(),
-            note: 'Meeting history is stored in Firestore subcollections and is not included.',
-            complexes: complexes.map(({ meetings: _, ...rest }) => rest),
+            complexes,
             users,
             contractors,
             systemSettings,
@@ -689,7 +720,7 @@ const AdminPanel: React.FC = () => {
             postMeetingFields: localPostMeetingFields,
             emailDigestEnabled: localEmailDigestEnabled,
         });
-        alert("System settings updated successfully.");
+        showToast('System settings saved.', 'success');
     };
 
     const filteredUsers = users.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -708,21 +739,25 @@ const AdminPanel: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto whitespace-nowrap bg-white dark:bg-slate-900 rounded-t-xl">
-                {[
+            <div className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto whitespace-nowrap bg-white dark:bg-slate-900 rounded-t-xl items-stretch">
+                {([
                     { id: 'properties', label: 'Properties', icon: <Building size={16}/> },
                     { id: 'contractors', label: 'Contractors', icon: <HardHat size={16}/> },
                     { id: 'users', label: 'Users', icon: <Users size={16}/> },
+                    null,
                     { id: 'settings', label: 'Compliance', icon: <Settings size={16}/> },
                     { id: 'templates', label: 'Templates', icon: <FileText size={16}/> },
                     { id: 'meetings', label: 'Meetings', icon: <ClipboardCheck size={16}/> },
+                    null,
                     { id: 'diagnostics', label: 'Diagnostics', icon: <Terminal size={16}/> },
                     { id: 'data', label: 'Data', icon: <Database size={16}/> }
-                ].map((tab) => (
-                    <button 
-                        key={tab.id} 
-                        onClick={() => { setActiveTab(tab.id as any); setSearchTerm(''); }} 
-                        className={`px-6 py-4 text-xs font-bold transition-colors border-b-2 uppercase tracking-widest flex items-center gap-2 ${activeTab === tab.id ? 'border-pink-600 text-pink-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border-transparent'}`}
+                ] as const).map((tab, i) => tab === null ? (
+                    <div key={`div-${i}`} className="w-px bg-slate-200 dark:bg-slate-700 mx-1 my-3 flex-shrink-0" />
+                ) : (
+                    <button
+                        key={tab.id}
+                        onClick={() => { setActiveTab(tab.id as any); setSearchTerm(''); }}
+                        className={`px-6 py-4 text-xs font-bold transition-colors border-b-2 uppercase tracking-widest flex items-center gap-2 flex-shrink-0 ${activeTab === tab.id ? 'border-pink-600 text-pink-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border-transparent'}`}
                     >
                         {tab.icon}{tab.label}
                     </button>
@@ -775,6 +810,54 @@ const AdminPanel: React.FC = () => {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+
+                            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border dark:border-slate-800 p-6 space-y-4">
+                                <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <Users size={16} className="text-pink-600" /> Bulk Manager Reassignment
+                                </h2>
+                                <p className="text-xs text-slate-500">Move all active complexes from one manager to another in a single operation.</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">From Manager</label>
+                                        <select value={bulkFrom} onChange={e => { setBulkFrom(e.target.value); setBulkConfirm(false); setBulkResult(''); }}
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm">
+                                            <option value="">Select source manager</option>
+                                            {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">To Manager</label>
+                                        <select value={bulkTo} onChange={e => { setBulkTo(e.target.value); setBulkConfirm(false); setBulkResult(''); }}
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-3 py-2 text-sm" disabled={!bulkFrom}>
+                                            <option value="">Select destination manager</option>
+                                            {managers.filter(m => m.name !== bulkFrom).map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                {bulkFrom && bulkTo && (() => {
+                                    const count = complexes.filter(c => !c.isArchived && c.managerName === bulkFrom).length;
+                                    return count > 0 ? (
+                                        <p className="text-xs text-slate-600 dark:text-slate-300">This will reassign <strong>{count}</strong> active complex{count !== 1 ? 'es' : ''} from <strong>{bulkFrom}</strong> to <strong>{bulkTo}</strong>.</p>
+                                    ) : (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400">No active complexes assigned to {bulkFrom}.</p>
+                                    );
+                                })()}
+                                {bulkFrom && bulkTo && complexes.filter(c => !c.isArchived && c.managerName === bulkFrom).length > 0 && (
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={bulkConfirm} onChange={e => setBulkConfirm(e.target.checked)} className="rounded text-pink-600" />
+                                        <span className="text-xs text-slate-600 dark:text-slate-300">I confirm this bulk update</span>
+                                    </label>
+                                )}
+                                {bulkResult && <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><CheckCircle2 size={14} /> {bulkResult}</p>}
+                                <div className="flex justify-end">
+                                    <button onClick={handleBulkReassign}
+                                        disabled={!bulkFrom || !bulkTo || !bulkConfirm || bulkLoading || complexes.filter(c => !c.isArchived && c.managerName === bulkFrom).length === 0}
+                                        className="flex items-center gap-2 px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        {bulkLoading ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
+                                        {bulkLoading ? 'Reassigning...' : 'Reassign Complexes'}
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border dark:border-slate-800 overflow-hidden">
@@ -1712,9 +1795,9 @@ const AdminPanel: React.FC = () => {
                                     <button
                                         onClick={async () => {
                                             const toFix = complexes.filter(c => (c as any).lastInsuranceValuer && !c.insuranceValuer);
-                                            if (toFix.length === 0) { alert('Nothing to migrate — all complexes already use the current field.'); return; }
+                                            if (toFix.length === 0) { showToast('Nothing to migrate — all complexes already use the current field.', 'info'); return; }
                                             await Promise.all(toFix.map(c => updateComplex({ ...c, insuranceValuer: (c as any).lastInsuranceValuer })));
-                                            alert(`Migrated ${toFix.length} complex${toFix.length !== 1 ? 'es' : ''}.`);
+                                            showToast(`Migrated ${toFix.length} complex${toFix.length !== 1 ? 'es' : ''}.`, 'success');
                                         }}
                                         className="shrink-0 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl transition-colors"
                                     >
@@ -1728,10 +1811,7 @@ const AdminPanel: React.FC = () => {
                                 <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                                     <Database size={18} className="text-pink-600" /> Full System Backup — JSON
                                 </h2>
-                                <p className="text-xs text-slate-500">Download a complete backup of all complexes, users, contractors, and system settings. Use for disaster recovery or data migration.</p>
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-lg p-2.5">
-                                    Note: Meeting history is stored in Firestore subcollections and is not included in this backup.
-                                </p>
+                                <p className="text-xs text-slate-500">Download a complete backup of all complexes (including meetings), users, contractors, and system settings. Use for disaster recovery or data migration.</p>
 
                                 <div>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Backup</p>

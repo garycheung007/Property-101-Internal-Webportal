@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
+import { ToastProvider } from './contexts/ToastContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ComplexList from './pages/ComplexList';
@@ -71,9 +72,11 @@ const App: React.FC = () => {
       <AuthProvider>
         <DataProvider>
           <SidebarProvider>
-            <HashRouter>
-              <AppRoutes />
-            </HashRouter>
+            <ToastProvider>
+              <HashRouter>
+                <AppRoutes />
+              </HashRouter>
+            </ToastProvider>
           </SidebarProvider>
         </DataProvider>
       </AuthProvider>

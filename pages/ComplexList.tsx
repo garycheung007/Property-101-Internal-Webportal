@@ -16,6 +16,7 @@ import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, Meetin
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS, DEFAULT_POST_MEETING_FIELDS } from '../constants/defaults';
 import FieldHint from '../components/FieldHint';
+import { useToast } from '../contexts/ToastContext';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -188,7 +189,18 @@ const ComplexList: React.FC = () => {
                 </thead>
                 <tbody className="divide-y dark:divide-slate-800">
                     {filteredComplexes.map((bc) => (
-                        <tr key={bc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group transition-colors" onClick={() => setSelectedComplexId(bc.id)}>
+                        <tr
+                            key={bc.id}
+                            tabIndex={0}
+                            className="hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-pink-500"
+                            onClick={() => setSelectedComplexId(bc.id)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedComplexId(bc.id); }
+                                if (e.key === 'ArrowDown') { e.preventDefault(); (e.currentTarget.nextElementSibling as HTMLElement)?.focus(); }
+                                if (e.key === 'ArrowUp') { e.preventDefault(); (e.currentTarget.previousElementSibling as HTMLElement)?.focus(); }
+                            }}
+                            aria-label={`Open ${bc.name}`}
+                        >
                             <td className="px-6 py-4 font-mono">{bc.bcNumber}</td>
                             <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{bc.name}</td>
                             <td className="px-6 py-4"><div className="flex items-center gap-2"><div className="w-7 h-7 rounded-full bg-pink-100 dark:bg-pink-900/40 text-pink-600 dark:text-pink-400 flex items-center justify-center text-[10px] font-bold border border-pink-200 dark:border-pink-800">{bc.managerName?.charAt(0) || '?'}</div><span className="text-xs font-medium">{bc.managerName || 'Unassigned'}</span></div></td>
@@ -275,7 +287,7 @@ const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: 
             <h2 className="text-lg font-bold text-slate-800 dark:text-white">Add New Complex</h2>
             <p className="text-xs text-slate-400 mt-0.5">Step {step + 1} of {WIZARD_STEPS.length} — {WIZARD_STEPS[step]}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20} /></button>
         </div>
 
         {/* Step indicator */}
@@ -401,6 +413,7 @@ const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: 
 const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; onSave: (bc: BodyCorporate) => void; initialTab?: 'details' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict' }> = ({ complex, onClose, onSave, initialTab = 'details' }) => {
     const { contractors, actionComments, addActionComment, systemSettings, managers } = useData();
     const { user: currentUser } = useAuth();
+    const { showToast } = useToast();
     const [form, setForm] = useState<BodyCorporate>(complex);
     const [baseline, setBaseline] = useState<BodyCorporate>(complex);
     const [hasBuildingManager, setHasBuildingManager] = useState<boolean>(!!complex.buildingManagerName);
@@ -420,8 +433,11 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [venueOther, setVenueOther] = useState(false);
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
     const [adminUnlocked, setAdminUnlocked] = useState(false);
+    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
     const [meetingSwitchPrompt, setMeetingSwitchPrompt] = useState<{ target: string | 'new' | null } | null>(null);
     const hasAutoSelectedMeeting = useRef(false);
+    const modalRef = useRef<HTMLDivElement>(null);
+    const isDirtyRef = useRef(false);
     const [postMeetingFormData, setPostMeetingFormData] = useState<Record<string, string>>({});
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
@@ -596,6 +612,30 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         .filter(m => !isMeetingPassed(m.date))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
     const isDirty = JSON.stringify(form) !== JSON.stringify(baseline) || isMeetingDirty();
+    isDirtyRef.current = isDirty;
+
+    useEffect(() => {
+        const modal = modalRef.current;
+        if (!modal) return;
+        modal.focus();
+        const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (isDirtyRef.current) setShowDiscardConfirm(true);
+                else onClose();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            const els = Array.from(modal.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(el => !el.closest('[aria-hidden="true"]'));
+            if (!els.length) return;
+            const first = els[0], last = els[els.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         if (isMeetingLocked) {
@@ -610,7 +650,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const handleSavePostMeeting = () => {
         const requiredMissing = postMeetingFields.filter(f => f.required && !postMeetingFormData[f.id]?.trim());
         if (requiredMissing.length > 0) {
-            alert(`Please fill in the required field(s): ${requiredMissing.map(f => f.label).join(', ')}`);
+            showToast(`Please fill in: ${requiredMissing.map(f => f.label).join(', ')}`, 'error');
             return;
         }
         let updatedComplex = { ...form };
@@ -829,13 +869,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
     return (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-2xl">
+            <div ref={modalRef} tabIndex={-1} className="relative bg-white dark:bg-slate-900 w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl rounded-2xl outline-none">
                 <div className="p-5 border-b dark:border-slate-800 flex justify-between bg-slate-50 dark:bg-slate-950 flex-shrink-0">
                     <div>
                         <h2 className="text-xl font-bold dark:text-white">{form.name}</h2>
                         <p className="text-slate-500 text-xs font-mono">{form.bcNumber} • {form.address}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
+                    <button onClick={isDirty ? () => setShowDiscardConfirm(true) : onClose} aria-label="Close" className="p-2 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
                 </div>
 
                 {/* Status strip */}
@@ -1448,8 +1488,10 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         </>
                                     )}
                                     {sortedMeetings.filter(m => !isMeetingPassed(m.date)).length === 0 && selectedMeetingId !== 'new' && (
-                                        <div className="px-3 py-6 text-center">
-                                            <p className="text-[10px] text-slate-400 italic">No upcoming meetings</p>
+                                        <div className="px-3 py-8 text-center flex flex-col items-center gap-2">
+                                            <Calendar size={24} className="text-slate-300 dark:text-slate-600" />
+                                            <p className="text-xs font-medium text-slate-400">No upcoming meetings</p>
+                                            <p className="text-[10px] text-slate-300 dark:text-slate-600">Use the + button above to schedule one</p>
                                         </div>
                                     )}
                                     {sortedMeetings.filter(m => isMeetingPassed(m.date)).length > 0 && (
@@ -1682,8 +1724,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                         dueBadge = <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${daysLeft <= 1 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : daysLeft <= 7 ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>{dueLabel}</span>;
                                                                     }
                                                                     const completedOn = completedDates[item.id];
+                                                                    const isOverdue = !isDone && !!(item.dueDaysBeforeMeeting && meetingForm.date && (() => {
+                                                                        const d = new Date(meetingForm.date!);
+                                                                        d.setDate(d.getDate() + (stage === 'AFTER_MEETING' ? item.dueDaysBeforeMeeting! : -item.dueDaysBeforeMeeting!));
+                                                                        return d < new Date();
+                                                                    })());
                                                                     return (
-                                                                        <label key={item.id} className={`flex items-center gap-3 p-3 border-b dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors ${isDone ? 'opacity-60' : ''}`}>
+                                                                        <label key={item.id} className={`flex items-center gap-3 py-3 px-3 border-b dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors border-l-4 ${isDone ? 'opacity-60 border-l-emerald-300 dark:border-l-emerald-700' : isOverdue ? 'border-l-red-400 dark:border-l-red-600 bg-red-50/30 dark:bg-red-950/10' : 'border-l-transparent'}`}>
                                                                             <input type="checkbox" className="rounded text-pink-600 focus:ring-pink-500 w-4 h-4 shrink-0" checked={isDone} onChange={() => handleToggleChecklistItem(item.id, stage)} disabled={effectiveLocked} />
                                                                             <span className={`text-xs flex-1 ${isDone ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
                                                                             {isDone && completedOn ? (
@@ -1776,7 +1823,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             <h3 className="font-bold text-xs uppercase dark:text-white tracking-widest text-slate-400">
                                                 {selectedConflictId === 'new' ? 'New Entry' : 'Edit Entry'}
                                             </h3>
-                                            <button onClick={() => { setSelectedConflictId(null); setConflictForm({}); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button>
+                                            <button onClick={() => { setSelectedConflictId(null); setConflictForm({}); }} aria-label="Close" className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={18}/></button>
                                         </div>
 
                                         <div className="space-y-4">
@@ -1839,7 +1886,11 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 </div>
                                 <div className="flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar mb-4">
                                     {(form.conflictRegister || []).length === 0 ? (
-                                        <p className="text-[10px] text-slate-400 italic text-center py-4">No entries yet.</p>
+                                        <div className="py-8 text-center flex flex-col items-center gap-2">
+                                            <UserCircle size={24} className="text-slate-300 dark:text-slate-600" />
+                                            <p className="text-xs font-medium text-slate-400">No entries yet</p>
+                                            <p className="text-[10px] text-slate-300 dark:text-slate-600">Add an entry using the button below</p>
+                                        </div>
                                     ) : (form.conflictRegister || []).map(entry => (
                                         <div key={entry.id} onClick={() => { setConflictForm({...entry}); setSelectedConflictId(entry.id); }} className={`p-3 bg-white dark:bg-slate-900 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${selectedConflictId === entry.id ? 'border-pink-500' : 'border-transparent dark:border-slate-800 hover:border-pink-200'}`}>
                                             <p className="text-xs font-bold dark:text-white truncate">{entry.memberName || 'Unnamed'}</p>
@@ -2238,10 +2289,23 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                         <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500 flex items-center gap-2"><CheckCircle2 size={14} /> No unsaved changes.</div>
                     )}
                     <div className="flex gap-3">
-                        <button onClick={onClose} className="px-6 py-2.5 text-slate-600 dark:text-slate-300 font-bold text-sm border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Discard</button>
+                        <button onClick={isDirty ? () => setShowDiscardConfirm(true) : onClose} className="px-6 py-2.5 text-slate-600 dark:text-slate-300 font-bold text-sm border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Discard</button>
                         <button onClick={handleSaveWithLogs} disabled={!isDirty} className={`px-8 py-2.5 rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 transition-all ${isDirty ? 'bg-pink-600 hover:bg-pink-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed shadow-none'}`}><Save size={18} /> Save Changes</button>
                     </div>
                 </div>
+
+                {showDiscardConfirm && (
+                    <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center rounded-2xl">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-2xl max-w-sm mx-4 border dark:border-slate-800">
+                            <h3 className="text-base font-bold text-slate-800 dark:text-white mb-2">Discard changes?</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">You have unsaved changes. Closing now will discard them.</p>
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => setShowDiscardConfirm(false)} className="px-4 py-2 text-sm border dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Keep editing</button>
+                                <button onClick={onClose} className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors">Discard</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
