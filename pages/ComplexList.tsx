@@ -537,7 +537,8 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         } else if (target === 'new') {
             const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc';
             const defaultNOITime = systemSettings.meetingDateSettings?.[typeKey]?.noiResponseDueTime || '';
-            setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {}, noiResponseDueTime: defaultNOITime });
+            const defaultReminderDays = systemSettings.meetingDateSettings?.[typeKey]?.noiResponseReminderDays ?? 2;
+            setMeetingForm({ type: 'AGM', date: '', time: '10:00', venue: '', checklistProgress: {}, noiResponseDueTime: defaultNOITime, noiResponseReminderDays: defaultReminderDays });
             setVenueOther(false); setSelectedMeetingId('new');
         } else {
             const m = (form.meetings || []).find(x => x.id === target);
@@ -1604,9 +1605,15 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         return (
                                                             <div className={`p-3 rounded-xl border ${meetingForm.nominationsChecked ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : responseOverdue ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
                                                                 <div className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${meetingForm.nominationsChecked ? 'text-emerald-600' : responseOverdue ? 'text-red-500' : 'text-slate-400'}`}>NOI Response Due</div>
-                                                                <div className="grid grid-cols-2 gap-1 mb-1.5">
-                                                                    <input type="date" className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-1.5 py-1 text-[10px] font-mono ${meetingForm.nominationsChecked ? 'text-emerald-600 border-emerald-300 dark:border-emerald-800' : responseOverdue ? 'text-red-500 border-red-300 dark:border-red-800' : 'dark:text-white'}`} value={meetingForm.noiResponseDueDate || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})} />
-                                                                    <input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-1.5 py-1 text-[10px] font-mono" value={meetingForm.noiResponseDueTime || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueTime: e.target.value})} />
+                                                                <div className="flex flex-col gap-1 mb-1.5">
+                                                                    <div>
+                                                                        <div className={`text-[8px] font-bold uppercase tracking-widest mb-0.5 ${meetingForm.nominationsChecked ? 'text-emerald-500' : responseOverdue ? 'text-red-400' : 'text-slate-400'}`}>Date</div>
+                                                                        <input type="date" className={`w-full border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-1.5 py-1 text-xs font-mono ${meetingForm.nominationsChecked ? 'text-emerald-600 border-emerald-300 dark:border-emerald-800' : responseOverdue ? 'text-red-500 border-red-300 dark:border-red-800' : 'dark:text-white'}`} value={meetingForm.noiResponseDueDate || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueDate: e.target.value})} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="text-[8px] font-bold uppercase tracking-widest mb-0.5 text-slate-400">Time</div>
+                                                                        <input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-1.5 py-1 text-xs font-mono" value={meetingForm.noiResponseDueTime || ''} onChange={e => setMeetingForm({...meetingForm, noiResponseDueTime: e.target.value})} />
+                                                                    </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1 mb-1.5">
                                                                     <span className="text-[9px] text-slate-400 whitespace-nowrap">Remind</span>

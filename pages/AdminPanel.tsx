@@ -1407,17 +1407,33 @@ const AdminPanel: React.FC = () => {
                                         </div>
                                     ))}
                                 </div>
-                                <div className="mt-4">
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">NOI Response Due Time (default)<FieldHint text="The default time of day that responses to the Notice of Intention are due. Shown on the meeting card and used for overdue calculations. Can be overridden per meeting." /></label>
-                                    <input
-                                        type="time"
-                                        className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm font-mono"
-                                        value={localMeetingDateSettings[meetingDateTab].noiResponseDueTime || ''}
-                                        onChange={e => setLocalMeetingDateSettings(prev => ({
-                                            ...prev,
-                                            [meetingDateTab]: { ...prev[meetingDateTab], noiResponseDueTime: e.target.value }
-                                        }))}
-                                    />
+                                <div className="mt-4 grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">NOI Response Due Time (default)<FieldHint text="The default time of day that responses to the Notice of Intention are due. Shown on the meeting card and used for overdue calculations. Can be overridden per meeting." /></label>
+                                        <input
+                                            type="time"
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm font-mono"
+                                            value={localMeetingDateSettings[meetingDateTab].noiResponseDueTime || ''}
+                                            onChange={e => setLocalMeetingDateSettings(prev => ({
+                                                ...prev,
+                                                [meetingDateTab]: { ...prev[meetingDateTab], noiResponseDueTime: e.target.value }
+                                            }))}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Reminder Days Before (default)<FieldHint text="How many working days before the NOI response due date to show a reminder. Can be overridden per meeting." /></label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={30}
+                                            className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm font-mono"
+                                            value={localMeetingDateSettings[meetingDateTab].noiResponseReminderDays ?? 2}
+                                            onChange={e => setLocalMeetingDateSettings(prev => ({
+                                                ...prev,
+                                                [meetingDateTab]: { ...prev[meetingDateTab], noiResponseReminderDays: parseInt(e.target.value) || 0 }
+                                            }))}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 

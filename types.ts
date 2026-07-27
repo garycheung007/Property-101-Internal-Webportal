@@ -20,6 +20,7 @@ export interface MeetingDateSettings {
   minutesPreferDays: number;
   minutesDeadlineDays: number;
   noiResponseDueTime?: string;
+  noiResponseReminderDays?: number;
 }
 
 export interface ConflictEntry {
