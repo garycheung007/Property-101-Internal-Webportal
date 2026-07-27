@@ -26,7 +26,7 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const { collapsed, toggleMobile } = useSidebar();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  const mainMargin = collapsed ? 'md:ml-[68px]' : 'md:ml-64';
+  const mainMargin = collapsed ? 'lg:ml-[68px]' : 'lg:ml-64';
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
@@ -34,12 +34,12 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       {/* Mobile hamburger */}
       <button
         onClick={toggleMobile}
-        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-pink-700 dark:bg-slate-800 text-white rounded-lg shadow-lg"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-pink-700 dark:bg-slate-800 text-white rounded-lg shadow-lg"
         aria-label="Open menu"
       >
         <Menu size={20} />
       </button>
-      <main className={`flex-1 ${mainMargin} transition-all duration-300 p-8 pt-16 md:pt-8`}>
+      <main className={`flex-1 ${mainMargin} transition-all duration-300 p-8 pt-16 lg:pt-8`}>
         {children}
       </main>
     </div>

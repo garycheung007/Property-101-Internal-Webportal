@@ -56,7 +56,7 @@ const Sidebar: React.FC = () => {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
           onClick={closeMobile}
         />
       )}
@@ -65,7 +65,7 @@ const Sidebar: React.FC = () => {
       <div className={`
         ${sidebarWidth} bg-pink-700 dark:bg-[#1a1a1a] text-white h-screen flex flex-col fixed left-0 top-0
         border-r border-pink-800 dark:border-slate-800 z-40 transition-all duration-300
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Header */}
         <div className={`p-4 flex items-center ${collapsed ? 'justify-center' : 'gap-2'}`}>
@@ -137,7 +137,7 @@ const Sidebar: React.FC = () => {
           {/* Collapse toggle */}
           <button
             onClick={toggleCollapsed}
-            className={`hidden md:flex items-center w-full px-3 py-2 bg-pink-800 dark:bg-slate-800 hover:bg-pink-900 dark:hover:bg-slate-700 rounded-lg text-sm text-pink-50 dark:text-slate-300 transition-colors ${collapsed ? 'justify-center' : 'gap-3'}`}
+            className={`hidden lg:flex items-center w-full px-3 py-2 bg-pink-800 dark:bg-slate-800 hover:bg-pink-900 dark:hover:bg-slate-700 rounded-lg text-sm text-pink-50 dark:text-slate-300 transition-colors ${collapsed ? 'justify-center' : 'gap-3'}`}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>Collapse</span></>}
