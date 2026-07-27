@@ -330,14 +330,6 @@ const MeetingDocsTest: React.FC = () => {
         >
           <Download size={12} /> Word
         </button>
-        <button
-          onClick={() => handleDownloadPdf(key)}
-          disabled={!previewHtml || previewKey !== key}
-          title="Click Preview first to enable PDF"
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
-        >
-          <Download size={12} /> PDF
-        </button>
       </div>
     </div>
   );
@@ -459,23 +451,25 @@ const MeetingDocsTest: React.FC = () => {
                   {isIsoc ? 'Incorporated Society' : 'Body Corporate'} Templates
                 </p>
                 {activeKeys.map(renderActionButtons)}
-                <div className="pt-3 border-t dark:border-slate-700 space-y-1.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Conflict Register</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={downloadConflictRegisterWord}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-700 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition-colors"
-                    >
-                      <Download size={12} /> Word
-                    </button>
-                    <button
-                      onClick={downloadConflictRegisterPdf}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg transition-colors"
-                    >
-                      <Download size={12} /> PDF
-                    </button>
+                {!isIsoc && (
+                  <div className="pt-3 border-t dark:border-slate-700 space-y-1.5">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Conflict Register</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={downloadConflictRegisterWord}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-700 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition-colors"
+                      >
+                        <Download size={12} /> Word
+                      </button>
+                      <button
+                        onClick={downloadConflictRegisterPdf}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-lg transition-colors"
+                      >
+                        <Download size={12} /> PDF
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
                 <p className="text-[10px] text-slate-400 italic">PDF opens a print dialog — select "Save as PDF".</p>
               </div>
             )}
