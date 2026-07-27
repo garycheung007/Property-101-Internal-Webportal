@@ -411,8 +411,9 @@ const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: 
 };
 
 const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; onSave: (bc: BodyCorporate) => void; initialTab?: 'details' | 'settings' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict' }> = ({ complex, onClose, onSave, initialTab = 'details' }) => {
-    const { contractors, actionComments, addActionComment, systemSettings, managers } = useData();
+    const { contractors, actionComments, addActionComment, systemSettings, managers, loadMeetings, meetingsLoaded } = useData();
     const { user: currentUser } = useAuth();
+    useEffect(() => { loadMeetings(); }, [loadMeetings]);
     const { showToast } = useToast();
     const [form, setForm] = useState<BodyCorporate>(complex);
     const [baseline, setBaseline] = useState<BodyCorporate>(complex);
@@ -1438,7 +1439,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                         </div>
                     )}
 
-                    {activeTab === 'meetings' && (
+                    {activeTab === 'meetings' && !meetingsLoaded && (
+                        <div className="flex-1 flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm gap-2">
+                            <RefreshCw size={16} className="animate-spin" />
+                            Loading meetings…
+                        </div>
+                    )}
+                    {activeTab === 'meetings' && meetingsLoaded && (
                         <>
                             {/* ── SWITCH PROMPT ── */}
                             {meetingSwitchPrompt && (

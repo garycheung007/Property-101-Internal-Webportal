@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
@@ -33,7 +33,8 @@ const TYPE_DOT: Record<string, string> = {
 };
 
 const MeetingCalendar: React.FC = () => {
-  const { complexes } = useData();
+  const { complexes, loadMeetings } = useData();
+  useEffect(() => { loadMeetings(); }, [loadMeetings]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const today = new Date();

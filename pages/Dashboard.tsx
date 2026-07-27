@@ -22,7 +22,7 @@ const subtractWorkingDays = (date: Date, days: number): Date => {
 };
 
 const Dashboard: React.FC = () => {
-  const { complexes, reminders, actionComments, addActionComment, removeActionComment, snoozedAlerts, snoozeAlert, unsnoozeAlert, managers, updateComplex, updateMeeting, systemSettings } = useData();
+  const { complexes, reminders, actionComments, addActionComment, removeActionComment, snoozedAlerts, snoozeAlert, unsnoozeAlert, managers, updateComplex, updateMeeting, systemSettings, loadMeetings } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const upcomingActionsRef = useRef<HTMLDivElement>(null);
@@ -37,6 +37,8 @@ const Dashboard: React.FC = () => {
   const [showSnoozedActions, setShowSnoozedActions] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [snoozeGroupItems, setSnoozeGroupItems] = useState<Reminder[]>([]);
+
+  useEffect(() => { loadMeetings(); }, [loadMeetings]);
 
   useEffect(() => {
     if (!hasInitializedFilter.current && complexes.length > 0 && user) {

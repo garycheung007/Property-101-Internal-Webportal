@@ -1,8 +1,8 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import {
   collection, onSnapshot, doc, addDoc, deleteDoc, setDoc,
-  writeBatch, collectionGroup
+  writeBatch, collectionGroup, getDocs
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
@@ -27,6 +27,8 @@ interface DataContextType {
   systemSettings: SystemSettings;
   loading: boolean;
   syncError: string | null;
+  meetingsLoaded: boolean;
+  loadMeetings: () => Promise<void>;
   addComplex: (bc: BodyCorporate) => Promise<void>;
   addComplexes: (bcs: BodyCorporate[]) => Promise<void>;
   updateComplex: (bc: BodyCorporate) => Promise<void>;
@@ -168,6 +170,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({});
   const [loading, setLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [meetingsLoaded, setMeetingsLoaded] = useState(false);
 
   const complexes = useMemo(() => (
     baseComplexes.map(bc => ({ ...bc, meetings: allMeetings[bc.id] || [] }))
@@ -180,15 +183,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       snapshot => { setBaseComplexes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BodyCorporate))); setLoading(false); },
       error => setSyncError(error.message)
     );
-
-    const unsubMeetings = onSnapshot(collectionGroup(db, 'meetings'), snapshot => {
-      const map: Record<string, Meeting[]> = {};
-      snapshot.docs.forEach(d => {
-        const bcId = d.ref.parent.parent?.id;
-        if (bcId) { if (!map[bcId]) map[bcId] = []; map[bcId].push({ id: d.id, ...d.data() } as Meeting); }
-      });
-      setAllMeetings(map);
-    });
 
     const unsubUsers       = onSnapshot(collection(db, 'users'),       s => setUsers(s.docs.map(d => ({ id: d.id, ...d.data() } as User))));
     const unsubContractors = onSnapshot(collection(db, 'contractors'),  s => setContractors(s.docs.map(d => ({ id: d.id, ...d.data() } as Contractor))));
@@ -212,8 +206,24 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    return () => { unsubComplexes(); unsubMeetings(); unsubUsers(); unsubContractors(); unsubComments(); unsubSnoozed(); unsubSettings(); unsubInvoices(); unsubResponses(); };
+    return () => { unsubComplexes(); unsubUsers(); unsubContractors(); unsubComments(); unsubSnoozed(); unsubSettings(); unsubInvoices(); unsubResponses(); };
   }, [isAuthenticated]);
+
+  const loadMeetings = useCallback(async () => {
+    if (meetingsLoaded) return;
+    try {
+      const snapshot = await getDocs(collectionGroup(db, 'meetings'));
+      const map: Record<string, Meeting[]> = {};
+      snapshot.docs.forEach(d => {
+        const bcId = d.ref.parent.parent?.id;
+        if (bcId) { if (!map[bcId]) map[bcId] = []; map[bcId].push({ id: d.id, ...d.data() } as Meeting); }
+      });
+      setAllMeetings(map);
+      setMeetingsLoaded(true);
+    } catch (err: any) {
+      setSyncError(err.message);
+    }
+  }, [meetingsLoaded]);
 
   const reminders = useMemo(() => (
     generateReminders(complexes, systemSettings.insuranceSettings || DEFAULT_INSURANCE_SETTINGS, systemSettings.meetingChecklistTemplates, systemSettings.meetingDateSettings)
@@ -353,7 +363,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      complexes, reminders, managers, users, contractors, actionComments, snoozedAlerts, systemSettings, loading, syncError,
+      complexes, reminders, managers, users, contractors, actionComments, snoozedAlerts, systemSettings, loading, syncError, meetingsLoaded, loadMeetings,
       addComplex, addComplexes, updateComplex, toggleArchiveComplex, getComplex, assignManagerToComplex,
       addUser, updateUser, deleteUser, updateUserRole, addMeeting, updateMeeting, deleteMeeting,
       addContractor, addContractors, updateContractor, deleteContractor,
