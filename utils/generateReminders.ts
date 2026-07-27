@@ -169,7 +169,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
   // NOI response due reminders — fires N working days before response due date
   complexes.filter(c => !c.isArchived).forEach(bc => {
     (bc.meetings || []).forEach(meeting => {
-      if (!meeting.noiResponseDueDate || meeting.nomIssued || meeting.minutesIssued) return;
+      if (!meeting.noiResponseDueDate || meeting.nominationsChecked || meeting.nomIssued || meeting.minutesIssued) return;
       const responseDue = new Date(meeting.noiResponseDueDate + 'T00:00:00');
       const reminderDays = meeting.noiResponseReminderDays ?? 2;
       const triggerDate = reminderDays > 0 ? subtractWorkingDays(responseDue, reminderDays) : responseDue;
