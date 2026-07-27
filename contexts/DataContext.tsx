@@ -256,12 +256,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addMeeting = async (bcId: string, meeting: Meeting) => {
     const meetingId = meeting.id || `mtg_${Date.now()}`;
-    await setDoc(doc(db, 'complexes', bcId, 'meetings', meetingId), cleanData({ ...meeting, id: meetingId }));
+    const finalMeeting = { ...meeting, id: meetingId };
+    await setDoc(doc(db, 'complexes', bcId, 'meetings', meetingId), cleanData(finalMeeting));
+    setAllMeetings(prev => ({ ...prev, [bcId]: [...(prev[bcId] || []), finalMeeting] }));
   };
-  const updateMeeting = async (bcId: string, m: Meeting) =>
-    setDoc(doc(db, 'complexes', bcId, 'meetings', m.id), cleanData(m), { merge: true });
-  const deleteMeeting = async (bcId: string, meetingId: string) =>
-    deleteDoc(doc(db, 'complexes', bcId, 'meetings', meetingId));
+  const updateMeeting = async (bcId: string, m: Meeting) => {
+    await setDoc(doc(db, 'complexes', bcId, 'meetings', m.id), cleanData(m), { merge: true });
+    setAllMeetings(prev => ({ ...prev, [bcId]: (prev[bcId] || []).map(x => x.id === m.id ? m : x) }));
+  };
+  const deleteMeeting = async (bcId: string, meetingId: string) => {
+    await deleteDoc(doc(db, 'complexes', bcId, 'meetings', meetingId));
+    setAllMeetings(prev => ({ ...prev, [bcId]: (prev[bcId] || []).filter(x => x.id !== meetingId) }));
+  };
 
   const addContractor    = async (c: Contractor) => setDoc(doc(db, 'contractors', c.id), cleanData(c), { merge: true });
   const addContractors   = async (cs: Contractor[]) => {
