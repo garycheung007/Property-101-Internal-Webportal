@@ -1585,7 +1585,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             const fmt = (d: string) => new Date(d).toLocaleDateString('en-NZ');
                                             const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - today.getTime()) / (1000*60*60*24));
                                             return (
-                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                                                     {/* NOI Preferred */}
                                                     <div className={`p-3 rounded-xl border ${meetingForm.noiIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.noiPref) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
                                                         <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.noiIssued ? 'text-emerald-600' : isPast(dates.noiPref) ? 'text-red-500' : 'text-slate-400'}`}>NOI Preferred</div>
@@ -1638,6 +1638,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomPref) ? 'text-red-500' : 'text-slate-400'}`}>NOM Preferred</div>
                                                         <div className={`text-sm font-bold font-mono ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomPref) ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>{fmt(dates.nomPref)}</div>
                                                         <div className="text-[10px] mt-0.5">{meetingForm.nomIssued ? <span className="text-emerald-600">✓ Issued {meetingForm.nomIssuedDate ? fmt(meetingForm.nomIssuedDate) : ''}</span> : isPast(dates.nomPref) ? <span className="text-red-400">Passed</span> : <span className="text-slate-400">{daysUntil(dates.nomPref)}d away</span>}</div>
+                                                    </div>
+                                                    {/* NOM Statutory */}
+                                                    <div className={`p-3 rounded-xl border ${meetingForm.nomIssued ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50' : isPast(dates.nomDead) ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50'}`}>
+                                                        <div className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomDead) ? 'text-red-500' : 'text-amber-600'}`}>NOM Statutory</div>
+                                                        <div className={`text-sm font-bold font-mono ${meetingForm.nomIssued ? 'text-emerald-600' : isPast(dates.nomDead) ? 'text-red-500' : 'text-amber-600'}`}>{fmt(dates.nomDead)}</div>
+                                                        <div className="text-[10px] mt-0.5">{meetingForm.nomIssued ? <span className="text-emerald-600">✓ Met</span> : isPast(dates.nomDead) ? <span className="text-red-400">Passed</span> : <span className="text-amber-500">{daysUntil(dates.nomDead)}d remaining</span>}</div>
                                                     </div>
                                                     {/* Meeting Date */}
                                                     <div className="p-3 rounded-xl border bg-pink-50 dark:bg-pink-900/10 border-pink-200 dark:border-pink-900/30">

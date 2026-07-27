@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Meeting } from '../types';
+import { Meeting, MeetingDateSettings } from '../types';
+import { DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -17,6 +18,14 @@ interface CalendarMeeting {
   meeting: Meeting;
   date: Date;
   isOverdue: boolean;
+}
+
+interface KeyDate {
+  type: 'noi-pref' | 'noi-stat' | 'noi-resp' | 'nom-pref' | 'nom-stat';
+  label: string;
+  bcId: string;
+  bcName: string;
+  bcNumber: string;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -32,8 +41,24 @@ const TYPE_DOT: Record<string, string> = {
   Committee: 'bg-sky-500',
 };
 
+const KEY_DATE_STYLES: Record<KeyDate['type'], string> = {
+  'noi-pref': 'border-l-[3px] border-slate-400 text-slate-500 dark:text-slate-400 pl-1.5',
+  'noi-stat': 'border-l-[3px] border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 pl-1.5',
+  'noi-resp': 'border-l-[3px] border-rose-400 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 pl-1.5',
+  'nom-pref': 'border-l-[3px] border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 pl-1.5',
+  'nom-stat': 'border-l-[3px] border-orange-400 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 pl-1.5',
+};
+
+const KEY_DATE_LEGEND: Array<{ type: KeyDate['type']; label: string; color: string }> = [
+  { type: 'noi-pref', label: 'NOI Pref',  color: 'bg-slate-400' },
+  { type: 'noi-stat', label: 'NOI Stat',  color: 'bg-amber-400' },
+  { type: 'noi-resp', label: 'NOI Resp',  color: 'bg-rose-400' },
+  { type: 'nom-pref', label: 'NOM Pref',  color: 'bg-blue-400' },
+  { type: 'nom-stat', label: 'NOM Stat',  color: 'bg-orange-400' },
+];
+
 const MeetingCalendar: React.FC = () => {
-  const { complexes, loadMeetings } = useData();
+  const { complexes, loadMeetings, systemSettings } = useData();
   useEffect(() => { loadMeetings(); }, [loadMeetings]);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -43,6 +68,7 @@ const MeetingCalendar: React.FC = () => {
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [filterManager, setFilterManager] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [showKeyDates, setShowKeyDates] = useState(true);
 
   const managers = useMemo(() => {
     const names = new Set(complexes.filter(c => !c.isArchived).map(c => c.managerName).filter(Boolean));
@@ -91,6 +117,35 @@ const MeetingCalendar: React.FC = () => {
     return map;
   }, [filtered, year, month]);
 
+  const keyDatesByDay = useMemo(() => {
+    if (!showKeyDates) return {} as Record<number, KeyDate[]>;
+    const map: Record<number, KeyDate[]> = {};
+    filtered.forEach(cm => {
+      if (!cm.meeting.date || cm.meeting.type === 'Committee') return;
+      const bc = complexes.find(c => c.id === cm.bcId);
+      const typeKey = bc?.type === 'Incorporated Society' ? 'rs' : 'bc';
+      const sysDefault = systemSettings?.meetingDateSettings?.[typeKey] || DEFAULT_MEETING_DATE_SETTINGS[typeKey];
+      const s: MeetingDateSettings = { ...sysDefault, ...(bc?.meetingDateSettings || {}) };
+      const meetDate = new Date(cm.meeting.date + 'T00:00:00');
+      const shift = (days: number) => { const d = new Date(meetDate); d.setDate(d.getDate() + days); return d; };
+      const candidates: Array<{ type: KeyDate['type']; label: string; date: Date }> = [
+        { type: 'noi-pref', label: 'NOI Pref', date: shift(-s.noiPreferDays) },
+        { type: 'noi-stat', label: 'NOI Stat', date: shift(-s.noiDeadlineDays) },
+        ...(cm.meeting.noiResponseDueDate ? [{ type: 'noi-resp' as const, label: 'NOI Resp', date: new Date(cm.meeting.noiResponseDueDate + 'T00:00:00') }] : []),
+        { type: 'nom-pref', label: 'NOM Pref', date: shift(-s.nomPreferDays) },
+        { type: 'nom-stat', label: 'NOM Stat', date: shift(-s.nomDeadlineDays) },
+      ];
+      candidates.forEach(({ type, label, date }) => {
+        if (date.getFullYear() === year && date.getMonth() === month) {
+          const d = date.getDate();
+          if (!map[d]) map[d] = [];
+          map[d].push({ type, label, bcId: cm.bcId, bcName: cm.bcName, bcNumber: cm.bcNumber });
+        }
+      });
+    });
+    return map;
+  }, [filtered, year, month, showKeyDates, systemSettings, complexes]);
+
   const upcomingAll = useMemo(() =>
     filtered.filter(m => m.date >= today).sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 8),
     [filtered]
@@ -130,6 +185,15 @@ const MeetingCalendar: React.FC = () => {
           <button onClick={() => setViewDate(new Date(today.getFullYear(), today.getMonth(), 1))} className="px-3 py-2 text-sm border dark:border-slate-700 rounded-lg dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
             Today
           </button>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none border dark:border-slate-700 rounded-lg px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <input
+              type="checkbox"
+              checked={showKeyDates}
+              onChange={e => setShowKeyDates(e.target.checked)}
+              className="rounded text-pink-600 focus:ring-pink-500 w-3.5 h-3.5"
+            />
+            <span className="text-sm dark:text-white whitespace-nowrap">Key Dates</span>
+          </label>
         </div>
       </div>
 
@@ -161,13 +225,17 @@ const MeetingCalendar: React.FC = () => {
               const cellDate = new Date(year, month, day);
               const isToday = cellDate.getTime() === today.getTime();
               const dayMeetings = meetingsByDay[day] || [];
+              const dayKeyDates = keyDatesByDay[day] || [];
+              const shownMeetings = dayMeetings.slice(0, 3);
+              const shownKeyDates = dayKeyDates.slice(0, 3);
+              const totalExtra = (dayMeetings.length - shownMeetings.length) + (dayKeyDates.length - shownKeyDates.length);
               return (
                 <div key={day} className={`border-b border-r dark:border-slate-800/60 min-h-[80px] p-1.5 ${isToday ? 'bg-pink-50 dark:bg-pink-950/20' : ''}`}>
                   <span className={`text-xs font-bold inline-flex items-center justify-center w-6 h-6 rounded-full mb-1 ${isToday ? 'bg-pink-600 text-white' : 'text-slate-500 dark:text-slate-400'}`}>
                     {day}
                   </span>
                   <div className="space-y-0.5">
-                    {dayMeetings.slice(0, 3).map((m, j) => (
+                    {shownMeetings.map((m, j) => (
                       <button
                         key={j}
                         onClick={() => navigate(`/complexes?id=${m.bcId}&tab=meetings`)}
@@ -177,8 +245,18 @@ const MeetingCalendar: React.FC = () => {
                         {m.meeting.type} {m.bcNumber}
                       </button>
                     ))}
-                    {dayMeetings.length > 3 && (
-                      <p className="text-[9px] text-slate-400 px-1">+{dayMeetings.length - 3} more</p>
+                    {shownKeyDates.map((kd, j) => (
+                      <button
+                        key={`kd-${j}`}
+                        onClick={() => navigate(`/complexes?id=${kd.bcId}&tab=meetings`)}
+                        className={`w-full text-left text-[10px] font-semibold py-0.5 rounded-r truncate leading-tight ${KEY_DATE_STYLES[kd.type]}`}
+                        title={`${kd.label} — ${kd.bcName}`}
+                      >
+                        {kd.label} · {kd.bcNumber}
+                      </button>
+                    ))}
+                    {totalExtra > 0 && (
+                      <p className="text-[9px] text-slate-400 px-1">+{totalExtra} more</p>
                     )}
                   </div>
                 </div>
@@ -239,6 +317,12 @@ const MeetingCalendar: React.FC = () => {
               <span className="w-2 h-2 rounded-full bg-red-400" />
               Overdue
             </span>
+            {showKeyDates && KEY_DATE_LEGEND.map(({ type, label, color }) => (
+              <span key={type} className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+                <span className={`w-0.5 h-3 rounded-sm ${color}`} />
+                {label}
+              </span>
+            ))}
           </div>
         </div>
       </div>
