@@ -649,7 +649,7 @@ const Dashboard: React.FC = () => {
                           <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{rem.bcName}</p>
                           {snooze && (
                             <p className="text-[10px] text-amber-500 flex items-center gap-1 mt-0.5">
-                              <BellOff size={9} /> Wakes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ')}
+                              <BellOff size={9} /> Resumes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                             </p>
                           )}
                         </div>
@@ -688,7 +688,7 @@ const Dashboard: React.FC = () => {
                           <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{rem.bcName}</p>
                           {snooze && (
                             <p className="text-[10px] text-amber-500 flex items-center gap-1 mt-0.5">
-                              <BellOff size={9} /> Wakes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ')}
+                              <BellOff size={9} /> Resumes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                             </p>
                           )}
                         </div>
