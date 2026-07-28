@@ -1,9 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ResponseTemplate } from '../types';
-import { MessageSquare, Search, Plus, Edit2, Trash2, X, Copy, Check, Loader2, Save } from 'lucide-react';
+import { MessageSquare, Search, Plus, Edit2, Trash2, X, Copy, Check, Loader2, Save, Bold, Italic, Underline, List, Link, Unlink } from 'lucide-react';
 
 const CATEGORIES = ['General', 'Insurance', 'Meetings', 'Levy Queries', 'Maintenance', 'Disclosure', 'Complaints', 'Other'];
 
@@ -18,32 +18,128 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Other':        'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
 };
 
+// Tailwind arbitrary-variant classes for rendering HTML body content
+const RICH_CLASS =
+  '[&_strong]:font-bold [&_b]:font-bold ' +
+  '[&_em]:italic [&_i]:italic ' +
+  '[&_u]:underline ' +
+  '[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1.5 ' +
+  '[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1.5 ' +
+  '[&_li]:mb-0.5 ' +
+  '[&_a]:text-blue-600 [&_a]:underline dark:[&_a]:text-blue-400 ' +
+  '[&_p]:mb-1.5';
+
+const stripHtml = (html: string): string => {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+};
+
+// Convert legacy plain-text bodies to HTML; pass through bodies that already contain tags.
+const toHtml = (body: string): string => {
+  if (/<[a-z][\s\S]*>/i.test(body)) return body;
+  return body
+    .split('\n')
+    .map(line =>
+      line.trim() === ''
+        ? '<p><br></p>'
+        : `<p>${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+    )
+    .join('');
+};
+
+// ── Rich Text Editor ─────────────────────────────────────────────────────────
+
+const RichEditor: React.FC<{
+  initialValue: string;
+  editorRef: React.RefObject<HTMLDivElement>;
+}> = ({ initialValue, editorRef }) => {
+  useEffect(() => {
+    if (editorRef.current) editorRef.current.innerHTML = toHtml(initialValue);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const exec = (cmd: string, val?: string) => {
+    document.execCommand(cmd, false, val);
+    editorRef.current?.focus();
+  };
+
+  const insertLink = () => {
+    // Save selection before prompt interrupts focus
+    const sel = window.getSelection();
+    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    const url = window.prompt('Enter URL (e.g. https://example.com):');
+    if (!url) return;
+    if (range && sel) { sel.removeAllRanges(); sel.addRange(range); }
+    exec('createLink', url);
+  };
+
+  // onMouseDown + preventDefault keeps editor focus when clicking toolbar buttons
+  const md = (e: React.MouseEvent, fn: () => void) => { e.preventDefault(); fn(); };
+  const tbtn = 'p-1.5 text-slate-500 dark:text-slate-400 hover:text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20 rounded transition-colors';
+  const sep = <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1 shrink-0" />;
+
+  return (
+    <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-pink-500 focus-within:border-pink-500">
+      <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-wrap">
+        <button type="button" onMouseDown={e => md(e, () => exec('bold'))}                className={tbtn} title="Bold"><Bold size={13} /></button>
+        <button type="button" onMouseDown={e => md(e, () => exec('italic'))}              className={tbtn} title="Italic"><Italic size={13} /></button>
+        <button type="button" onMouseDown={e => md(e, () => exec('underline'))}           className={tbtn} title="Underline"><Underline size={13} /></button>
+        {sep}
+        <button type="button" onMouseDown={e => md(e, () => exec('insertUnorderedList'))} className={tbtn} title="Bullet list"><List size={13} /></button>
+        {sep}
+        <button type="button" onMouseDown={e => md(e, insertLink)}                        className={tbtn} title="Insert link"><Link size={13} /></button>
+        <button type="button" onMouseDown={e => md(e, () => exec('unlink'))}              className={tbtn} title="Remove link"><Unlink size={13} /></button>
+      </div>
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        className={`min-h-[200px] p-3 text-sm focus:outline-none dark:bg-slate-800 dark:text-white leading-relaxed ${RICH_CLASS}`}
+      />
+    </div>
+  );
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 const ResponseLibrary: React.FC = () => {
   const { responseTemplates, deleteResponseTemplate } = useData();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  const [searchTerm, setSearchTerm]         = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [isModalOpen, setIsModalOpen]       = useState(false);
+  const [searchTerm, setSearchTerm]             = useState('');
+  const [filterCategory, setFilterCategory]     = useState('all');
+  const [isModalOpen, setIsModalOpen]           = useState(false);
   const [editingTemplate, setEditingTemplate]   = useState<ResponseTemplate | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<ResponseTemplate | null>(null);
-  const [deletingIds, setDeletingIds]       = useState<Set<string>>(new Set());
-  const [copiedId, setCopiedId]             = useState<string | null>(null);
+  const [deletingIds, setDeletingIds]           = useState<Set<string>>(new Set());
+  const [copiedId, setCopiedId]                 = useState<string | null>(null);
 
   const filtered = useMemo(() => (
     responseTemplates
       .filter(t =>
         (filterCategory === 'all' || t.category === filterCategory) &&
         (t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         t.body.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         stripHtml(t.body).toLowerCase().includes(searchTerm.toLowerCase()) ||
          t.category.toLowerCase().includes(searchTerm.toLowerCase()))
       )
       .sort((a, b) => a.title.localeCompare(b.title))
   ), [responseTemplates, searchTerm, filterCategory]);
 
   const handleCopy = async (template: ResponseTemplate) => {
-    await navigator.clipboard.writeText(template.body);
+    const html = toHtml(template.body);
+    const plain = stripHtml(html);
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html':  new Blob([html],  { type: 'text/html' }),
+          'text/plain': new Blob([plain], { type: 'text/plain' }),
+        }),
+      ]);
+    } catch {
+      // Fallback for browsers that don't support ClipboardItem
+      await navigator.clipboard.writeText(plain);
+    }
     setCopiedId(template.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -156,7 +252,7 @@ const ResponseLibrary: React.FC = () => {
                 )}
               </div>
               <h3 className="font-bold text-slate-800 dark:text-white text-sm mb-2 leading-snug">{t.title}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-3">{t.body}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-3">{stripHtml(t.body)}</p>
               <div className="mt-4 pt-3 border-t dark:border-slate-800 flex items-center justify-between">
                 <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Click to view &amp; copy</span>
                 <Copy size={13} className="text-slate-300 dark:text-slate-600" />
@@ -188,7 +284,10 @@ const ResponseLibrary: React.FC = () => {
               </button>
             </div>
             <div className="p-6 overflow-y-auto flex-1">
-              <pre className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200 leading-relaxed font-sans">{selectedTemplate.body}</pre>
+              <div
+                className={`text-sm text-slate-700 dark:text-slate-200 leading-relaxed ${RICH_CLASS}`}
+                dangerouslySetInnerHTML={{ __html: toHtml(selectedTemplate.body) }}
+              />
             </div>
             <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-950 shrink-0">
               {isAdmin && (
@@ -220,34 +319,39 @@ const ResponseLibrary: React.FC = () => {
   );
 };
 
+// ── Add / Edit Modal ─────────────────────────────────────────────────────────
+
 const ResponseModal: React.FC<{
   template: ResponseTemplate | null;
   onClose: () => void;
 }> = ({ template, onClose }) => {
   const { addResponseTemplate, updateResponseTemplate } = useData();
   const { user } = useAuth();
+  const editorRef = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState({
     title:    template?.title    || '',
     category: template?.category || 'General',
-    body:     template?.body     || '',
   });
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim() || !form.body.trim()) return;
+    const body = editorRef.current?.innerHTML?.trim() ?? '';
+    if (!form.title.trim() || !stripHtml(body).trim()) return;
     setIsSaving(true);
     try {
       if (template) {
         await updateResponseTemplate({
           ...template,
           ...form,
+          body,
           updatedAt: new Date().toISOString(),
           updatedBy: user?.name || '',
         });
       } else {
         await addResponseTemplate({
           ...form,
+          body,
           createdAt: new Date().toISOString(),
           createdBy: user?.name || '',
         });
@@ -294,14 +398,7 @@ const ResponseModal: React.FC<{
           </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Response Text</label>
-            <textarea
-              required
-              rows={12}
-              className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm focus:ring-2 focus:ring-pink-500 outline-none resize-none leading-relaxed"
-              placeholder="Type the full response text here..."
-              value={form.body}
-              onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
-            />
+            <RichEditor initialValue={template?.body ?? ''} editorRef={editorRef} />
           </div>
           <button
             type="submit"
