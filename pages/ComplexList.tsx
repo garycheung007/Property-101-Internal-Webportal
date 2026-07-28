@@ -431,6 +431,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [ltmpEditing, setLtmpEditing] = useState(false);
     const [portfolioEditing, setPortfolioEditing] = useState(false);
     const [complianceEditing, setComplianceEditing] = useState(false);
+    const [insurancePolicyEditing, setInsurancePolicyEditing] = useState(false);
     const [venueOther, setVenueOther] = useState(false);
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
     const [adminUnlocked, setAdminUnlocked] = useState(false);
@@ -609,6 +610,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const hasRequiredPostMeetingMissing = postMeetingFields.some(f => f.required && !postMeetingFormData[f.id]?.trim());
 
     const insuranceExpired = !isInsuranceValid(form.insuranceExpiry);
+    const insuranceDaysFromNow = (() => {
+        const parsed = parseDateSafe(form.insuranceExpiry);
+        if (!parsed) return null;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        return Math.round((parsed.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    })();
     const upcomingMeetingsCount = (form.meetings || []).filter(m => !isMeetingPassed(m.date)).length;
     const nextMeeting = [...(form.meetings || [])]
         .filter(m => !isMeetingPassed(m.date))
@@ -1331,39 +1338,143 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                     )}
 
                     {activeTab === 'insurance' && (
+                        <div className="space-y-5">
+                        {/* Status bar */}
+                        {(() => {
+                            const completedSteps = workflowSteps.filter(s => (!s.isBcOnly || form.type === 'Body Corporate') && insuranceProgress[s.id]?.completed).length;
+                            const totalSteps = workflowSteps.filter(s => !s.isBcOnly || form.type === 'Body Corporate').length;
+                            const pct = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+                            let barClass = '';
+                            let icon: React.ReactNode;
+                            let primaryText = '';
+                            let subText = '';
+                            if (!form.insuranceExpiry) {
+                                barClass = 'bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900/30';
+                                icon = <AlertCircle size={16} className="text-amber-500" />;
+                                primaryText = 'Insurance expiry date not set';
+                                subText = 'Add an expiry date below to track renewal status';
+                            } else if (insuranceExpired) {
+                                const days = insuranceDaysFromNow !== null ? Math.abs(insuranceDaysFromNow) : 0;
+                                barClass = 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-900/30';
+                                icon = <ShieldAlert size={16} className="text-red-500" />;
+                                primaryText = `Policy Expired — ${formatDateNZ(form.insuranceExpiry)}`;
+                                subText = `${days} day${days !== 1 ? 's' : ''} overdue · Renewal required`;
+                            } else if (insuranceDaysFromNow !== null && insuranceDaysFromNow <= 60) {
+                                barClass = 'bg-amber-50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900/30';
+                                icon = <AlertCircle size={16} className="text-amber-500" />;
+                                primaryText = `Expiring Soon — ${formatDateNZ(form.insuranceExpiry)}`;
+                                subText = `${insuranceDaysFromNow} day${insuranceDaysFromNow !== 1 ? 's' : ''} remaining · Start renewal process`;
+                            } else {
+                                barClass = 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-900/30';
+                                icon = <ShieldCheck size={16} className="text-emerald-500" />;
+                                primaryText = `Policy Valid — expires ${formatDateNZ(form.insuranceExpiry)}`;
+                                subText = `${insuranceDaysFromNow} days remaining`;
+                            }
+                            return (
+                                <div className={`flex items-center justify-between flex-wrap gap-4 p-4 rounded-2xl border ${barClass}`}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/70 dark:bg-black/20 flex-shrink-0">{icon}</div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800 dark:text-white">{primaryText}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subText}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-white/70 dark:bg-black/20 px-3 py-1.5 rounded-xl">
+                                        <div className="w-16 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                                            <div className="h-full rounded-full bg-pink-500 transition-all" style={{ width: `${pct}%` }} />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{completedSteps}/{totalSteps} workflow steps</span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                            <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-6">
+                            <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-4">
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-4">
                                     <ShieldCheck size={16} className="text-pink-600" /> Policy Configuration
+                                    {insurancePolicyEditing ? (
+                                        <button onClick={() => setInsurancePolicyEditing(false)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider transition-colors"><Check size={12} /> Done</button>
+                                    ) : (
+                                        <button onClick={() => setInsurancePolicyEditing(true)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors"><Pencil size={12} /> Edit</button>
+                                    )}
                                 </h3>
-                                <div className="grid grid-cols-1 gap-5">
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Insurance Expiry Date</label>
+                                        {insurancePolicyEditing ? (
+                                            <div className="relative">
+                                                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                                                <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.insuranceExpiry || ''} onChange={e => setForm({...form, insuranceExpiry: e.target.value})} />
+                                            </div>
+                                        ) : (
+                                            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${!form.insuranceExpiry ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800' : insuranceExpired ? 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900/30' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>
+                                                {!form.insuranceExpiry ? (
+                                                    <span className="text-sm text-slate-400 dark:text-slate-500 italic">Not set</span>
+                                                ) : insuranceExpired ? (
+                                                    <><AlertCircle size={15} className="text-red-500 flex-shrink-0" /><span className="text-sm font-bold text-red-600 dark:text-red-400">{formatDateNZ(form.insuranceExpiry)}</span></>
+                                                ) : (
+                                                    <><ShieldCheck size={15} className="text-emerald-500 flex-shrink-0" /><span className="text-sm font-bold text-slate-700 dark:text-slate-200">{formatDateNZ(form.insuranceExpiry)}</span></>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Underwriter</label>
-                                        <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.insuranceUnderwriter || ''} onChange={e => setForm({...form, insuranceUnderwriter: e.target.value})}>
-                                            <option value="">-- Choose --</option>
-                                            {underwriters.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
-                                        </select>
+                                        {insurancePolicyEditing ? (
+                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.insuranceUnderwriter || ''} onChange={e => setForm({...form, insuranceUnderwriter: e.target.value})}>
+                                                <option value="">-- Choose --</option>
+                                                {underwriters.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                                            </select>
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.insuranceUnderwriter || <span className="text-slate-400 dark:text-slate-500 italic">Not set</span>}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Broker</label>
-                                        <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.insuranceBroker || ''} onChange={e => setForm({...form, insuranceBroker: e.target.value})}>
-                                            <option value="">-- Choose --</option>
-                                            {brokers.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-                                        </select>
+                                        {insurancePolicyEditing ? (
+                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.insuranceBroker || ''} onChange={e => setForm({...form, insuranceBroker: e.target.value})}>
+                                                <option value="">-- Choose --</option>
+                                                {brokers.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                                            </select>
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.insuranceBroker || <span className="text-slate-400 dark:text-slate-500 italic">Not set</span>}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Insurance Valuer</label>
-                                        <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.insuranceValuer || ''} onChange={e => setForm({...form, insuranceValuer: e.target.value})}>
-                                            <option value="">-- Choose --</option>
-                                            {valuers.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
-                                        </select>
+                                        {insurancePolicyEditing ? (
+                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.insuranceValuer || ''} onChange={e => setForm({...form, insuranceValuer: e.target.value})}>
+                                                <option value="">-- Choose --</option>
+                                                {valuers.map(v => <option key={v.id} value={v.name}>{v.name}</option>)}
+                                            </select>
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.insuranceValuer || <span className="text-slate-400 dark:text-slate-500 italic">Not set</span>}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Valuation Date</label>
-                                        <div className="relative">
-                                            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                            <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.lastInsuranceValuationDate || ''} onChange={e => setForm({...form, lastInsuranceValuationDate: e.target.value})} />
-                                        </div>
+                                        {insurancePolicyEditing ? (
+                                            <div className="relative">
+                                                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                                                <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.lastInsuranceValuationDate || ''} onChange={e => setForm({...form, lastInsuranceValuationDate: e.target.value})} />
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.lastInsuranceValuationDate ? formatDateNZ(form.lastInsuranceValuationDate) : <span className="text-slate-400 dark:text-slate-500 italic">Not set</span>}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Insurance Notes</label>
+                                        {insurancePolicyEditing ? (
+                                            <textarea
+                                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm resize-none"
+                                                rows={3}
+                                                placeholder="e.g. policy number, special conditions, broker contact notes…"
+                                                value={form.insuranceNote || ''}
+                                                onChange={e => setForm({...form, insuranceNote: e.target.value})}
+                                            />
+                                        ) : (
+                                            <p className="text-sm text-slate-700 dark:text-slate-200 px-1 py-1 whitespace-pre-wrap">{form.insuranceNote || <span className="text-slate-400 dark:text-slate-500 italic">No notes added</span>}</p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1437,6 +1548,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     </div>
                                 )}
                             </div>
+                        </div>
                         </div>
                     )}
 
