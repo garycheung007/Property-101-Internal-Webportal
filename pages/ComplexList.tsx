@@ -17,6 +17,7 @@ import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplate
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS, DEFAULT_POST_MEETING_FIELDS } from '../constants/defaults';
 import FieldHint from '../components/FieldHint';
 import { useToast } from '../contexts/ToastContext';
+import { generateReminders } from '../utils/generateReminders';
 
 /**
  * Robust date parser that handles ISO (YYYY-MM-DD), NZ/UK (DD/MM/YYYY), 
@@ -620,6 +621,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const nextMeeting = [...(form.meetings || [])]
         .filter(m => !isMeetingPassed(m.date))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+    const alertCount = generateReminders([complex], systemSettings.insuranceSettings).length;
     const isDirty = JSON.stringify(form) !== JSON.stringify(baseline) || isMeetingDirty();
     isDirtyRef.current = isDirty;
 
@@ -930,265 +932,337 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
 
                 <div className={`flex-1 min-h-0 transition-colors relative ${activeTab === 'meetings' ? 'overflow-hidden flex' : 'overflow-y-auto p-8 bg-slate-50/30 dark:bg-slate-950/30'}`}>
                     {activeTab === 'details' && (
-                        <div className="space-y-6">
-                        {currentUser?.role === 'admin' && (
-                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-4">
-                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
-                                    <Pencil size={16} className="text-pink-600" /> Property Information
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="md:col-span-2">
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Complex Name</label>
-                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} />
+                        <div className="space-y-5">
+                        {/* Zone 1: At a Glance */}
+                        <div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[.14em] mb-3 flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-slate-200 dark:after:bg-slate-800">At a Glance</p>
+                            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                                {/* Insurance card */}
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('insurance')}
+                                    className={`flex flex-col items-start gap-1 p-4 rounded-2xl border text-left transition-opacity hover:opacity-75 ${insuranceExpired ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900/40' : insuranceDaysFromNow !== null && insuranceDaysFromNow <= 30 ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/40' : 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/40'}`}
+                                >
+                                    <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${insuranceExpired ? 'text-red-500' : insuranceDaysFromNow !== null && insuranceDaysFromNow <= 30 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                        <Shield size={11} /> Insurance
                                     </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">BC / IS Number</label>
-                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcNumber || ''} onChange={e => setForm({...form, bcNumber: e.target.value})} />
+                                    <p className={`text-xs font-bold leading-tight ${insuranceExpired ? 'text-red-600 dark:text-red-400' : insuranceDaysFromNow !== null && insuranceDaysFromNow <= 30 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                                        {form.insuranceExpiry ? formatDateNZ(form.insuranceExpiry) : 'Not set'}
+                                    </p>
+                                    <p className={`text-[9px] leading-tight ${insuranceExpired ? 'text-red-500' : insuranceDaysFromNow !== null && insuranceDaysFromNow <= 30 ? 'text-amber-600' : 'text-emerald-500'}`}>
+                                        {insuranceExpired ? 'Expired' : insuranceDaysFromNow !== null ? `${insuranceDaysFromNow}d left` : 'View details →'}
+                                    </p>
+                                </button>
+                                {/* Next Meeting card */}
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('meetings')}
+                                    className="flex flex-col items-start gap-1 p-4 rounded-2xl border text-left transition-opacity hover:opacity-75 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/40"
+                                >
+                                    <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-blue-500">
+                                        <Calendar size={11} /> Next Meeting
                                     </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Type</label>
-                                        <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.type || 'Body Corporate'} onChange={e => setForm({...form, type: e.target.value as import('../types').ComplexType})}>
-                                            <option value="Body Corporate">Body Corporate</option>
-                                            <option value="Incorporated Society">Incorporated Society</option>
-                                        </select>
+                                    <p className="text-xs font-bold text-blue-700 dark:text-blue-400 leading-tight">
+                                        {nextMeeting ? formatDateNZ(nextMeeting.date) : 'None scheduled'}
+                                    </p>
+                                    <p className="text-[9px] text-blue-500 leading-tight">
+                                        {nextMeeting ? (nextMeeting.type || 'Meeting') : 'View calendar →'}
+                                    </p>
+                                </button>
+                                {/* BWOF card */}
+                                <div className={`flex flex-col items-start gap-1 p-4 rounded-2xl border ${form.bwofExpiry ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/40' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}>
+                                    <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${form.bwofExpiry ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                        <ClipboardCheck size={11} /> BWOF
                                     </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Address</label>
-                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Number of Units</label>
-                                        <input type="number" min={0} className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.units || 0} onChange={e => setForm({...form, units: parseInt(e.target.value) || 0})} />
-                                    </div>
+                                    <p className={`text-xs font-bold leading-tight ${form.bwofExpiry ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                        {form.bwofExpiry ? formatDateNZ(form.bwofExpiry) : 'Not applicable'}
+                                    </p>
+                                    <p className={`text-[9px] leading-tight ${form.bwofExpiry ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                        {form.bwofExpiry ? 'On file' : '—'}
+                                    </p>
                                 </div>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
-                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
-                                    <Building size={16} className="text-pink-600" /> Portfolio & Statutory
-                                    {portfolioEditing ? (
-                                        <button onClick={() => setPortfolioEditing(false)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 uppercase tracking-wider transition-colors"><Check size={12} /> Done</button>
-                                    ) : (
-                                        <button onClick={() => setPortfolioEditing(true)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors"><Pencil size={12} /> Edit</button>
-                                    )}
-                                </h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Account Manager</label>
-                                        {portfolioEditing && currentUser?.role === 'admin' ? (
-                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managerName || ''} onChange={e => setForm({...form, managerName: e.target.value})}>
-                                                <option value="">-- Choose Manager --</option>
-                                                {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                                            </select>
-                                        ) : (
-                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.managerName || 'Unassigned'}</p>
-                                        )}
+                                {/* Last AGM card */}
+                                <div className="flex flex-col items-start gap-1 p-4 rounded-2xl border bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700">
+                                    <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                                        <History size={11} /> Last AGM
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY Start</label>
-                                            {portfolioEditing && currentUser?.role === 'admin' ? (
-                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearStart || ''} onChange={e => setForm({...form, financialYearStart: e.target.value})} placeholder="e.g. 1-May" />
-                                            ) : (
-                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearStart || 'N/A'}</p>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY End</label>
-                                            {portfolioEditing && currentUser?.role === 'admin' ? (
-                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearEnd || ''} onChange={e => setForm({...form, financialYearEnd: e.target.value})} placeholder="e.g. 30-Apr" />
-                                            ) : (
-                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearEnd || 'N/A'}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div
-                                        className={`flex items-center justify-between p-3 rounded-2xl border dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 select-none ${portfolioEditing && currentUser?.role === 'admin' ? 'cursor-pointer' : 'cursor-default'}`}
-                                        onClick={() => portfolioEditing && currentUser?.role === 'admin' && setForm(f => ({ ...f, isGstRegistered: !f.isGstRegistered }))}
-                                    >
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">GST Registered</span>
-                                            <span className="text-[9px] text-slate-400">Used in S146 disclosure</span>
-                                        </div>
-                                        <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form.isGstRegistered ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
-                                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form.isGstRegistered ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Management Fee (Annual)</label>
-                                        {feeEditing ? (
-                                            <div className="flex gap-2 items-center">
-                                                <div className="relative flex-1">
-                                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                                    <input autoFocus type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managementFee || 0} onChange={e => setForm({...form, managementFee: parseFloat(e.target.value) || 0})} placeholder="0.00" />
-                                                </div>
-                                                <button onClick={() => setFeeEditing(false)} className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold transition-colors">Done</button>
-                                                <button onClick={() => { setForm({...form, managementFee: complex.managementFee}); setFeeEditing(false); }} className="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors">Cancel</button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center justify-between px-3 py-2.5 border dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800">
-                                                <div className="flex items-center gap-2">
-                                                    <DollarSign size={16} className="text-slate-400" />
-                                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{(form.managementFee || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <button onClick={() => setFeeEditing(true)} className="flex items-center gap-1.5 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors">
-                                                    <Pencil size={12} /> Edit
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contracted Committee Meetings</label>
-                                        {portfolioEditing && currentUser?.role === 'admin' ? (
-                                            <div className="relative">
-                                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                                <input type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.numberOfCommitteeMeetings || 0} onChange={e => setForm({...form, numberOfCommitteeMeetings: parseInt(e.target.value) || 0})} placeholder="0" />
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2 px-1 py-1">
-                                                <Clock size={16} className="text-slate-400" />
-                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{form.numberOfCommitteeMeetings || 0}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between items-center mb-1">
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Last AGM Date</label>
-                                            {form.previousAgmDate === calculatedAgmDate && calculatedAgmDate && (
-                                                <span className="flex items-center gap-1 text-[8px] font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/30 px-1.5 py-0.5 rounded-full animate-pulse uppercase">
-                                                    <Sparkles size={8} /> Smart Value
-                                                </span>
-                                            )}
-                                        </div>
-                                        {portfolioEditing ? (
-                                            <div className="relative">
-                                                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                                <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.previousAgmDate || ''} onChange={e => setForm({...form, previousAgmDate: e.target.value})} />
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.previousAgmDate ? formatDateNZ(form.previousAgmDate) : 'N/A'}</p>
-                                        )}
-                                        <p className="text-[9px] text-slate-400 mt-1 italic leading-tight">Auto-fills from the most recent past AGM in scheduled meetings. Manual entry allowed.</p>
-                                    </div>
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 leading-tight">
+                                        {form.previousAgmDate ? formatDateNZ(form.previousAgmDate) : 'Not recorded'}
+                                    </p>
+                                    <p className="text-[9px] text-slate-400 leading-tight">
+                                        {form.previousAgmDate ? (() => {
+                                            const d = parseDateSafe(form.previousAgmDate);
+                                            if (!d) return '—';
+                                            const days = Math.round((new Date().getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+                                            return days === 0 ? 'Today' : `${days}d ago`;
+                                        })() : '—'}
+                                    </p>
                                 </div>
-                            </div>
-
-                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
-                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
-                                    <Shield size={16} className="text-pink-600" /> Compliance Status
-                                    {complianceEditing ? (
-                                        <button onClick={() => setComplianceEditing(false)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 uppercase tracking-wider transition-colors"><Check size={12} /> Done</button>
-                                    ) : (
-                                        <button onClick={() => setComplianceEditing(true)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors"><Pencil size={12} /> Edit</button>
-                                    )}
-                                </h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Insurance Expiry Date</label>
-                                        {complianceEditing ? (
-                                            <div className={`relative rounded-xl border-2 transition-colors ${isInsuranceValid(form.insuranceExpiry) ? 'border-slate-200 dark:border-slate-700' : 'border-pink-500 bg-pink-50/30'}`}>
-                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
-                                                    {isInsuranceValid(form.insuranceExpiry) ? null : <AlertCircle size={16} className="text-pink-600" />}
-                                                    <span className={`text-sm font-bold ${!isInsuranceValid(form.insuranceExpiry) ? 'text-pink-600' : 'text-slate-700 dark:text-slate-200'}`}>
-                                                        {formatDateNZ(form.insuranceExpiry) || 'dd/mm/yyyy'}
-                                                    </span>
-                                                </div>
-                                                <input type="date" className="w-full p-2.5 text-sm opacity-0 cursor-pointer" value={form.insuranceExpiry || ''} onChange={e => setForm({...form, insuranceExpiry: e.target.value})} />
-                                            </div>
-                                        ) : (
-                                            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isInsuranceValid(form.insuranceExpiry) ? 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800' : 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900/30'}`}>
-                                                {isInsuranceValid(form.insuranceExpiry) ? <ShieldCheck size={15} className="text-emerald-500 flex-shrink-0" /> : <AlertCircle size={15} className="text-red-500 flex-shrink-0" />}
-                                                <span className={`text-sm font-bold ${isInsuranceValid(form.insuranceExpiry) ? 'text-slate-700 dark:text-slate-200' : 'text-red-600 dark:text-red-400'}`}>{formatDateNZ(form.insuranceExpiry) || 'Not set'}</span>
-                                            </div>
-                                        )}
+                                {/* Open Alerts card */}
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className={`flex flex-col items-start gap-1 p-4 rounded-2xl border text-left transition-opacity hover:opacity-75 ${alertCount > 0 ? 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900/40' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}
+                                >
+                                    <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${alertCount > 0 ? 'text-orange-500' : 'text-slate-400'}`}>
+                                        <AlertCircle size={11} /> Open Alerts
                                     </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">BWOF Expiry Date</label>
-                                            {complianceEditing && currentUser?.role === 'admin' && form.bwofExpiry && (
-                                                <button type="button" onClick={handleBwofRemove} className="text-[10px] font-bold text-pink-500 hover:text-pink-700 dark:hover:text-pink-300 transition-colors">Remove</button>
-                                            )}
-                                        </div>
-                                        {complianceEditing ? (
-                                            <div className="relative">
-                                                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                                <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm cursor-pointer" value={form.bwofExpiry || ''} onChange={e => handleBwofDateChange(e.target.value)} />
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bwofExpiry ? formatDateNZ(form.bwofExpiry) : 'Not set'}</p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Compliance Company</label>
-                                        {complianceEditing ? (
-                                            <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.complianceCompany || ''} onChange={e => setForm({...form, complianceCompany: e.target.value})}>
-                                                <option value="">-- Choose Contractor --</option>
-                                                {bwofCos.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                            </select>
-                                        ) : (
-                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.complianceCompany || '—'}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
-                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
-                                    <UserCircle size={16} className="text-pink-600" /> Building Manager
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (hasBuildingManager) {
-                                                setHasBuildingManager(false);
-                                                setForm(f => ({ ...f, buildingManagerName: '', buildingManagerPhone: '', buildingManagerEmail: '' }));
-                                            } else {
-                                                setHasBuildingManager(true);
-                                            }
-                                        }}
-                                        className="ml-auto text-[10px] font-bold text-pink-500 hover:text-pink-700 dark:hover:text-pink-300 transition-colors"
-                                    >
-                                        {hasBuildingManager ? 'Remove' : '+ Add'}
-                                    </button>
-                                </h3>
-                                {hasBuildingManager ? (
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Name</label>
-                                            <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.buildingManagerName || ''} onChange={e => setForm({...form, buildingManagerName: e.target.value})} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contact Details</label>
-                                            <div className="space-y-2">
-                                                <div className="relative">
-                                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                                    <input type="text" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs" placeholder="Phone" value={form.buildingManagerPhone || ''} onChange={e => setForm({...form, buildingManagerPhone: e.target.value})} />
-                                                </div>
-                                                <div className="relative">
-                                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                                    <input type="email" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs" placeholder="Email" value={form.buildingManagerEmail || ''} onChange={e => setForm({...form, buildingManagerEmail: e.target.value})} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-                                        <UserCircle size={28} className="text-slate-200 dark:text-slate-700" />
-                                        <p className="text-xs text-slate-400 italic">No building manager assigned</p>
-                                    </div>
-                                )}
+                                    <p className={`text-2xl font-black leading-none ${alertCount > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                        {alertCount}
+                                    </p>
+                                    <p className={`text-[9px] leading-tight ${alertCount > 0 ? 'text-orange-500' : 'text-slate-400'}`}>
+                                        {alertCount > 0 ? 'View on Dashboard →' : 'All clear'}
+                                    </p>
+                                </button>
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-3">
-                            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
-                                <MessageSquareMore size={16} className="text-pink-600" /> Notes
-                            </h3>
-                            <textarea
-                                className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-1 focus:ring-pink-500 min-h-[120px]"
-                                placeholder="Add internal notes for this complex..."
-                                value={form.notes || ''}
-                                onChange={e => setForm({...form, notes: e.target.value})}
-                            />
+                        {/* Zone 2: Details */}
+                        <div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[.14em] mb-3 flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-slate-200 dark:after:bg-slate-800">Details</p>
+                            <div className="space-y-4">
+                                {currentUser?.role === 'admin' && (
+                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-4">
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
+                                            <Pencil size={16} className="text-pink-600" /> Property Information
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="md:col-span-2">
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Complex Name</label>
+                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">BC / IS Number</label>
+                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.bcNumber || ''} onChange={e => setForm({...form, bcNumber: e.target.value})} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Type</label>
+                                                <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.type || 'Body Corporate'} onChange={e => setForm({...form, type: e.target.value as import('../types').ComplexType})}>
+                                                    <option value="Body Corporate">Body Corporate</option>
+                                                    <option value="Incorporated Society">Incorporated Society</option>
+                                                </select>
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Address</label>
+                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Number of Units</label>
+                                                <input type="number" min={0} className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.units || 0} onChange={e => setForm({...form, units: parseInt(e.target.value) || 0})} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                                    {/* Portfolio — col-span-3 */}
+                                    <div className="lg:col-span-3 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
+                                            <Building size={16} className="text-pink-600" /> Portfolio
+                                            {portfolioEditing ? (
+                                                <button onClick={() => setPortfolioEditing(false)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 uppercase tracking-wider transition-colors"><Check size={12} /> Done</button>
+                                            ) : (
+                                                <button onClick={() => setPortfolioEditing(true)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors"><Pencil size={12} /> Edit</button>
+                                            )}
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Account Manager</label>
+                                                {portfolioEditing && currentUser?.role === 'admin' ? (
+                                                    <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managerName || ''} onChange={e => setForm({...form, managerName: e.target.value})}>
+                                                        <option value="">-- Choose Manager --</option>
+                                                        {managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                                    </select>
+                                                ) : (
+                                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.managerName || 'Unassigned'}</p>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY Start</label>
+                                                    {portfolioEditing && currentUser?.role === 'admin' ? (
+                                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearStart || ''} onChange={e => setForm({...form, financialYearStart: e.target.value})} placeholder="e.g. 1-May" />
+                                                    ) : (
+                                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearStart || 'N/A'}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY End</label>
+                                                    {portfolioEditing && currentUser?.role === 'admin' ? (
+                                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearEnd || ''} onChange={e => setForm({...form, financialYearEnd: e.target.value})} placeholder="e.g. 30-Apr" />
+                                                    ) : (
+                                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearEnd || 'N/A'}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div
+                                                className={`flex items-center justify-between p-3 rounded-2xl border dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 select-none ${portfolioEditing && currentUser?.role === 'admin' ? 'cursor-pointer' : 'cursor-default'}`}
+                                                onClick={() => portfolioEditing && currentUser?.role === 'admin' && setForm(f => ({ ...f, isGstRegistered: !f.isGstRegistered }))}
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">GST Registered</span>
+                                                    <span className="text-[9px] text-slate-400">Used in S146 disclosure</span>
+                                                </div>
+                                                <div className={`w-12 h-6 rounded-full p-1 transition-colors ${form.isGstRegistered ? 'bg-pink-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                                                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${form.isGstRegistered ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Management Fee (Annual)</label>
+                                                {feeEditing ? (
+                                                    <div className="flex gap-2 items-center">
+                                                        <div className="relative flex-1">
+                                                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                            <input autoFocus type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managementFee || 0} onChange={e => setForm({...form, managementFee: parseFloat(e.target.value) || 0})} placeholder="0.00" />
+                                                        </div>
+                                                        <button onClick={() => setFeeEditing(false)} className="px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold transition-colors">Done</button>
+                                                        <button onClick={() => { setForm({...form, managementFee: complex.managementFee}); setFeeEditing(false); }} className="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors">Cancel</button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center justify-between px-3 py-2.5 border dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800">
+                                                        <div className="flex items-center gap-2">
+                                                            <DollarSign size={16} className="text-slate-400" />
+                                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{(form.managementFee || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                        <button onClick={() => setFeeEditing(true)} className="flex items-center gap-1.5 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors">
+                                                            <Pencil size={12} /> Edit
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contracted Committee Meetings</label>
+                                                {portfolioEditing && currentUser?.role === 'admin' ? (
+                                                    <div className="relative">
+                                                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                        <input type="number" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.numberOfCommitteeMeetings || 0} onChange={e => setForm({...form, numberOfCommitteeMeetings: parseInt(e.target.value) || 0})} placeholder="0" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2 px-1 py-1">
+                                                        <Clock size={16} className="text-slate-400" />
+                                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{form.numberOfCommitteeMeetings || 0}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Last AGM Date</label>
+                                                    {form.previousAgmDate === calculatedAgmDate && calculatedAgmDate && (
+                                                        <span className="flex items-center gap-1 text-[8px] font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-900/30 px-1.5 py-0.5 rounded-full animate-pulse uppercase">
+                                                            <Sparkles size={8} /> Smart Value
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {portfolioEditing ? (
+                                                    <div className="relative">
+                                                        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                        <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.previousAgmDate || ''} onChange={e => setForm({...form, previousAgmDate: e.target.value})} />
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.previousAgmDate ? formatDateNZ(form.previousAgmDate) : 'N/A'}</p>
+                                                )}
+                                                <p className="text-[9px] text-slate-400 mt-1 italic leading-tight">Auto-fills from the most recent past AGM in scheduled meetings. Manual entry allowed.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* BWOF & Compliance — col-span-2 */}
+                                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
+                                            <Shield size={16} className="text-pink-600" /> BWOF & Compliance
+                                            {complianceEditing ? (
+                                                <button onClick={() => setComplianceEditing(false)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 uppercase tracking-wider transition-colors"><Check size={12} /> Done</button>
+                                            ) : (
+                                                <button onClick={() => setComplianceEditing(true)} className="ml-auto flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 uppercase tracking-wider transition-colors"><Pencil size={12} /> Edit</button>
+                                            )}
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">BWOF Expiry Date</label>
+                                                    {complianceEditing && currentUser?.role === 'admin' && form.bwofExpiry && (
+                                                        <button type="button" onClick={handleBwofRemove} className="text-[10px] font-bold text-pink-500 hover:text-pink-700 dark:hover:text-pink-300 transition-colors">Remove</button>
+                                                    )}
+                                                </div>
+                                                {complianceEditing ? (
+                                                    <div className="relative">
+                                                        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                        <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm cursor-pointer" value={form.bwofExpiry || ''} onChange={e => handleBwofDateChange(e.target.value)} />
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bwofExpiry ? formatDateNZ(form.bwofExpiry) : 'Not set'}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Compliance Company</label>
+                                                {complianceEditing ? (
+                                                    <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.complianceCompany || ''} onChange={e => setForm({...form, complianceCompany: e.target.value})}>
+                                                        <option value="">-- Choose Contractor --</option>
+                                                        {bwofCos.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                    </select>
+                                                ) : (
+                                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.complianceCompany || '—'}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* Building Manager */}
+                                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-5">
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
+                                        <UserCircle size={16} className="text-pink-600" /> Building Manager
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (hasBuildingManager) {
+                                                    setHasBuildingManager(false);
+                                                    setForm(f => ({ ...f, buildingManagerName: '', buildingManagerPhone: '', buildingManagerEmail: '' }));
+                                                } else {
+                                                    setHasBuildingManager(true);
+                                                }
+                                            }}
+                                            className="ml-auto text-[10px] font-bold text-pink-500 hover:text-pink-700 dark:hover:text-pink-300 transition-colors"
+                                        >
+                                            {hasBuildingManager ? 'Remove' : '+ Add'}
+                                        </button>
+                                    </h3>
+                                    {hasBuildingManager ? (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Name</label>
+                                                <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm" value={form.buildingManagerName || ''} onChange={e => setForm({...form, buildingManagerName: e.target.value})} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Contact Details</label>
+                                                <div className="space-y-2">
+                                                    <div className="relative">
+                                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                        <input type="text" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs" placeholder="Phone" value={form.buildingManagerPhone || ''} onChange={e => setForm({...form, buildingManagerPhone: e.target.value})} />
+                                                    </div>
+                                                    <div className="relative">
+                                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                        <input type="email" className="w-full pl-10 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-xs" placeholder="Email" value={form.buildingManagerEmail || ''} onChange={e => setForm({...form, buildingManagerEmail: e.target.value})} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+                                            <UserCircle size={28} className="text-slate-200 dark:text-slate-700" />
+                                            <p className="text-xs text-slate-400 italic">No building manager assigned</p>
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Notes */}
+                                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border dark:border-slate-800 space-y-3">
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b dark:border-slate-800 pb-3">
+                                        <MessageSquareMore size={16} className="text-pink-600" /> Notes
+                                    </h3>
+                                    <textarea
+                                        className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-sm resize-none outline-none focus:ring-1 focus:ring-pink-500 min-h-[120px]"
+                                        placeholder="Add internal notes for this complex..."
+                                        value={form.notes || ''}
+                                        onChange={e => setForm({...form, notes: e.target.value})}
+                                    />
+                                </div>
+                            </div>
                         </div>
                         </div>
                     )}
