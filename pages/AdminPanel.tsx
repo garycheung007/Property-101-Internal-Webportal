@@ -5,8 +5,7 @@ import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS, DEFAULT_POST_MEETING_FIELDS } from '../constants/defaults';
-import { db, firebaseConfig, storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, firebaseConfig } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { BodyCorporate, User, UserRole, ComplexType, SystemSettings, Contractor, ContractorCategory, InsuranceSettings, WorkflowStepConfig, MeetingChecklistItem, ReminderType, TemplateFileRecord, MeetingDateSettings, InvoicePricingTier, PostMeetingField } from '../types';
@@ -61,14 +60,7 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
                     await deleteApp(secondaryApp);
                 }
             }
-            let finalSignatureUrl = form.signatureUrl;
-            if (pendingSignatureFile) {
-                const ext = pendingSignatureFile.name.split('.').pop() || 'png';
-                const sigRef = ref(storage, `signatures/${userId}.${ext}`);
-                await uploadBytes(sigRef, pendingSignatureFile);
-                finalSignatureUrl = await getDownloadURL(sigRef);
-            }
-            await onSave({ ...form as User, id: userId, signatureUrl: finalSignatureUrl });
+            await onSave({ ...form as User, id: userId, signatureUrl: form.signatureUrl });
         } finally {
             setIsSaving(false);
         }
@@ -430,18 +422,27 @@ const AdminPanel: React.FC = () => {
         });
     }, []);
 
-    const handleDocxUpload = async (key: string, file: File) => {
+    const handleDocxUpload = (key: string, file: File) => {
         setUploadingDocx(key);
-        try {
-            const storageRef = ref(storage, `templates/${key}.docx`);
-            await uploadBytes(storageRef, file);
-            const storageUrl = await getDownloadURL(storageRef);
-            const record: TemplateFileRecord = { name: file.name, storageUrl, uploadedAt: new Date().toISOString() };
-            await setDoc(doc(db, 'templates_v2', key), record);
-            setDocxTemplates(prev => ({ ...prev, [key]: record }));
-        } finally {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const base64 = (e.target?.result as string).split(',')[1];
+                const record: TemplateFileRecord = { name: file.name, data: base64, uploadedAt: new Date().toISOString() };
+                await setDoc(doc(db, 'templates_v2', key), record);
+                setDocxTemplates(prev => ({ ...prev, [key]: record }));
+                showToast('Template uploaded.', 'success');
+            } catch (err: any) {
+                showToast(`Upload failed: ${err?.message || 'Unknown error'}`, 'error');
+            } finally {
+                setUploadingDocx(null);
+            }
+        };
+        reader.onerror = () => {
+            showToast('Failed to read file.', 'error');
             setUploadingDocx(null);
-        }
+        };
+        reader.readAsDataURL(file);
     };
 
     const renderDocxCard = (key: string, label: string) => {
