@@ -124,7 +124,7 @@ const ComplexList: React.FC = () => {
 
   const filteredComplexes = complexes.filter(c => !c.isArchived).filter(c => {
         const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.bcNumber.toLowerCase().includes(searchTerm.toLowerCase()) || c.address.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesManager = filterManager === 'all' || c.managerName === filterManager;
+        const matchesManager = filterManager === 'all' || c.managerName?.trim().toLowerCase() === filterManager.trim().toLowerCase();
         const matchesType = filterType === 'all' || c.type === filterType;
         return matchesSearch && matchesManager && matchesType;
   });
