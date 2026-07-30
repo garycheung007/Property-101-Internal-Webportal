@@ -42,8 +42,13 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (!hasInitializedFilter.current && complexes.length > 0 && user) {
-      const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName === user.name);
-      if (hasOwnComplexes) setSelectedManager(user.name);
+      if (user.role === 'support' && user.supportedManagerName) {
+        const managerHasComplexes = complexes.some(c => !c.isArchived && c.managerName === user.supportedManagerName);
+        if (managerHasComplexes) setSelectedManager(user.supportedManagerName);
+      } else {
+        const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName === user.name);
+        if (hasOwnComplexes) setSelectedManager(user.name);
+      }
       hasInitializedFilter.current = true;
     }
   }, [complexes, user]);
@@ -65,14 +70,14 @@ const Dashboard: React.FC = () => {
 
   const activeComplexes = complexes.filter(c => !c.isArchived);
 
-  const filteredComplexes = selectedManager === 'all' 
-    ? activeComplexes 
-    : activeComplexes.filter(c => c.managerName === selectedManager);
+  const filteredComplexes = selectedManager === 'all'
+    ? activeComplexes
+    : activeComplexes.filter(c => c.managerName?.trim().toLowerCase() === selectedManager.trim().toLowerCase());
 
   const filteredReminders = reminders.filter(r => {
       const complex = complexes.find(c => c.id === r.bcId);
       if (selectedManager === 'all') return true;
-      return complex?.managerName === selectedManager;
+      return complex?.managerName?.trim().toLowerCase() === selectedManager.trim().toLowerCase();
   });
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
