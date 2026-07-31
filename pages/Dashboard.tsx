@@ -43,10 +43,10 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!hasInitializedFilter.current && complexes.length > 0 && user) {
       if (user.role === 'support' && user.supportedManagerName) {
-        const managerHasComplexes = complexes.some(c => !c.isArchived && c.managerName === user.supportedManagerName);
+        const managerHasComplexes = complexes.some(c => !c.isArchived && c.managerName?.trim().toLowerCase() === user.supportedManagerName?.trim().toLowerCase());
         if (managerHasComplexes) setSelectedManager(user.supportedManagerName);
-      } else {
-        const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName === user.name);
+      } else if (user.role === 'account_manager') {
+        const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName?.trim().toLowerCase() === user.name?.trim().toLowerCase());
         if (hasOwnComplexes) setSelectedManager(user.name);
       }
       hasInitializedFilter.current = true;
