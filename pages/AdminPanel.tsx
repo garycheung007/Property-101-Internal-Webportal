@@ -303,7 +303,7 @@ const InsuranceExpiryRow: React.FC<{ bc: BodyCorporate; onSave: (bc: BodyCorpora
 const POST_MEETING_FIELD_OPTIONS: Array<{ fieldKey: string; label: string }> = [
     { fieldKey: 'levyInstalments',           label: 'No. of Levy Instalments' },
     { fieldKey: 'levyDueDates',              label: 'Levy Due Dates' },
-    { fieldKey: 'managementFee',             label: 'Management Fee' },
+    { fieldKey: 'managementFee',             label: 'Management Fee Incl GST' },
     { fieldKey: 'approvedBudget',            label: 'Annual Levy Budget' },
     { fieldKey: 'operatingFundBalance',      label: 'Operating Fund Balance' },
     { fieldKey: 'reserveFundBalance',        label: 'Reserve Fund Balance' },
@@ -419,7 +419,12 @@ const AdminPanel: React.FC = () => {
         if (systemSettings.waterRateOptions) setLocalWaterRateOptions(systemSettings.waterRateOptions);
         if (systemSettings.conflictRegisterTemplate) setLocalConflictRegisterTemplate(systemSettings.conflictRegisterTemplate);
         if (systemSettings.invoicePricingTiers) setLocalPricingTiers(systemSettings.invoicePricingTiers);
-        if (systemSettings.postMeetingFields) setLocalPostMeetingFields(systemSettings.postMeetingFields);
+        if (systemSettings.postMeetingFields) setLocalPostMeetingFields(
+            systemSettings.postMeetingFields.map(f => {
+                const opt = POST_MEETING_FIELD_OPTIONS.find(o => o.fieldKey === f.fieldKey);
+                return opt ? { ...f, label: opt.label } : f;
+            })
+        );
         if (systemSettings.emailDigestEnabled !== undefined) setLocalEmailDigestEnabled(systemSettings.emailDigestEnabled);
     }, [systemSettings]);
 
