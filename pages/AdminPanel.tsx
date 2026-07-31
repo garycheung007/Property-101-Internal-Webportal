@@ -302,10 +302,14 @@ const InsuranceExpiryRow: React.FC<{ bc: BodyCorporate; onSave: (bc: BodyCorpora
 
 const POST_MEETING_FIELD_OPTIONS: Array<{ fieldKey: string; label: string }> = [
     { fieldKey: 'levyInstalments',           label: 'No. of Levy Instalments' },
+    { fieldKey: 'levyDueDates',              label: 'Levy Due Dates' },
+    { fieldKey: 'managementFee',             label: 'Management Fee' },
     { fieldKey: 'approvedBudget',            label: 'Annual Levy Budget' },
     { fieldKey: 'operatingFundBalance',      label: 'Operating Fund Balance' },
     { fieldKey: 'reserveFundBalance',        label: 'Reserve Fund Balance' },
     { fieldKey: 'lastFinancialStatementBalance', label: 'Financial Statement Balance' },
+    { fieldKey: 'bcAccountName',             label: 'BC Account Name' },
+    { fieldKey: 'bcAccountNumber',           label: 'BC Account Number' },
     { fieldKey: 'notes',                     label: 'Meeting Notes' },
 ];
 
