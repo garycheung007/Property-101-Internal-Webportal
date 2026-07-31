@@ -86,7 +86,7 @@ const calculateDefaultResponseDueDate = (dateStr?: string) => {
 };
 
 const ComplexList: React.FC = () => {
-  const { complexes, updateComplex, addComplex, managers, initializeDummyData, updateMeeting, deleteMeeting } = useData();
+  const { complexes, updateComplex, addComplex, managers, initializeDummyData, addMeeting, updateMeeting, deleteMeeting } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -103,10 +103,10 @@ const ComplexList: React.FC = () => {
   useEffect(() => {
     if (!hasInitializedFilter.current && complexes.length > 0 && user) {
       if (user.role === 'support' && user.supportedManagerName) {
-        const managerHasComplexes = complexes.some(c => !c.isArchived && c.managerName === user.supportedManagerName);
+        const managerHasComplexes = complexes.some(c => !c.isArchived && c.managerName?.trim().toLowerCase() === user.supportedManagerName?.trim().toLowerCase());
         if (managerHasComplexes) setFilterManager(user.supportedManagerName);
       } else if (user.role === 'account_manager') {
-        const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName === user.name);
+        const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName?.trim().toLowerCase() === user.name?.trim().toLowerCase());
         if (hasOwnComplexes) setFilterManager(user.name);
       }
       hasInitializedFilter.current = true;
@@ -135,17 +135,17 @@ const ComplexList: React.FC = () => {
     
     // 2. Synchronize meetings sub-collection
     const originalComplex = complexes.find(c => c.id === updatedBc.id);
-    const originalMeetingIds = originalComplex?.meetings.map(m => m.id) || [];
+    const originalMeetingIds = new Set(originalComplex?.meetings.map(m => m.id) || []);
     const currentMeetingIds = new Set(updatedBc.meetings?.map(m => m.id) || []);
-    
+
     // Process Deletions
-    const deletePromises = originalMeetingIds
+    const deletePromises = [...originalMeetingIds]
         .filter(id => !currentMeetingIds.has(id))
         .map(id => deleteMeeting(updatedBc.id, id));
-    
-    // Process Updates/Additions
+
+    // Process Updates/Additions — addMeeting for new entries (correctly appends to local state)
     const updatePromises = (updatedBc.meetings || [])
-        .map(m => updateMeeting(updatedBc.id, m));
+        .map(m => originalMeetingIds.has(m.id) ? updateMeeting(updatedBc.id, m) : addMeeting(updatedBc.id, m));
 
     // Await all database operations to ensure persistence before unmounting modal
     await Promise.all([...deletePromises, ...updatePromises]);

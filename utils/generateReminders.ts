@@ -1,6 +1,20 @@
 import { BodyCorporate, Reminder, ReminderType, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings } from '../types';
 import { DEFAULT_INSURANCE_SETTINGS, DEFAULT_WORKFLOW, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
+const parseDate = (dateStr?: string): Date | null => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) return d;
+  const nzMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (nzMatch) {
+    const [, day, month, year] = nzMatch;
+    const y = year.length === 2 ? '20' + year : year;
+    const p = new Date(parseInt(y), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(p.getTime())) return p;
+  }
+  return null;
+};
+
 const subtractWorkingDays = (date: Date, n: number): Date => {
   const result = new Date(date);
   let count = 0;
@@ -30,8 +44,8 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
     const progress = bc.insuranceWorkflowProgress || {};
 
     if (bc.insuranceExpiry) {
-      const insDate = new Date(bc.insuranceExpiry);
-      const diffDays = Math.ceil((insDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const insDate = parseDate(bc.insuranceExpiry);
+      if (insDate) { const diffDays = Math.ceil((insDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
       const hasCompletedAnyStep = workflowSteps.some(s => s.id && progress[s.id]?.completed);
 
@@ -60,7 +74,9 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
 
         if (today >= triggerDate) {
           if (step.isValuationCheck && bc.lastInsuranceValuationDate) {
-            const valAge = (insDate.getTime() - new Date(bc.lastInsuranceValuationDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+            const valDate = parseDate(bc.lastInsuranceValuationDate);
+            if (!valDate) return;
+            const valAge = (insDate.getTime() - valDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
             if (valAge < settings.valuationValidityYears) return;
           }
           const daysUntilTrigger = Math.ceil((triggerDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -73,6 +89,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
           });
         }
       });
+      } // end if (insDate)
     }
 
     // NOI/NOM reminders — upcoming meetings only
