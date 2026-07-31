@@ -93,6 +93,7 @@ const ComplexList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterManager, setFilterManager] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<'active' | 'archived' | 'all'>('active');
   const hasInitializedFilter = useRef(false);
   const [selectedComplexId, setSelectedComplexId] = useState<string | null>(null);
   const [initialModalTab, setInitialModalTab] = useState<'details' | 'settings' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict'>('details');
@@ -122,7 +123,11 @@ const ComplexList: React.FC = () => {
     }
   }, [searchParams]);
 
-  const filteredComplexes = complexes.filter(c => !c.isArchived).filter(c => {
+  const filteredComplexes = complexes.filter(c => {
+    if (filterStatus === 'active') return !c.isArchived;
+    if (filterStatus === 'archived') return !!c.isArchived;
+    return true;
+  }).filter(c => {
         const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.bcNumber.toLowerCase().includes(searchTerm.toLowerCase()) || c.address.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesManager = filterManager === 'all' || c.managerName?.trim().toLowerCase() === filterManager.trim().toLowerCase();
         const matchesType = filterType === 'all' || c.type === filterType;
@@ -181,6 +186,7 @@ const ComplexList: React.FC = () => {
             <div className="flex gap-2 w-full md:w-auto">
                  <select className="flex-1 md:flex-none py-2 px-3 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none transition-all" value={filterManager} onChange={(e) => setFilterManager(e.target.value)}><option value="all">All Managers</option>{managers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}</select>
                  <select className="flex-1 md:flex-none py-2 px-3 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none transition-all" value={filterType} onChange={(e) => setFilterType(e.target.value)}><option value="all">All Types</option><option value="Body Corporate">Body Corporate</option><option value="Incorporated Society">Incorporated Society</option></select>
+                 <select className="flex-1 md:flex-none py-2 px-3 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm outline-none transition-all" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select>
             </div>
         </div>
         <div className="overflow-x-auto">
@@ -1140,6 +1146,26 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         <Clock size={16} className="text-slate-400" />
                                                         <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{form.numberOfCommitteeMeetings || 0}</p>
                                                     </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Management Start Date</label>
+                                                {portfolioEditing && currentUser?.role === 'admin' ? (
+                                                    <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.managementStartDate || ''} onChange={e => setForm({...form, managementStartDate: e.target.value})} />
+                                                ) : (
+                                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.managementStartDate ? formatDateNZ(form.managementStartDate) : 'N/A'}</p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Onboarding Type</label>
+                                                {portfolioEditing && currentUser?.role === 'admin' ? (
+                                                    <select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-1 focus:ring-pink-500" value={form.onboardingType || ''} onChange={e => setForm({...form, onboardingType: e.target.value as import('../types').OnboardingType || undefined})}>
+                                                        <option value="">— Not set —</option>
+                                                        <option value="New Development">New Development</option>
+                                                        <option value="Takeover">Takeover</option>
+                                                    </select>
+                                                ) : (
+                                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.onboardingType || 'N/A'}</p>
                                                 )}
                                             </div>
                                             <div>

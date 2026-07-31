@@ -109,7 +109,12 @@ const UserEditModal: React.FC<{ user: User | null; onClose: () => void; onSave: 
                     <div className="pt-2 border-t dark:border-slate-800">
                         <label className="text-[10px] font-bold text-pink-600 uppercase block mb-2">Electronic Signature</label>
                         <div className="flex flex-col gap-3">
-                            {form.signatureUrl && <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border flex justify-center"><img src={form.signatureUrl} alt="Signature" className="max-h-16 w-auto object-contain" style={{ maxWidth: '200px' }} /></div>}
+                            {form.signatureUrl && (
+                                <div className="relative bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border flex justify-center">
+                                    <img src={form.signatureUrl} alt="Signature" className="max-h-16 w-auto object-contain" style={{ maxWidth: '200px' }} />
+                                    <button type="button" onClick={() => setForm({...form, signatureUrl: undefined})} className="absolute top-2 right-2 p-1 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-full hover:text-red-500 transition-colors" title="Remove signature"><X size={12} /></button>
+                                </div>
+                            )}
                             <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed rounded-xl cursor-pointer hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 transition-all"><Upload size={16} className="text-slate-400" /><span className="text-xs font-bold text-slate-500 uppercase">Upload Signature</span><input type="file" className="hidden" accept="image/*" onChange={handleFileChange} /></label>
                         </div>
                     </div>
@@ -334,6 +339,7 @@ const AdminPanel: React.FC = () => {
     });
     const [checklistType, setChecklistType] = useState<'bc' | 'rs'>('bc');
     const [checklistDrag, setChecklistDrag] = useState<{ stage: string; fromIdx: number; overIdx: number } | null>(null);
+    const [workflowDrag, setWorkflowDrag] = useState<{ fromIdx: number; overIdx: number } | null>(null);
     const [localMeetingDateSettings, setLocalMeetingDateSettings] = useState({
         bc: { ...(systemSettings.meetingDateSettings?.bc || DEFAULT_MEETING_DATE_SETTINGS.bc) },
         rs: { ...(systemSettings.meetingDateSettings?.rs || DEFAULT_MEETING_DATE_SETTINGS.rs) },
@@ -961,7 +967,25 @@ const AdminPanel: React.FC = () => {
                                     <h3 className="text-xs font-bold uppercase text-slate-400 tracking-widest">Global Renewal Workflow</h3>
                                     <div className="space-y-2">
                                         {localInsurance.workflowSteps.map((step, idx) => (
-                                            <div key={step.id || idx} className="grid grid-cols-12 gap-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 items-center">
+                                            <div key={step.id || idx}
+                                                draggable
+                                                onDragStart={() => setWorkflowDrag({ fromIdx: idx, overIdx: idx })}
+                                                onDragOver={(e) => { e.preventDefault(); setWorkflowDrag(prev => prev ? { ...prev, overIdx: idx } : null); }}
+                                                onDrop={() => {
+                                                    if (!workflowDrag) return;
+                                                    const { fromIdx, overIdx } = workflowDrag;
+                                                    if (fromIdx === overIdx) { setWorkflowDrag(null); return; }
+                                                    const next = [...localInsurance.workflowSteps];
+                                                    const [moved] = next.splice(fromIdx, 1);
+                                                    next.splice(overIdx, 0, moved);
+                                                    setLocalInsurance({ ...localInsurance, workflowSteps: next });
+                                                    setWorkflowDrag(null);
+                                                }}
+                                                onDragEnd={() => setWorkflowDrag(null)}
+                                                className={`flex items-center gap-2 p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700 transition-all ${workflowDrag?.fromIdx === idx ? 'opacity-40' : ''} ${workflowDrag?.overIdx === idx && workflowDrag.fromIdx !== idx ? 'border-pink-400 ring-1 ring-pink-300' : ''}`}
+                                            >
+                                            <span className="cursor-grab text-slate-300 dark:text-slate-600 hover:text-slate-400 shrink-0 active:cursor-grabbing"><GripVertical size={16} /></span>
+                                            <div className="flex-1 grid grid-cols-12 gap-3 items-center">
                                                 <div className="col-span-4">
                                                     <input 
                                                         type="text" 
@@ -1028,7 +1052,7 @@ const AdminPanel: React.FC = () => {
                                                     </label>
                                                 </div>
                                                 <div className="col-span-1 flex justify-end">
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             const next = localInsurance.workflowSteps.filter((_, i) => i !== idx);
                                                             setLocalInsurance({...localInsurance, workflowSteps: next});
@@ -1038,6 +1062,7 @@ const AdminPanel: React.FC = () => {
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
+                                            </div>
                                             </div>
                                         ))}
                                         <button 
