@@ -106,7 +106,7 @@ const ComplexList: React.FC = () => {
       if (user.role === 'support' && user.supportedManagerName) {
         const managerHasComplexes = complexes.some(c => !c.isArchived && c.managerName?.trim().toLowerCase() === user.supportedManagerName?.trim().toLowerCase());
         if (managerHasComplexes) setFilterManager(user.supportedManagerName);
-      } else if (user.role === 'account_manager') {
+      } else if (user.role === 'account_manager' || user.role === 'admin') {
         const hasOwnComplexes = complexes.some(c => !c.isArchived && c.managerName?.trim().toLowerCase() === user.name?.trim().toLowerCase());
         if (hasOwnComplexes) setFilterManager(user.name);
       }
