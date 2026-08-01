@@ -294,6 +294,7 @@ const DisclosureGenerator: React.FC = () => {
         return `${day} ${month} ${d.getFullYear()}`;
       })(),
       waterAmountOutstanding: formatNZD(waterAmountOutstanding, '[Amount]'),
+      invoiceAmount:        formatNZD(invoiceAmount, '[Invoice Amount]'),
       pcdsPreparationDate:  (() => {
         if (!pcdsPreparationDate) return '[PCDS Date]';
         const d = new Date(pcdsPreparationDate + 'T00:00:00');
@@ -339,6 +340,7 @@ const DisclosureGenerator: React.FC = () => {
       Metered_Charges: vals.meteredCharges,
       Water_Reading_Date: vals.waterReadingDate,
       Water_Amount_Outstanding: vals.waterAmountOutstanding,
+      Invoice_Amount: vals.invoiceAmount,
       // lowercase_underscore (matches old HTML template tag names)
       bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
       current_date: vals.currentDate, unit_number: vals.unitNumber, unit_levy: vals.unitLevy,
@@ -373,6 +375,7 @@ const DisclosureGenerator: React.FC = () => {
       metered_charges: vals.meteredCharges,
       water_reading_date: vals.waterReadingDate,
       water_amount_outstanding: vals.waterAmountOutstanding,
+      invoice_amount: vals.invoiceAmount,
     };
   };
 
