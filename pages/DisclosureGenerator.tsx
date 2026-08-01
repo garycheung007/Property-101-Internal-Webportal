@@ -128,6 +128,8 @@ const DisclosureGenerator: React.FC = () => {
   const [pcdsPreparationDate, setPcdsPreparationDate] = useState('');
   const [waterReadingDate, setWaterReadingDate] = useState('');
   const [waterAmountOutstanding, setWaterAmountOutstanding] = useState('');
+  const [lastWaterMeterReading, setLastWaterMeterReading] = useState('');
+  const [lastWaterCharge, setLastWaterCharge] = useState('');
   const [docxTemplates, setDocxTemplates] = useState<Partial<Record<string, TemplateFileRecord>>>({});
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewing, setPreviewing] = useState(false);
@@ -188,6 +190,8 @@ const DisclosureGenerator: React.FC = () => {
     setPcdsPreparationDate('');
     setWaterReadingDate('');
     setWaterAmountOutstanding('');
+    setLastWaterMeterReading('');
+    setLastWaterCharge('');
     setPreviewHtml('');
     setInvoiceEnabled(false);
     setInvoiceTierId('');
@@ -294,6 +298,8 @@ const DisclosureGenerator: React.FC = () => {
         return `${day} ${month} ${d.getFullYear()}`;
       })(),
       waterAmountOutstanding: formatNZD(waterAmountOutstanding, '[Amount]'),
+      lastWaterMeterReading: lastWaterMeterReading || '',
+      lastWaterCharge:      formatNZD(lastWaterCharge, ''),
       invoiceAmount:        formatNZD(invoiceAmount, '[Invoice Amount]'),
       pcdsPreparationDate:  (() => {
         if (!pcdsPreparationDate) return '[PCDS Date]';
@@ -340,6 +346,8 @@ const DisclosureGenerator: React.FC = () => {
       Metered_Charges: vals.meteredCharges,
       Water_Reading_Date: vals.waterReadingDate,
       Water_Amount_Outstanding: vals.waterAmountOutstanding,
+      Last_Water_Meter_Reading: vals.lastWaterMeterReading,
+      Last_Water_Charge: vals.lastWaterCharge,
       Invoice_Amount: vals.invoiceAmount,
       // lowercase_underscore (matches old HTML template tag names)
       bc_name: vals.bcName, bc_number: vals.bcNumber, address: vals.bcAddress,
@@ -375,6 +383,8 @@ const DisclosureGenerator: React.FC = () => {
       metered_charges: vals.meteredCharges,
       water_reading_date: vals.waterReadingDate,
       water_amount_outstanding: vals.waterAmountOutstanding,
+      last_water_meter_reading: vals.lastWaterMeterReading,
+      last_water_charge: vals.lastWaterCharge,
       invoice_amount: vals.invoiceAmount,
     };
   };
@@ -623,6 +633,16 @@ const DisclosureGenerator: React.FC = () => {
                   <div>
                     <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Levy Outstanding as at Date of Preparation ($)</label>
                     <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 0" value={levyOutstanding} onChange={e => setLevyOutstanding(e.target.value)} />
+                  </div>
+                  <div className="pt-3 border-t dark:border-slate-800 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Last Water Meter Reading (if any)</label>
+                      <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 1234" value={lastWaterMeterReading} onChange={e => setLastWaterMeterReading(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Last Water Charge ($) (if any)</label>
+                      <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 45.00" value={lastWaterCharge} onChange={e => setLastWaterCharge(e.target.value)} />
+                    </div>
                   </div>
                   {isBcOnCharged && (
                     <div className="pt-3 border-t dark:border-slate-800 grid grid-cols-2 gap-3">
