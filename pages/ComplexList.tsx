@@ -448,6 +448,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const modalRef = useRef<HTMLDivElement>(null);
     const isDirtyRef = useRef(false);
     const [postMeetingFormData, setPostMeetingFormData] = useState<Record<string, string>>({});
+    const [postMeetingSchedule, setPostMeetingSchedule] = useState<Array<{month: number; day: number}>>([]);
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
     const valuers = contractors.filter(c => c.category === 'Insurance Valuer');
@@ -660,6 +661,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
             const initial: Record<string, string> = {};
             fields.forEach(f => { initial[f.id] = (form as any)[f.fieldKey] ?? ''; });
             setPostMeetingFormData(initial);
+            setPostMeetingSchedule(form.levyDueDateSchedule || []);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isMeetingLocked, selectedMeetingId]);
@@ -672,11 +674,17 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         }
         let updatedComplex = { ...form };
         postMeetingFields.forEach(f => {
+            if (f.fieldKey === 'levyDueDates') return;
             const val = postMeetingFormData[f.id];
             if (val !== undefined) {
                 (updatedComplex as any)[f.fieldKey] = f.fieldKey === 'managementFee' ? (parseFloat(val) || 0) : f.fieldKey === 'numberOfCommitteeMembers' ? (parseInt(val) || 0) : val;
             }
         });
+        if (postMeetingFields.some(f => f.fieldKey === 'levyInstalments')) {
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            (updatedComplex as any).levyDueDateSchedule = postMeetingSchedule;
+            (updatedComplex as any).levyDueDates = postMeetingSchedule.map(e => `${e.day} ${months[e.month - 1]}`).join(', ');
+        }
         const updatedMeeting: Partial<Meeting> = { ...meetingForm, postMeetingUpdateSaved: true, postMeetingUpdateDismissed: false };
         const currentMeetings = updatedComplex.meetings || [];
         const resolvedId = selectedMeetingId === 'new' ? `mtg_${Date.now()}` : selectedMeetingId!;
@@ -2007,21 +2015,86 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                     <span className="text-[10px] text-slate-400">Updates the complex record</span>
                                                 </div>
                                                 <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                    {postMeetingFields.map(field => (
-                                                        <div key={field.id} className="flex flex-col gap-1">
-                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                                                                {field.label}
-                                                                {field.required && <span className="text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold normal-case tracking-normal">Required</span>}
-                                                            </label>
-                                                            <input
-                                                                type="text"
-                                                                className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-family-inherit"
-                                                                value={postMeetingFormData[field.id] ?? ''}
-                                                                onChange={e => setPostMeetingFormData(prev => ({ ...prev, [field.id]: e.target.value }))}
-                                                                placeholder={field.fieldKey.includes('Balance') || field.fieldKey.includes('Budget') ? 'e.g. $12,000' : ''}
-                                                            />
-                                                        </div>
-                                                    ))}
+                                                    {postMeetingFields.map(field => {
+                                                        if (field.fieldKey === 'levyDueDates') return null;
+                                                        if (field.fieldKey === 'levyInstalments') return (
+                                                            <div key={field.id} className="col-span-full flex flex-col gap-3">
+                                                                <div className="flex flex-col gap-1">
+                                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                                        {field.label}
+                                                                        {field.required && <span className="text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold normal-case tracking-normal">Required</span>}
+                                                                    </label>
+                                                                    <select
+                                                                        className="w-40 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                                                        value={postMeetingFormData[field.id] || ''}
+                                                                        onChange={e => {
+                                                                            const count = e.target.value;
+                                                                            const n = parseInt(count) || 0;
+                                                                            setPostMeetingFormData(prev => ({ ...prev, [field.id]: count }));
+                                                                            setPostMeetingSchedule(prev => Array.from({ length: n }, (_, i) => prev[i] || { month: 1, day: 1 }));
+                                                                        }}
+                                                                    >
+                                                                        <option value="">Select</option>
+                                                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                                                                            <option key={n} value={String(n)}>{n}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                                {postMeetingSchedule.length > 0 && (
+                                                                    <div>
+                                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Levy Due Dates</label>
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                                            {postMeetingSchedule.map((entry, idx) => (
+                                                                                <div key={idx} className="flex items-center gap-2 border dark:border-slate-700 rounded-xl px-3 py-2">
+                                                                                    <span className="text-[11px] font-bold text-slate-400 w-16 shrink-0">Instal. {idx + 1}</span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min={1}
+                                                                                        max={31}
+                                                                                        className="w-14 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-center"
+                                                                                        value={entry.day}
+                                                                                        onChange={e => {
+                                                                                            const s = [...postMeetingSchedule];
+                                                                                            s[idx] = { ...s[idx], day: parseInt(e.target.value) || 1 };
+                                                                                            setPostMeetingSchedule(s);
+                                                                                        }}
+                                                                                    />
+                                                                                    <select
+                                                                                        className="flex-1 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500"
+                                                                                        value={entry.month}
+                                                                                        onChange={e => {
+                                                                                            const s = [...postMeetingSchedule];
+                                                                                            s[idx] = { ...s[idx], month: parseInt(e.target.value) };
+                                                                                            setPostMeetingSchedule(s);
+                                                                                        }}
+                                                                                    >
+                                                                                        {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, mi) => (
+                                                                                            <option key={mi + 1} value={mi + 1}>{m}</option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                        return (
+                                                            <div key={field.id} className="flex flex-col gap-1">
+                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                                    {field.label}
+                                                                    {field.required && <span className="text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold normal-case tracking-normal">Required</span>}
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 font-family-inherit"
+                                                                    value={postMeetingFormData[field.id] ?? ''}
+                                                                    onChange={e => setPostMeetingFormData(prev => ({ ...prev, [field.id]: e.target.value }))}
+                                                                    placeholder={field.fieldKey.includes('Balance') || field.fieldKey.includes('Budget') ? 'e.g. $12,000' : ''}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                                 <div className="flex items-center justify-between px-5 py-3.5 border-t dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
                                                     <span className="text-[10px] text-slate-400">Required fields must be filled before saving</span>

@@ -595,6 +595,30 @@ const DisclosureGenerator: React.FC = () => {
                   <textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. 12 Example St, Auckland 1010" value={ownerAddress} onChange={e => setOwnerAddress(e.target.value)} />
                 </div>
               )}
+              {docType === 'cpl' && (
+                <>
+                  <div className="pt-3 border-t dark:border-slate-800">
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Lawyer Name</label>
+                    <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. Jane Smith" value={lawyerName} onChange={e => setLawyerName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Lawyer Address (C/-)</label>
+                    <textarea rows={2} className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm resize-none" placeholder="e.g. Smith & Co, 1 Law St, Auckland" value={lawyerAddress} onChange={e => setLawyerAddress(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Lawyer Email</label>
+                    <input type="email" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. jane@smithco.co.nz" value={lawyerEmail} onChange={e => setLawyerEmail(e.target.value)} />
+                  </div>
+                  <div className="pt-3 border-t dark:border-slate-800">
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Instalment Amount ($)</label>
+                    <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 1125" value={instalmentAmount} onChange={e => setInstalmentAmount(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-bold text-slate-500 uppercase mb-1">Levy Outstanding as at Date of Preparation ($)</label>
+                    <input type="text" className="w-full rounded-lg border dark:border-slate-700 dark:bg-slate-800 dark:text-white p-2.5 text-sm" placeholder="e.g. 0" value={levyOutstanding} onChange={e => setLevyOutstanding(e.target.value)} />
+                  </div>
+                </>
+              )}
               {docType === 's147' && (
                 <>
                   <div className="pt-3 border-t dark:border-slate-800 grid grid-cols-2 gap-3">
