@@ -311,6 +311,7 @@ const POST_MEETING_FIELD_OPTIONS: Array<{ fieldKey: string; label: string }> = [
     { fieldKey: 'bcAccountName',             label: 'BC Account Name' },
     { fieldKey: 'bcAccountNumber',           label: 'BC Account Number' },
     { fieldKey: 'notes',                     label: 'Meeting Notes' },
+    { fieldKey: 'numberOfCommitteeMembers',  label: 'No. of Committee Members' },
 ];
 
 const AdminPanel: React.FC = () => {

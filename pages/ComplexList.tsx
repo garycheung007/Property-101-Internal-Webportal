@@ -674,7 +674,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
         postMeetingFields.forEach(f => {
             const val = postMeetingFormData[f.id];
             if (val !== undefined) {
-                (updatedComplex as any)[f.fieldKey] = f.fieldKey === 'managementFee' ? (parseFloat(val) || 0) : val;
+                (updatedComplex as any)[f.fieldKey] = f.fieldKey === 'managementFee' ? (parseFloat(val) || 0) : f.fieldKey === 'numberOfCommitteeMembers' ? (parseInt(val) || 0) : val;
             }
         });
         const updatedMeeting: Partial<Meeting> = { ...meetingForm, postMeetingUpdateSaved: true, postMeetingUpdateDismissed: false };
