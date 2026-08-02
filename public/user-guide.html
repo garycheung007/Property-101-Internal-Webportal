@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Property 101 — Staff Portal Guide</title>
+<style>
+  /* ── Tokens ── */
+  :root {
+    --navy:        #1B2A4A;
+    --teal:        #2B8A7E;
+    --teal-dim:    #1E6B61;
+    --teal-bg:     #E6F4F2;
+    --amber:       #B45309;
+    --amber-bg:    #FEF3C7;
+    --red:         #B91C1C;
+    --red-bg:      #FEE2E2;
+    --bg:          #F4F6FA;
+    --surface:     #FFFFFF;
+    --sidebar:     #EAEEf5;
+    --text:        #1B2A4A;
+    --text-muted:  #5A6478;
+    --border:      #D8DEE9;
+    --tag-admin:   #1B2A4A;
+    --tag-manager: #1D4ED8;
+    --tag-support: #6D28D9;
+    --tag-accounts:#B45309;
+    --radius:      6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:         #0D1625;
+      --surface:    #162033;
+      --sidebar:    #111C2E;
+      --text:       #DCE3EF;
+      --text-muted: #7D8FA9;
+      --border:     #253047;
+      --teal-bg:    #0D2B28;
+      --amber-bg:   #2A1D08;
+      --red-bg:     #2A0E0E;
+      --teal:       #38A99B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:         #0D1625;
+    --surface:    #162033;
+    --sidebar:    #111C2E;
+    --text:       #DCE3EF;
+    --text-muted: #7D8FA9;
+    --border:     #253047;
+    --teal-bg:    #0D2B28;
+    --amber-bg:   #2A1D08;
+    --red-bg:     #2A0E0E;
+    --teal:       #38A99B;
+  }
+  :root[data-theme="light"] {
+    --navy:        #1B2A4A;
+    --teal:        #2B8A7E;
+    --teal-bg:     #E6F4F2;
+    --amber-bg:    #FEF3C7;
+    --red-bg:      #FEE2E2;
+    --bg:          #F4F6FA;
+    --surface:     #FFFFFF;
+    --sidebar:     #EAEEf5;
+    --text:        #1B2A4A;
+    --text-muted:  #5A6478;
+    --border:      #D8DEE9;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 248px;
+    flex-shrink: 0;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  #sidebar-header {
+    padding: 20px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  #sidebar-header .logo-mark {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 4px;
+  }
+  #sidebar-header .logo-square {
+    width: 30px; height: 30px;
+    background: var(--navy);
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+  #sidebar-header .logo-text {
+    font-weight: 700;
+    font-size: 13.5px;
+    color: var(--text);
+    line-height: 1.25;
+  }
+  #sidebar-header .logo-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+  #sidebar-header .guide-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-top: 10px;
+  }
+
+  #sidebar nav { flex: 1; padding: 10px 0 20px; }
+  .nav-group-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 14px 18px 4px;
+  }
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 18px;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: color 0.1s, background 0.1s;
+  }
+  .nav-link:hover { color: var(--text); background: rgba(43,138,126,0.06); }
+  .nav-link.active {
+    color: var(--teal);
+    border-left-color: var(--teal);
+    background: rgba(43,138,126,0.08);
+    font-weight: 600;
+  }
+  .nav-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+    opacity: 0.5;
+  }
+  .nav-link.active .nav-dot { opacity: 1; }
+
+  /* ── Main content ── */
+  #main {
+    flex: 1;
+    min-width: 0;
+    padding: 44px 52px 80px;
+    max-width: 860px;
+  }
+
+  /* ── Page header ── */
+  .page-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  @media (prefers-color-scheme: dark) { .page-title { color: var(--text); } }
+  :root[data-theme="dark"] .page-title { color: var(--text); }
+  .page-subtitle {
+    color: var(--text-muted);
+    font-size: 14.5px;
+    margin-bottom: 32px;
+  }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 52px;
+    scroll-margin-top: 24px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .section-icon {
+    width: 32px; height: 32px;
+    border-radius: 7px;
+    background: var(--teal-bg);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .section-icon svg { width: 16px; height: 16px; stroke: var(--teal); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  h2.section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+  .section-roles { display: flex; gap: 5px; flex-wrap: wrap; margin-left: auto; }
+
+  h3.sub-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin: 24px 0 10px;
+  }
+  p { margin-bottom: 10px; color: var(--text); }
+
+  /* ── Role badges ── */
+  .role { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+  .role-admin    { background: rgba(27,42,74,0.12);  color: var(--navy); }
+  .role-manager  { background: rgba(29,78,216,0.1);  color: #1D4ED8; }
+  .role-support  { background: rgba(109,40,217,0.1); color: #6D28D9; }
+  .role-accounts { background: rgba(180,83,9,0.1);   color: #B45309; }
+  :root[data-theme="dark"] .role-admin    { background: rgba(220,230,255,0.1); color: #93ACDF; }
+  :root[data-theme="dark"] .role-manager  { background: rgba(96,165,250,0.12); color: #60A5FA; }
+  :root[data-theme="dark"] .role-support  { background: rgba(167,139,250,0.12); color: #A78BFA; }
+  :root[data-theme="dark"] .role-accounts { background: rgba(251,191,36,0.12); color: #FBB724; }
+  @media (prefers-color-scheme: dark) {
+    .role-admin    { background: rgba(220,230,255,0.1); color: #93ACDF; }
+    .role-manager  { background: rgba(96,165,250,0.12); color: #60A5FA; }
+    .role-support  { background: rgba(167,139,250,0.12); color: #A78BFA; }
+    .role-accounts { background: rgba(251,191,36,0.12); color: #FBB724; }
+  }
+
+  /* ── Steps ── */
+  .steps { display: flex; flex-direction: column; gap: 0; margin: 12px 0 16px; }
+  .step { display: flex; gap: 14px; padding: 10px 0; }
+  .step:not(:last-child) { border-bottom: 1px solid var(--border); }
+  .step-num {
+    width: 24px; height: 24px; flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--teal);
+    color: #fff;
+    font-size: 11.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+  }
+  .step-body { flex: 1; }
+  .step-body strong { display: block; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .step-body span { font-size: 13.5px; color: var(--text-muted); }
+
+  /* ── Callouts ── */
+  .callout {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    margin: 14px 0;
+    font-size: 13.5px;
+  }
+  .callout-tip  { background: var(--teal-bg); border-left: 3px solid var(--teal); }
+  .callout-warn { background: var(--amber-bg); border-left: 3px solid #D97706; }
+  .callout-note { background: var(--red-bg);   border-left: 3px solid #DC2626; }
+  .callout-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .callout-body { flex: 1; }
+  .callout-body strong { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; color: inherit; opacity: 0.75; }
+
+  /* ── Feature list ── */
+  .feature-list { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 10px 0 14px; }
+  .feature-list li { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+  .feature-list li::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--teal); flex-shrink: 0; margin-top: 7px; }
+
+  /* ── Field table ── */
+  .field-table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  .field-table th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); padding: 6px 10px; border-bottom: 1.5px solid var(--border); }
+  .field-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .field-table tr:last-child td { border-bottom: none; }
+  .field-table td:first-child { font-weight: 600; white-space: nowrap; }
+  .field-name { font-family: monospace; font-size: 12px; background: rgba(43,138,126,0.08); color: var(--teal); padding: 1px 5px; border-radius: 3px; }
+
+  /* ── Two-col layout ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+  @media (max-width: 680px) { .two-col { grid-template-columns: 1fr; } }
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .info-card-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 5px; }
+  .info-card-value { font-size: 13.5px; color: var(--text); }
+
+  /* ── Inline code ── */
+  code { font-family: monospace; font-size: 12.5px; background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px; }
+  :root[data-theme="dark"] code { background: rgba(255,255,255,0.08); }
+  @media (prefers-color-scheme: dark) { code { background: rgba(255,255,255,0.08); } }
+
+  /* ── Divider ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 30px 0; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    body { flex-direction: column; }
+    #sidebar { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
+    #sidebar nav { display: flex; flex-wrap: wrap; padding: 8px 12px; gap: 4px; }
+    .nav-group-label { display: none; }
+    .nav-link { padding: 4px 10px; border-left: none; border-radius: 4px; font-size: 12px; }
+    .nav-link.active { background: var(--teal); color: #fff; }
+    #main { padding: 24px 20px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div class="logo-mark">
+      <div class="logo-square">P1</div>
+      <div>
+        <div class="logo-text">Property 101 Group</div>
+        <div class="logo-sub">Body Corporate Portal</div>
+      </div>
+    </div>
+    <div class="guide-label">Staff User Guide</div>
+  </div>
+  <nav id="sidebar-nav">
+    <div class="nav-group-label">Getting Started</div>
+    <a class="nav-link active" href="#welcome" onclick="setActive(this)"><span class="nav-dot"></span>Welcome &amp; Roles</a>
+    <a class="nav-link" href="#login" onclick="setActive(this)"><span class="nav-dot"></span>Logging In</a>
+
+    <div class="nav-group-label">Daily Work</div>
+    <a class="nav-link" href="#dashboard" onclick="setActive(this)"><span class="nav-dot"></span>Dashboard</a>
+    <a class="nav-link" href="#complexes" onclick="setActive(this)"><span class="nav-dot"></span>Complexes</a>
+    <a class="nav-link" href="#meetings-tab" onclick="setActive(this)"><span class="nav-dot"></span>Meeting Checklist</a>
+    <a class="nav-link" href="#calendar" onclick="setActive(this)"><span class="nav-dot"></span>Meeting Calendar</a>
+
+    <div class="nav-group-label">Documents</div>
+    <a class="nav-link" href="#doc-prep" onclick="setActive(this)"><span class="nav-dot"></span>Document Preparation</a>
+    <a class="nav-link" href="#disclosure" onclick="setActive(this)"><span class="nav-dot"></span>Disclosure &amp; CPL</a>
+    <a class="nav-link" href="#invoices" onclick="setActive(this)"><span class="nav-dot"></span>On-Charge Invoices</a>
+
+    <div class="nav-group-label">Reference</div>
+    <a class="nav-link" href="#responses" onclick="setActive(this)"><span class="nav-dot"></span>Response Library</a>
+    <a class="nav-link" href="#contractors" onclick="setActive(this)"><span class="nav-dot"></span>Contractors</a>
+    <a class="nav-link" href="#reports" onclick="setActive(this)"><span class="nav-dot"></span>Reports</a>
+
+  </nav>
+</div>
+
+<!-- Main content -->
+<div id="main">
+  <div class="page-title">Staff Portal Guide</div>
+  <div class="page-subtitle">Property 101 Group — Internal Reference</div>
+
+  <!-- WELCOME -->
+  <div class="section" id="welcome">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h2 class="section-title">Welcome &amp; Roles</h2>
+    </div>
+
+    <p>The Property 101 staff portal is where you manage the full lifecycle of your body corporate and incorporated society portfolio — from meeting preparation through to statutory disclosures and insurance renewals.</p>
+
+    <h3 class="sub-title">Your Role Determines What You See</h3>
+    <div class="two-col">
+      <div class="info-card">
+        <div class="info-card-label"><span class="role role-admin">Admin</span></div>
+        <div class="info-card-value">Full access to everything — all complexes, all settings, Admin Panel, delete and archive functions.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label"><span class="role role-manager">Manager</span></div>
+        <div class="info-card-value">Full access to your own portfolio. Can view all complexes, generate documents, manage meetings. No Admin Panel access.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label"><span class="role role-support">Support</span></div>
+        <div class="info-card-value">Dashboard auto-filters to your assigned manager's portfolio. Can generate disclosures and documents. No Admin Panel.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label"><span class="role role-accounts">Accounts</span></div>
+        <div class="info-card-value">Access to On-Charge Invoices (including delete/restore), plus read access to complexes and reports.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div class="section" id="login">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <h2 class="section-title">Logging In</h2>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Enter your username</strong>
+          <span>Type your first name only (e.g. <code>laura</code>) — the portal automatically adds <code>@prop101.co.nz</code>. You can also type your full email address.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Enter your password</strong>
+          <span>Type your password and click Sign In. Contact an admin if you need your password reset.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>You're in</strong>
+          <span>Support staff will see the Dashboard filtered to their assigned manager's portfolio automatically.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">💡</div>
+      <div class="callout-body"><strong>Tip</strong>If you get a login error, check that Caps Lock is off. Contact Gary if the problem continues.</div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="section" id="dashboard">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </div>
+      <h2 class="section-title">Dashboard</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+      </div>
+    </div>
+
+    <p>The Dashboard is your daily starting point. It shows alerts and actions across your portfolio at a glance.</p>
+
+    <h3 class="sub-title">Understanding the Stat Cards</h3>
+    <p>Three cards appear at the top: <strong>Upcoming Actions</strong> (things due soon), <strong>Critical Alerts</strong> (issues needing immediate attention), and <strong>AGMs Remaining</strong> this year. Click any card to jump to that section below.</p>
+
+    <h3 class="sub-title">Critical Alerts (Red Zone)</h3>
+    <p>These are urgent items — expired insurance, missed deadlines, overdue actions. Each row has:</p>
+    <ul class="feature-list">
+      <li>A <strong>checkbox</strong> to select it — tick multiple rows, then use <strong>"Snooze X selected"</strong> to snooze them all at once</li>
+      <li>A <strong>Snooze</strong> button (hover to reveal) — postpones the alert for 1–7 days with a reason</li>
+      <li>An <strong>Audit Trail</strong> button (hover to reveal) — view and add notes against this alert</li>
+      <li>Click the <strong>row itself</strong> to open that complex</li>
+    </ul>
+
+    <h3 class="sub-title">Upcoming Actions (Yellow Zone)</h3>
+    <p>Items that are due within the threshold window. Each row has a <strong>Log Details</strong> button and a <strong>Navigate to Complex</strong> button. Levy actions also have a <strong>Mark Done</strong> button.</p>
+
+    <h3 class="sub-title">Snoozing an Alert</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body"><strong>Click Snooze</strong><span>Hover the alert row and click the Snooze button, or tick the checkbox and use the batch button.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body"><strong>Choose duration (1–7 days) and enter a reason</strong><span>The reason is required. The modal shows when the alert will return.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body"><strong>Confirm</strong><span>The alert moves to the Snoozed panel at the bottom of the dashboard until the snooze expires.</span></div>
+      </div>
+    </div>
+
+    <h3 class="sub-title">Manager Filter</h3>
+    <p>Admins see a dropdown at the top to filter by any manager. Support staff see only their assigned manager's portfolio — this is set automatically on login.</p>
+
+    <h3 class="sub-title">Meeting Cards</h3>
+    <p>Upcoming meetings across the portfolio appear below the alerts. Each card shows the BC name, meeting type, date, and the <strong>next required action</strong> (e.g. NOI Required, NOM Required). Click a card to go to that complex's Meetings tab.</p>
+  </div>
+
+  <!-- COMPLEXES -->
+  <div class="section" id="complexes">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </div>
+      <h2 class="section-title">Complexes</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+      </div>
+    </div>
+
+    <p>The Complexes page lists all body corporates and incorporated societies in the portfolio. Click any row to open that complex.</p>
+
+    <h3 class="sub-title">Finding a Complex</h3>
+    <ul class="feature-list">
+      <li>Use the <strong>search box</strong> — searches by name, BC number, or address</li>
+      <li>Filter by <strong>Manager</strong>, <strong>Type</strong> (BC or IS), or <strong>Status</strong> (Active / Archived)</li>
+      <li>The list defaults to showing only Active complexes</li>
+    </ul>
+
+    <h3 class="sub-title">Inside a Complex — 7 Tabs</h3>
+    <table class="field-table">
+      <thead><tr><th>Tab</th><th>What It Contains</th></tr></thead>
+      <tbody>
+        <tr><td>Overview</td><td>At-a-glance status cards, property details, account manager, levy settings, BWOF, building manager, and notes</td></tr>
+        <tr><td>Settings</td><td>Bank account details, levy instalment schedule, debt collection reminder days, and meeting date overrides</td></tr>
+        <tr><td>Insurance</td><td>Policy details, renewal workflow checklist, and the Finish Cycle function to roll over to a new year</td></tr>
+        <tr><td>Meetings</td><td>All past and upcoming meetings with checklists, key deadlines, and the Post-Meeting Update card</td></tr>
+        <tr><td>Conflicts</td><td>Committee conflict of interest register — add entries and download as Word or PDF</td></tr>
+        <tr><td>Statutory</td><td>Financial balances, LTMP dates, AIG liability, water rate, and weathertightness/defect disclosures</td></tr>
+        <tr><td>Activity</td><td>Read-only audit log of all changes made to this complex</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">💡</div>
+      <div class="callout-body"><strong>Quick Navigation</strong>The coloured status pills below the complex name (Insurance, BWOF, Next Meeting) are clickable — they jump directly to the relevant tab.</div>
+    </div>
+  </div>
+
+  <!-- MEETINGS TAB -->
+  <div class="section" id="meetings-tab">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      </div>
+      <h2 class="section-title">Meeting Checklist</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+      </div>
+    </div>
+
+    <p>Inside any complex, the <strong>Meetings tab</strong> is where you track meeting preparation progress from NOI through to post-meeting minutes.</p>
+
+    <h3 class="sub-title">Selecting a Meeting</h3>
+    <p>The left sidebar lists all meetings. Click one to open it in the right panel. Click <strong>New Meeting</strong> to schedule a new one.</p>
+
+    <h3 class="sub-title">Key Deadlines Strip</h3>
+    <p>Six dates appear automatically based on the meeting date and your system settings:</p>
+    <ul class="feature-list">
+      <li><strong>NOI Preferred Date</strong> and <strong>NOI Statutory Deadline</strong> — when to issue the Notice of Items</li>
+      <li><strong>NOI Response Due</strong> — deadline for responses (editable inline; set the time and reminder days here)</li>
+      <li><strong>NOM Preferred Date</strong> and <strong>NOM Statutory Deadline</strong> — when to issue the Notice of Meeting</li>
+      <li><strong>Meeting Date</strong> — the meeting itself</li>
+    </ul>
+
+    <h3 class="sub-title">Working Through the Checklist</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body"><strong>Tick checklist items as you complete them</strong><span>There are 4 stages: NOI, NOM, Prior to Meeting, and After Meeting. Each has its own set of tasks.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body"><strong>Issued dates auto-stamp</strong><span>When all items in the NOI, NOM, or Minutes stage are ticked, the system records today as the issued date — no need to enter it separately.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body"><strong>Complete the Post-Meeting Update</strong><span>Once all four stages reach 100%, a card appears asking for post-meeting details (levy amounts, fund balances, etc.). Fill it in and click Save.</span></div>
+      </div>
+    </div>
+
+    <div class="callout callout-warn">
+      <div class="callout-icon">⚠</div>
+      <div class="callout-body"><strong>Important</strong>The Post-Meeting Update card must be saved to update the complex's financial records and levy schedule. Don't dismiss it without saving.</div>
+    </div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div class="section" id="calendar">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </div>
+      <h2 class="section-title">Meeting Calendar</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+      </div>
+    </div>
+
+    <p>A monthly calendar view of all meetings across the portfolio. Colour-coded by type: AGM (pink), EGM (violet), SGM (orange), Committee (sky).</p>
+
+    <ul class="feature-list">
+      <li>Use <strong>Key Dates</strong> toggle to show or hide NOI/NOM deadline markers on the calendar</li>
+      <li>Filter by <strong>Manager</strong> or <strong>Meeting Type</strong> using the header dropdowns</li>
+      <li>Click <strong>Today</strong> to jump back to the current month</li>
+      <li>Click any meeting chip to navigate directly to that complex</li>
+      <li>The <strong>Upcoming Meetings panel</strong> lists the next 8 meetings across the portfolio with a days-until countdown</li>
+    </ul>
+  </div>
+
+  <!-- DOCUMENT PREPARATION -->
+  <div class="section" id="doc-prep">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <h2 class="section-title">Document Preparation</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+      </div>
+    </div>
+
+    <p>Found under <strong>Document Preparation</strong> in the sidebar. Generates NOI cover letters, response forms, and other meeting documents as Word (.docx) files, auto-filled with the complex's data.</p>
+
+    <h3 class="sub-title">Generating a Document</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body"><strong>Search for the property</strong><span>Type the name or BC number in the search box and select it from the dropdown.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body"><strong>Select the meeting (optional)</strong><span>If the document relates to a specific meeting, choose it. Otherwise the complex's general AGM data is used.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body"><strong>Click Preview</strong><span>An A4 preview appears on the right showing the completed document with all merge fields filled in.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body"><strong>Click Word to download</strong><span>Downloads a .docx file ready to send. The correct template (Body Corporate or Inc Society) is used automatically based on the complex type.</span></div>
+      </div>
+    </div>
+
+    <h3 class="sub-title">Available Templates</h3>
+    <ul class="feature-list">
+      <li>NOI Cover Letter</li>
+      <li>Response Form</li>
+      <li>Notice of Delegation</li>
+      <li>AIG Association Liability Form</li>
+      <li>Debt Collection Flowchart (admin only)</li>
+      <li>Declaration Form — Financial Statement (Inc Society only)</li>
+      <li>Conflict Register (download as Word or PDF)</li>
+    </ul>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">💡</div>
+      <div class="callout-body"><strong>Tip</strong>If the Word button is greyed out, the template hasn't been uploaded yet. Ask an admin to upload it via Admin Panel → Templates.</div>
+    </div>
+  </div>
+
+  <!-- DISCLOSURE -->
+  <div class="section" id="disclosure">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <h2 class="section-title">Disclosure &amp; CPL</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+      </div>
+    </div>
+
+    <p>Found under <strong>Disclosure &amp; CPL</strong> in the sidebar. Generates the three statutory disclosure documents required for property transactions.</p>
+
+    <h3 class="sub-title">Document Types</h3>
+    <table class="field-table">
+      <thead><tr><th>Type</th><th>Used For</th></tr></thead>
+      <tbody>
+        <tr><td>S146</td><td>Pre-Contract Disclosure Statement — issued before a sale agreement is signed</td></tr>
+        <tr><td>S147</td><td>Pre-Settlement Disclosure Statement — issued before settlement</td></tr>
+        <tr><td>CPL</td><td>Certificate of Projected Levy — used by lenders for mortgage purposes</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Generating a Disclosure</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body"><strong>Search and select the complex</strong><span>Type the name or BC number in the search box.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body"><strong>Choose the document type</strong><span>Click S146, S147, or CPL. The fields shown will change based on your selection.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body"><strong>Fill in the transaction details</strong><span>Enter the unit number, annual levy, owner name, and lawyer details as required. Fields that are not needed for your document type are hidden automatically.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body"><strong>Enable Invoice (if applicable)</strong><span>Toggle on the invoice to charge for the disclosure. Select a pricing tier or enter a custom amount.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body"><strong>Click Preview, then Word</strong><span>Preview the document first, then download the completed .docx file.</span></div>
+      </div>
+    </div>
+
+    <div class="callout callout-warn">
+      <div class="callout-icon">⚠</div>
+      <div class="callout-body"><strong>Duplicate Warning</strong>If the same complex, document type, and unit already has an outstanding invoice, you'll see a warning. A popup will ask for a reason before you can proceed to download.</div>
+    </div>
+
+    <h3 class="sub-title">Key Fields by Document Type</h3>
+    <table class="field-table">
+      <thead><tr><th>Field</th><th>S146</th><th>S147</th><th>CPL</th></tr></thead>
+      <tbody>
+        <tr><td>Unit Number</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Annual Levy</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Owner Name</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Owner Address</td><td>✓</td><td>–</td><td>–</td></tr>
+        <tr><td>Lawyer Name / Address / Email</td><td>–</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Instalment Amount</td><td>–</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Levy Outstanding</td><td>–</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Water Reading + Meter</td><td>–</td><td>✓</td><td>–</td></tr>
+        <tr><td>PCDS Preparation Date</td><td>–</td><td>✓</td><td>–</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- INVOICES -->
+  <div class="section" id="invoices">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <h2 class="section-title">On-Charge Invoices</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+        <span class="role role-accounts">Accounts</span>
+      </div>
+    </div>
+
+    <p>Found under <strong>Financial</strong> in the sidebar. Tracks disclosure and CPL invoices issued to buyers and lawyers.</p>
+
+    <h3 class="sub-title">Invoice Status Flow</h3>
+    <p>Invoices move through three states: <strong>Outstanding → Recovered → (Deleted)</strong>. Deleted invoices can be restored.</p>
+
+    <h3 class="sub-title">Creating a Manual Invoice</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body"><strong>Click Create Invoice</strong><span>Select the property, document type (S146, S147, CPL, or Other), and unit number.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body"><strong>Set the amount</strong><span>For S146/S147/CPL, choose a pricing tier. For Other, enter a custom amount. GST is calculated automatically.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body"><strong>Click Create Invoice</strong><span>The invoice appears in the Outstanding table immediately.</span></div>
+      </div>
+    </div>
+
+    <h3 class="sub-title">Marking an Invoice as Recovered</h3>
+    <p>Click the <strong>Recover</strong> action on an outstanding invoice. A confirmation modal shows the invoice details — click <strong>Yes, mark recovered</strong> to confirm. The invoice moves to the Recovered table.</p>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">💡</div>
+      <div class="callout-body"><strong>Accounts Role</strong>Only admins and accounts-role users can delete or restore invoices. All other users can view invoices and mark them as recovered.</div>
+    </div>
+  </div>
+
+  <!-- RESPONSE LIBRARY -->
+  <div class="section" id="responses">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <h2 class="section-title">Response Library</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+      </div>
+    </div>
+
+    <p>A library of pre-written email responses for common owner and committee enquiries. Saves time and keeps replies consistent.</p>
+
+    <h3 class="sub-title">Finding and Copying a Response</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body"><strong>Search or browse by category</strong><span>Categories: General, Insurance, Meetings, Levy Queries, Maintenance, Disclosure, Complaints, Other.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body"><strong>Click a card to open it</strong><span>The full formatted response is shown in a modal.</span></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body"><strong>Click Copy to Clipboard</strong><span>The response copies as both formatted HTML and plain text — paste it directly into an email.</span></div>
+      </div>
+    </div>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">💡</div>
+      <div class="callout-body"><strong>Admin Only</strong>Only admins can add, edit, or delete responses. If you need a new response added to the library, contact Gary.</div>
+    </div>
+  </div>
+
+  <!-- CONTRACTORS -->
+  <div class="section" id="contractors">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </div>
+      <h2 class="section-title">Contractors</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+        <span class="role role-support">Support</span>
+      </div>
+    </div>
+
+    <p>A directory of all contractors — insurance brokers, valuers, compliance companies, and others — used across the portfolio.</p>
+
+    <ul class="feature-list">
+      <li>Search by company name or contact person</li>
+      <li>Filter by category using the dropdown</li>
+      <li>Toggle <strong>Preferred Only</strong> to show preferred contractors</li>
+      <li>The <strong>Coverage Gaps</strong> panel shows complexes that have no Insurance Broker or Valuer assigned</li>
+      <li>Only admins can mark a contractor as Preferred, or add/delete contractors</li>
+    </ul>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="section" id="reports">
+    <div class="section-header">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      </div>
+      <h2 class="section-title">Reports</h2>
+      <div class="section-roles">
+        <span class="role role-admin">Admin</span>
+        <span class="role role-manager">Manager</span>
+      </div>
+    </div>
+
+    <h3 class="sub-title">Reports Page</h3>
+    <p>Shows portfolio summary charts and a full property snapshot table. Three CSV exports are available:</p>
+    <ul class="feature-list">
+      <li><strong>Meeting Workload CSV</strong> — meetings per manager (total, AGMs, committee)</li>
+      <li><strong>Full Portfolio List CSV</strong> — all active complexes with 21 data fields</li>
+      <li><strong>Manager Portfolio CSV</strong> — same as above, filtered to a specific manager</li>
+    </ul>
+  </div>
+
+  <hr>
+  <p style="font-size:12.5px; color: var(--text-muted); text-align:center;">Property 101 Group — Staff Portal Guide &nbsp;·&nbsp; For help, contact Gary</p>
+</div>
+
+<script>
+  function setActive(el) {
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // Scrollspy
+  const sections = document.querySelectorAll('.section[id]');
+  const links = document.querySelectorAll('.nav-link');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => {
+          l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => obs.observe(s));
+</script>
+
+</body>
+</html>

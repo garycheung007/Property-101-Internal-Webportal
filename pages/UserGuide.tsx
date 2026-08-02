@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-const GUIDE_URL = 'https://claude.ai/code/artifact/c9e2f12f-19c5-4505-9c3c-a44867959b75';
+const GUIDE_URL = '/user-guide.html';
 
 const UserGuide: React.FC = () => (
   <div className="-mx-8 -mt-16 lg:-mt-8 -mb-8" style={{ height: '100vh' }}>
