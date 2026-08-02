@@ -18,6 +18,7 @@ import Financial from './pages/Financial';
 import ContractorList from './pages/ContractorList';
 import ResponseLibrary from './pages/ResponseLibrary';
 import MeetingCalendar from './pages/MeetingCalendar';
+import UserGuide from './pages/UserGuide';
 import Sidebar from './components/Sidebar';
 import { Menu } from 'lucide-react';
 
@@ -62,6 +63,7 @@ const AppRoutes = () => {
       <Route path="/meeting-docs-test" element={<ProtectedLayout><MeetingDocsTest /></ProtectedLayout>} />
       <Route path="/financials"  element={<ProtectedLayout><Financials /></ProtectedLayout>} />
       <Route path="/financial"   element={<ProtectedLayout><Financial /></ProtectedLayout>} />
+      <Route path="/help"        element={<ProtectedLayout><UserGuide /></ProtectedLayout>} />
     </Routes>
   );
 };
