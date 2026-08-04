@@ -438,6 +438,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [ltmpEditing, setLtmpEditing] = useState(false);
     const [portfolioEditing, setPortfolioEditing] = useState(false);
     const [complianceEditing, setComplianceEditing] = useState(false);
+    const [bwofDraft, setBwofDraft] = useState<string>(complex.bwofExpiry || '');
     const [insurancePolicyEditing, setInsurancePolicyEditing] = useState(false);
     const [venueOther, setVenueOther] = useState(false);
     const [meetingDeleteConfirm, setMeetingDeleteConfirm] = useState<string | null>(null);
@@ -500,6 +501,10 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
             setForm(prev => ({ ...prev, previousAgmDate: calculatedAgmDate }));
         }
     }, [calculatedAgmDate]);
+
+    useEffect(() => {
+        if (complianceEditing) setBwofDraft(form.bwofExpiry || '');
+    }, [complianceEditing]);
 
     useEffect(() => {
         const venues = systemSettings.meetingVenues || [];
@@ -1220,7 +1225,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 {complianceEditing ? (
                                                     <div className="relative">
                                                         <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                                        <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm cursor-pointer" value={form.bwofExpiry || ''} onChange={e => handleBwofDateChange(e.target.value)} />
+                                                        <input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm cursor-pointer" value={bwofDraft} onChange={e => setBwofDraft(e.target.value)} onBlur={() => handleBwofDateChange(bwofDraft)} />
                                                     </div>
                                                 ) : (
                                                     <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.bwofExpiry ? formatDateNZ(form.bwofExpiry) : 'Not set'}</p>
