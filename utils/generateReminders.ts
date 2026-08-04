@@ -1,4 +1,4 @@
-import { BodyCorporate, Reminder, ReminderType, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings } from '../types';
+import { BodyCorporate, Reminder, ReminderType, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings, SystemSettings } from '../types';
 import { DEFAULT_INSURANCE_SETTINGS, DEFAULT_WORKFLOW, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 
 const parseDate = (dateStr?: string): Date | null => {
@@ -29,7 +29,17 @@ type StageTemplates = { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]
 type ChecklistTemplates = { bc: StageTemplates; rs: StageTemplates; };
 type MeetingDateConfig = { bc: MeetingDateSettings; rs: MeetingDateSettings; };
 
-export function generateReminders(complexes: BodyCorporate[], settings: InsuranceSettings = DEFAULT_INSURANCE_SETTINGS, checklistTemplates?: ChecklistTemplates, meetingDateConfig?: MeetingDateConfig): Reminder[] {
+const parseFyeDate = (fyeStr: string, year: number): Date | null => {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const parts = fyeStr.trim().split(' ');
+  if (parts.length !== 2) return null;
+  const day = parseInt(parts[0]);
+  const monthIdx = months.findIndex(m => m.toLowerCase() === parts[1].toLowerCase());
+  if (monthIdx === -1 || isNaN(day)) return null;
+  return new Date(year, monthIdx, day);
+};
+
+export function generateReminders(complexes: BodyCorporate[], settings: InsuranceSettings = DEFAULT_INSURANCE_SETTINGS, checklistTemplates?: ChecklistTemplates, meetingDateConfig?: MeetingDateConfig, systemSettings?: SystemSettings): Reminder[] {
   const reminders: Reminder[] = [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const workflowSteps = settings.workflowSteps || DEFAULT_WORKFLOW;
@@ -231,6 +241,84 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
         severity: 'medium',
       });
     });
+  });
+
+  // AGM Cycle / Financial Year End reminders
+  const defaultLeadWeeks = systemSettings?.financialStatementLeadTimeWeeks ?? 3;
+
+  complexes.filter(c => !c.isArchived).forEach(bc => {
+    if (!bc.financialYearEnd) return;
+
+    const fyeThisYear = parseFyeDate(bc.financialYearEnd, today.getFullYear());
+    if (!fyeThisYear) return;
+
+    // If this year's FYE passed more than 90 days ago, the active cycle is next year's FYE
+    const msFromThisYearFye = fyeThisYear.getTime() - today.getTime();
+    const daysFromThisYearFye = msFromThisYearFye / (1000 * 60 * 60 * 24);
+    const upcomingFYE = daysFromThisYearFye < -90
+      ? parseFyeDate(bc.financialYearEnd, today.getFullYear() + 1)!
+      : fyeThisYear;
+
+    const lastFYE = new Date(upcomingFYE);
+    lastFYE.setFullYear(lastFYE.getFullYear() - 1);
+
+    const daysUntilFYE = Math.ceil((upcomingFYE.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const fyeYear = upcomingFYE.getFullYear();
+
+    // Check if an AGM (or any meeting) has been scheduled/held since the last FYE
+    const hasAgmThisCycle = (bc.meetings || []).some(m => {
+      if (m.type !== 'AGM') return false;
+      const mtgDate = new Date(m.date);
+      return !isNaN(mtgDate.getTime()) && mtgDate >= lastFYE;
+    });
+
+    if (hasAgmThisCycle) {
+      // AGM scheduled — show "Financials Ready" to the manager when accounts mark done
+      if (bc.agmCycleFinancialsStatus === 'done' && bc.agmCycleYear === fyeYear) {
+        reminders.push({
+          id: `fin-ready-${bc.id}`,
+          bcId: bc.id,
+          bcName: bc.name,
+          type: ReminderType.FINANCIALS_READY,
+          dueDate: today.toISOString().split('T')[0],
+          message: `FINANCIALS READY: Accounts have completed the financial statements for ${bc.name} (FYE ${bc.financialYearEnd} ${fyeYear})`,
+          severity: 'low',
+        });
+      }
+      return;
+    }
+
+    // No AGM scheduled for this cycle — start alerting 30 days before FYE
+    if (daysUntilFYE > 30) return;
+
+    const fyeDateStr = upcomingFYE.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
+    const financialsBy = bc.agmCycleYear === fyeYear && bc.agmCycleFinancialsNeededBy
+      ? ` — financials requested by ${new Date(bc.agmCycleFinancialsNeededBy + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`
+      : ` — suggest financials by ${new Date(upcomingFYE.getTime() + defaultLeadWeeks * 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`;
+
+    if (daysUntilFYE < 0) {
+      // FYE has passed — Critical Alert
+      reminders.push({
+        id: `agm-due-${bc.id}`,
+        bcId: bc.id,
+        bcName: bc.name,
+        type: ReminderType.AGM_DUE,
+        dueDate: upcomingFYE.toISOString().split('T')[0],
+        message: `AGM DUE: Financial year ended ${fyeDateStr} — no AGM scheduled yet${financialsBy}`,
+        severity: 'high',
+      });
+    } else {
+      // FYE approaching — Upcoming Action
+      reminders.push({
+        id: `agm-due-${bc.id}`,
+        bcId: bc.id,
+        bcName: bc.name,
+        type: ReminderType.UPCOMING_ACTION,
+        dueDate: upcomingFYE.toISOString().split('T')[0],
+        message: `AGM DUE: Financial year ends ${fyeDateStr} in ${daysUntilFYE} day${daysUntilFYE !== 1 ? 's' : ''} — schedule AGM and set financials date${financialsBy}`,
+        severity: 'medium',
+      });
+    }
   });
 
   return reminders;

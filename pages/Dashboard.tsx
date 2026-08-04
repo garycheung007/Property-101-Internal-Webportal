@@ -3,9 +3,10 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, ChevronDown, ChevronUp, BellOff } from 'lucide-react';
+import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, ChevronDown, ChevronUp, BellOff, Play } from 'lucide-react';
 import { Reminder, ReminderType } from '../types';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
+import StartAgmProcessModal from '../components/StartAgmProcessModal';
 
 type DashboardCat = 'MEETING' | 'COMPLIANCE' | 'INSURANCE' | 'DEBT' | 'OTHER';
 const ALL_CATS: DashboardCat[] = ['MEETING', 'COMPLIANCE', 'INSURANCE', 'DEBT', 'OTHER'];
@@ -22,7 +23,7 @@ const subtractWorkingDays = (date: Date, days: number): Date => {
 };
 
 const Dashboard: React.FC = () => {
-  const { complexes, reminders, actionComments, addActionComment, removeActionComment, snoozedAlerts, snoozeAlert, unsnoozeAlert, managers, updateComplex, updateMeeting, systemSettings, loadMeetings } = useData();
+  const { complexes, reminders, actionComments, addActionComment, removeActionComment, snoozedAlerts, snoozeAlert, unsnoozeAlert, managers, updateComplex, updateMeeting, addMeeting, systemSettings, loadMeetings } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const upcomingActionsRef = useRef<HTMLDivElement>(null);
@@ -38,6 +39,7 @@ const Dashboard: React.FC = () => {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [snoozeGroupItems, setSnoozeGroupItems] = useState<Reminder[]>([]);
   const [selectedAlerts, setSelectedAlerts] = useState<Set<string>>(new Set());
+  const [agmModalReminder, setAgmModalReminder] = useState<Reminder | null>(null);
 
   useEffect(() => { loadMeetings(); }, [loadMeetings]);
 
@@ -58,11 +60,11 @@ const Dashboard: React.FC = () => {
     if (hasInitializedSections.current || reminders.length === 0) return;
     hasInitializedSections.current = true;
     const toOpen = new Set<string>(reminders
-      .filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY)
+      .filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && r.type !== ReminderType.FINANCIALS_READY)
       .map(r => {
         if (r.type === ReminderType.INSURANCE || r.type === ReminderType.INSURANCE_VALUATION) return 'INSURANCE';
         if (r.type === ReminderType.BWOF || r.type === ReminderType.COMPLIANCE) return 'COMPLIANCE';
-        if (r.type === ReminderType.AGM || r.message.includes('NOI') || r.message.includes('NOM') || r.message.toLowerCase().includes('notice') || r.message.toLowerCase().includes('minutes')) return 'MEETING';
+        if (r.type === ReminderType.AGM || r.type === ReminderType.AGM_DUE || r.message.includes('NOI') || r.message.includes('NOM') || r.message.toLowerCase().includes('notice') || r.message.toLowerCase().includes('minutes')) return 'MEETING';
         return 'OTHER';
       })
     );
@@ -85,8 +87,9 @@ const Dashboard: React.FC = () => {
   const activeSnoozedIds = new Set(
     snoozedAlerts.filter(s => new Date(s.snoozedUntil) >= today).map(s => s.reminderId)
   );
-  const criticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && !activeSnoozedIds.has(r.id));
-  const snoozedCriticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && activeSnoozedIds.has(r.id));
+  const criticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && r.type !== ReminderType.FINANCIALS_READY && !activeSnoozedIds.has(r.id));
+  const financialsReadyAlerts = filteredReminders.filter(r => r.type === ReminderType.FINANCIALS_READY && !activeSnoozedIds.has(r.id));
+  const snoozedCriticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && r.type !== ReminderType.FINANCIALS_READY && activeSnoozedIds.has(r.id));
   const upcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION && !activeSnoozedIds.has(r.id));
   const snoozedUpcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION && activeSnoozedIds.has(r.id));
   const levyReminders = filteredReminders.filter(r => r.type === ReminderType.LEVY);
@@ -210,7 +213,7 @@ const Dashboard: React.FC = () => {
   const getCatForAlert = (type: ReminderType, message: string): DashboardCat => {
     if (type === ReminderType.INSURANCE || type === ReminderType.INSURANCE_VALUATION) return 'INSURANCE';
     if (type === ReminderType.BWOF || type === ReminderType.COMPLIANCE) return 'COMPLIANCE';
-    if (type === ReminderType.AGM || message.includes('NOI') || message.includes('NOM') || message.toLowerCase().includes('notice') || message.toLowerCase().includes('minutes')) return 'MEETING';
+    if (type === ReminderType.AGM || type === ReminderType.AGM_DUE || message.includes('NOI') || message.includes('NOM') || message.toLowerCase().includes('notice') || message.toLowerCase().includes('minutes')) return 'MEETING';
     return 'OTHER';
   };
 
@@ -219,12 +222,12 @@ const Dashboard: React.FC = () => {
     if (prefix) {
       const p = prefix[1].trim();
       if (p === 'INSURANCE' || p.includes('VALUATION')) return 'INSURANCE';
-      if (p === 'MEETING' || p.includes('NOI') || p.includes('NOM')) return 'MEETING';
+      if (p === 'MEETING' || p.includes('NOI') || p.includes('NOM') || p === 'AGM DUE') return 'MEETING';
       if (p === 'COMPLIANCE' || p.includes('BWOF')) return 'COMPLIANCE';
       if (p.includes('DEBT') || p.includes('LEVY')) return 'DEBT';
     }
     if (message.toLowerCase().includes('insurance') || message.toLowerCase().includes('valuation')) return 'INSURANCE';
-    if (message.includes('NOI') || message.includes('NOM') || message.toLowerCase().includes('notice') || message.toLowerCase().includes('minutes')) return 'MEETING';
+    if (message.includes('NOI') || message.includes('NOM') || message.toLowerCase().includes('notice') || message.toLowerCase().includes('minutes') || message.includes('AGM DUE')) return 'MEETING';
     if (message.toLowerCase().includes('bwof') || message.toLowerCase().includes('compliance')) return 'COMPLIANCE';
     return 'OTHER';
   };
@@ -361,6 +364,25 @@ const Dashboard: React.FC = () => {
       };
   };
 
+  const handleStartAgm = async (agmDate: string, financialsNeededBy: string, notes: string) => {
+    if (!agmModalReminder) return;
+    const bc = complexes.find(c => c.id === agmModalReminder.bcId);
+    if (!bc) return;
+    const fyeYear = new Date(agmModalReminder.dueDate + 'T00:00:00').getFullYear();
+    await addMeeting(bc.id, { id: `agm-${Date.now()}`, type: 'AGM', date: agmDate, time: '', venue: '' });
+    await updateComplex({
+      ...bc,
+      agmCycleYear: fyeYear,
+      agmCycleFinancialsNeededBy: financialsNeededBy,
+      agmCycleFinancialsNotes: notes || undefined,
+      agmCycleFinancialsStatus: 'not_started',
+      agmCycleFinancialsConfirmedByAccounts: false,
+      agmCycleFinancialsAltDate: undefined,
+    });
+    setAgmModalReminder(null);
+    navigate(`/complexes?id=${bc.id}&tab=meetings&from=dashboard`);
+  };
+
   const handleLevyMarkDone = async (bcId: string) => {
       const bc = complexes.find(c => c.id === bcId);
       if (!bc) return;
@@ -444,6 +466,28 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="space-y-6">
+
+        {/* Financials Ready green banner */}
+        {financialsReadyAlerts.length > 0 && (
+          <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-xl overflow-hidden shadow-sm">
+            <div className="px-4 py-2 border-b border-emerald-100 dark:border-emerald-900/30 flex items-center gap-2">
+              <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">Financials Ready</span>
+            </div>
+            <div className="divide-y divide-emerald-100 dark:divide-emerald-900/20">
+              {financialsReadyAlerts.map(alert => (
+                <div key={alert.id} className="flex items-start gap-3 px-4 py-2.5 hover:bg-emerald-100/40 dark:hover:bg-emerald-900/20 cursor-pointer transition-colors" onClick={() => navigate(`/complexes?id=${alert.bcId}&tab=meetings&from=dashboard`)}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-snug">{alert.message}</div>
+                  </div>
+                  <button className="shrink-0 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-900/50 px-2 py-0.5 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors" onClick={e => { e.stopPropagation(); navigate(`/complexes?id=${alert.bcId}&tab=meetings&from=dashboard`); }}>
+                    Go to Meetings →
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Category Work Sections */}
         <div
@@ -540,7 +584,7 @@ const Dashboard: React.FC = () => {
                                     <div
                                       key={alert.id}
                                       className={`flex items-start gap-2 px-4 py-2.5 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors ${selectedAlerts.has(alert.id) ? 'bg-red-100/40 dark:bg-red-900/20' : ''}`}
-                                      onClick={() => navigateToProperty(alert.bcId, alert.type, alert.message)}
+                                      onClick={() => alert.type === ReminderType.AGM_DUE ? setAgmModalReminder(alert) : navigateToProperty(alert.bcId, alert.type, alert.message)}
                                     >
                                       <input
                                         type="checkbox"
@@ -552,6 +596,12 @@ const Dashboard: React.FC = () => {
                                       <div className="flex-1 min-w-0">
                                         <div className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-snug">{alert.message}</div>
                                       </div>
+                                      {alert.type === ReminderType.AGM_DUE && (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); setAgmModalReminder(alert); }}
+                                          className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors mt-0.5"
+                                        ><Play size={9} /> Start AGM</button>
+                                      )}
                                       <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
                                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
                                         <button
@@ -620,11 +670,18 @@ const Dashboard: React.FC = () => {
                                       }
                                       if (entry.kind === 'action') {
                                         const chip = getDueChip(entry.rem.dueDate);
+                                        const isAgmDue = entry.rem.message.startsWith('AGM DUE:');
                                         return (
-                                          <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
+                                          <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => isAgmDue ? setAgmModalReminder(entry.rem) : navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
                                             <div className="flex-1 min-w-0">
                                               <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
                                             </div>
+                                            {isAgmDue && (
+                                              <button
+                                                onClick={e => { e.stopPropagation(); setAgmModalReminder(entry.rem); }}
+                                                className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors mt-0.5"
+                                              ><Play size={9} /> Start AGM</button>
+                                            )}
                                             <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
                                             <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
                                               <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
@@ -893,6 +950,22 @@ const Dashboard: React.FC = () => {
             }}
           />
       )}
+      {agmModalReminder && (() => {
+        const bc = complexes.find(c => c.id === agmModalReminder.bcId);
+        if (!bc) return null;
+        const upcomingFYE = new Date(agmModalReminder.dueDate + 'T00:00:00');
+        const fyeYear = upcomingFYE.getFullYear();
+        return (
+          <StartAgmProcessModal
+            bc={bc}
+            systemSettings={systemSettings}
+            fyeYear={fyeYear}
+            upcomingFYE={upcomingFYE}
+            onConfirm={handleStartAgm}
+            onClose={() => setAgmModalReminder(null)}
+          />
+        );
+      })()}
     </div>
   );
 };

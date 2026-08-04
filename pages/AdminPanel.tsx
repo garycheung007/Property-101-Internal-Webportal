@@ -354,6 +354,7 @@ const AdminPanel: React.FC = () => {
     );
     const [newPmfFieldKey, setNewPmfFieldKey] = useState('');
     const [meetingDateTab, setMeetingDateTab] = useState<'bc' | 'rs'>('bc');
+    const [localFinancialLeadWeeks, setLocalFinancialLeadWeeks] = useState<number>(systemSettings.financialStatementLeadTimeWeeks ?? 3);
     const [localVenues, setLocalVenues] = useState<string[]>(systemSettings.meetingVenues || []);
     const [newVenueInput, setNewVenueInput] = useState('');
     const [localStandardParagraph, setLocalStandardParagraph] = useState(systemSettings.disclosureStandardParagraph ?? 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing.');
@@ -734,6 +735,7 @@ const AdminPanel: React.FC = () => {
             waterRateOptions: localWaterRateOptions,
             conflictRegisterTemplate: localConflictRegisterTemplate,
             meetingDateSettings: localMeetingDateSettings,
+            financialStatementLeadTimeWeeks: localFinancialLeadWeeks,
             postMeetingFields: localPostMeetingFields,
             emailDigestEnabled: localEmailDigestEnabled,
         });
@@ -1471,6 +1473,31 @@ const AdminPanel: React.FC = () => {
                                         />
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Financial Statement Defaults */}
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-4">
+                                <div className="border-b dark:border-slate-800 pb-4">
+                                    <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                                        <FileText size={18} className="text-pink-600" /> Financial Statement Defaults
+                                    </h2>
+                                    <p className="text-xs text-slate-400 mt-1.5">Default lead time for financial statement preparation after FYE. Managers can override this per-complex when starting the AGM process.</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">Financials needed within</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={26}
+                                        value={localFinancialLeadWeeks}
+                                        onChange={e => setLocalFinancialLeadWeeks(Math.max(1, parseInt(e.target.value) || 3))}
+                                        className="w-24 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm text-center"
+                                    />
+                                    <label className="text-sm text-slate-500 dark:text-slate-400">weeks of FYE</label>
+                                </div>
+                                <p className="text-xs text-slate-400 italic">
+                                    When a manager starts an AGM process, the "Financials Needed By" date will default to FYE + {localFinancialLeadWeeks} week{localFinancialLeadWeeks !== 1 ? 's' : ''}.
+                                </p>
                             </div>
 
                             {/* Post-Meeting Update Fields */}

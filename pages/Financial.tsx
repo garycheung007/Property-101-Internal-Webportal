@@ -1,13 +1,31 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { Receipt, Clock, CheckCircle2, Loader2, Plus, AlertTriangle, X, Trash2, Edit2, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
+import { Receipt, Clock, CheckCircle2, Loader2, Plus, AlertTriangle, X, Trash2, Edit2, RotateCcw, ChevronDown, ChevronRight, Calendar, FileText, ThumbsUp, ThumbsDown, Play, CheckSquare, AlertCircle } from 'lucide-react';
+
+const parseFyeDate = (fyeStr: string, year: number): Date | null => {
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const parts = fyeStr.trim().split(' ');
+    if (parts.length !== 2) return null;
+    const day = parseInt(parts[0]);
+    const monthIdx = months.findIndex(m => m.toLowerCase() === parts[1].toLowerCase());
+    if (monthIdx === -1 || isNaN(day)) return null;
+    return new Date(year, monthIdx, day);
+};
 
 const Financial: React.FC = () => {
     const { user } = useAuth();
-    const { invoices, markInvoiceRecovered, addInvoice, deleteInvoice, restoreInvoice, unrecoverInvoice, complexes, pricingTiers } = useData();
+    const { invoices, markInvoiceRecovered, addInvoice, deleteInvoice, restoreInvoice, unrecoverInvoice, complexes, pricingTiers, updateComplex, systemSettings, loadMeetings } = useData();
+    const [activeTab, setActiveTab] = useState<'invoices' | 'fye'>('invoices');
+
+    // FYE Schedule state
+    const [altDateInputId, setAltDateInputId] = useState<string | null>(null);
+    const [altDateValue, setAltDateValue] = useState('');
+    const [fyeUpdatingId, setFyeUpdatingId] = useState<string | null>(null);
+
+    useEffect(() => { loadMeetings(); }, [loadMeetings]);
     const [invoiceFilterComplex, setInvoiceFilterComplex] = useState('all');
     const [invoiceFilterDocType, setInvoiceFilterDocType] = useState('all');
     const [recoveringId, setRecoveringId] = useState<string | null>(null);
@@ -87,6 +105,70 @@ const Financial: React.FC = () => {
         setUnrecovering(true);
         try { await unrecoverInvoice(confirmUnrecoverId, unrecoverReason.trim()); }
         finally { setUnrecovering(false); setConfirmUnrecoverId(null); setUnrecoverReason(''); }
+    };
+
+    // FYE Schedule data
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const defaultLeadWeeks = systemSettings.financialStatementLeadTimeWeeks ?? 3;
+
+    const fyeRows = complexes
+        .filter(c => !c.isArchived && c.financialYearEnd)
+        .map(bc => {
+            const fyeThisYear = parseFyeDate(bc.financialYearEnd, today.getFullYear());
+            if (!fyeThisYear) return null;
+            const daysFromThisYearFye = (fyeThisYear.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+            const upcomingFYE = daysFromThisYearFye < -90
+                ? parseFyeDate(bc.financialYearEnd, today.getFullYear() + 1)!
+                : fyeThisYear;
+            const lastFYE = new Date(upcomingFYE);
+            lastFYE.setFullYear(lastFYE.getFullYear() - 1);
+            const fyeYear = upcomingFYE.getFullYear();
+            const daysUntilFYE = Math.ceil((upcomingFYE.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            const agmMeetings = (bc.meetings || []).filter(m => m.type === 'AGM' && new Date(m.date) >= lastFYE);
+            const hasAgm = agmMeetings.length > 0;
+            const agmDate = agmMeetings.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]?.date;
+            const isCycleDataCurrent = bc.agmCycleYear === fyeYear;
+            return { bc, upcomingFYE, fyeYear, daysUntilFYE, hasAgm, agmDate, isCycleDataCurrent };
+        })
+        .filter(Boolean) as { bc: typeof complexes[0]; upcomingFYE: Date; fyeYear: number; daysUntilFYE: number; hasAgm: boolean; agmDate?: string; isCycleDataCurrent: boolean }[];
+
+    // Sort: overdue no-AGM first, then upcoming no-AGM, then by FYE date
+    fyeRows.sort((a, b) => {
+        const aCritical = a.daysUntilFYE < 0 && !a.hasAgm ? 0 : !a.hasAgm ? 1 : 2;
+        const bCritical = b.daysUntilFYE < 0 && !b.hasAgm ? 0 : !b.hasAgm ? 1 : 2;
+        if (aCritical !== bCritical) return aCritical - bCritical;
+        return a.daysUntilFYE - b.daysUntilFYE;
+    });
+
+    const fyeActionCount = fyeRows.filter(r => !r.hasAgm && r.daysUntilFYE <= 30).length;
+
+    const handleFyeConfirm = async (bc: typeof complexes[0]) => {
+        setFyeUpdatingId(bc.id);
+        try { await updateComplex({ ...bc, agmCycleFinancialsConfirmedByAccounts: true, agmCycleFinancialsAltDate: undefined }); }
+        finally { setFyeUpdatingId(null); }
+    };
+
+    const handleFyeAltDate = async (bc: typeof complexes[0]) => {
+        if (!altDateValue) return;
+        setFyeUpdatingId(bc.id);
+        try {
+            await updateComplex({ ...bc, agmCycleFinancialsAltDate: altDateValue, agmCycleFinancialsConfirmedByAccounts: false });
+            setAltDateInputId(null);
+            setAltDateValue('');
+        } finally { setFyeUpdatingId(null); }
+    };
+
+    const handleFyeMarkStatus = async (bc: typeof complexes[0], status: 'in_progress' | 'done') => {
+        setFyeUpdatingId(bc.id);
+        try { await updateComplex({ ...bc, agmCycleFinancialsStatus: status }); }
+        finally { setFyeUpdatingId(null); }
+    };
+
+    const handleFyeAcceptAlt = async (bc: typeof complexes[0]) => {
+        setFyeUpdatingId(bc.id);
+        try {
+            await updateComplex({ ...bc, agmCycleFinancialsNeededBy: bc.agmCycleFinancialsAltDate, agmCycleFinancialsAltDate: undefined, agmCycleFinancialsConfirmedByAccounts: false });
+        } finally { setFyeUpdatingId(null); }
     };
 
     const fmtCurrency = (n: number) => `$${n.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -228,23 +310,186 @@ const Financial: React.FC = () => {
         <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Financial</h1>
-                <div className="flex items-center gap-3">
-                    <div className="flex gap-2 text-xs">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 font-bold">
-                            <Clock size={12} /> Outstanding: {fmtCurrency(totalOutstanding)}
+                {activeTab === 'invoices' && (
+                    <div className="flex items-center gap-3">
+                        <div className="flex gap-2 text-xs">
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 font-bold">
+                                <Clock size={12} /> Outstanding: {fmtCurrency(totalOutstanding)}
+                            </div>
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 font-bold">
+                                <CheckCircle2 size={12} /> Recovered: {fmtCurrency(totalRecovered)}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-700 dark:text-emerald-400 font-bold">
-                            <CheckCircle2 size={12} /> Recovered: {fmtCurrency(totalRecovered)}
-                        </div>
+                        <button
+                            onClick={() => setShowCreateModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm"
+                        >
+                            <Plus size={14} /> Create Invoice
+                        </button>
                     </div>
-                    <button
-                        onClick={() => setShowCreateModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm"
-                    >
-                        <Plus size={14} /> Create Invoice
-                    </button>
-                </div>
+                )}
             </div>
+
+            {/* Tab bar */}
+            <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl w-fit">
+                <button
+                    onClick={() => setActiveTab('invoices')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${activeTab === 'invoices' ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                >
+                    <Receipt size={13} /> On-Charge Invoices
+                </button>
+                <button
+                    onClick={() => setActiveTab('fye')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${activeTab === 'fye' ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                >
+                    <Calendar size={13} /> FYE Schedule
+                    {fyeActionCount > 0 && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-500 text-white rounded-full leading-none">{fyeActionCount}</span>
+                    )}
+                </button>
+            </div>
+
+            {/* FYE Schedule Tab */}
+            {activeTab === 'fye' && (
+                <div className="space-y-4">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Tracks the AGM scheduling cycle and financial statement preparation for each complex. Managers use the Dashboard to start the process; accounts confirm dates and update status here.
+                    </p>
+                    {fyeRows.length === 0 ? (
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 shadow-sm p-10 text-center text-slate-400">
+                            <Calendar size={28} className="mx-auto mb-2 opacity-20" />
+                            <p className="text-sm">No active complexes with a financial year end date.</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border dark:border-slate-800 shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] uppercase font-bold text-slate-500 tracking-widest">
+                                        <tr>
+                                            <th className="px-4 py-3">Property</th>
+                                            <th className="px-4 py-3">FYE Date</th>
+                                            <th className="px-4 py-3">AGM Scheduled</th>
+                                            <th className="px-4 py-3">Financials Needed By</th>
+                                            <th className="px-4 py-3">Status</th>
+                                            <th className="px-4 py-3">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y dark:divide-slate-800">
+                                        {fyeRows.map(({ bc, upcomingFYE, fyeYear, daysUntilFYE, hasAgm, agmDate, isCycleDataCurrent }) => {
+                                            const isOverdue = daysUntilFYE < 0 && !hasAgm;
+                                            const isUrgent = daysUntilFYE <= 30 && daysUntilFYE >= 0 && !hasAgm;
+                                            const financialsBy = isCycleDataCurrent ? bc.agmCycleFinancialsNeededBy : undefined;
+                                            const altDate = isCycleDataCurrent ? bc.agmCycleFinancialsAltDate : undefined;
+                                            const confirmedByAccounts = isCycleDataCurrent && bc.agmCycleFinancialsConfirmedByAccounts;
+                                            const finStatus = isCycleDataCurrent ? bc.agmCycleFinancialsStatus : undefined;
+                                            const notes = isCycleDataCurrent ? bc.agmCycleFinancialsNotes : undefined;
+                                            const isAccounts = user?.role === 'accounts' || user?.role === 'admin';
+                                            const isManager = user?.role === 'admin' || user?.role === 'account_manager';
+                                            const isLoading = fyeUpdatingId === bc.id;
+                                            const defaultBy = new Date(upcomingFYE.getTime() + defaultLeadWeeks * 7 * 24 * 60 * 60 * 1000);
+
+                                            let statusBadge: React.ReactNode;
+                                            if (finStatus === 'done') {
+                                                statusBadge = <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"><CheckCircle2 size={9} />Ready</span>;
+                                            } else if (finStatus === 'in_progress') {
+                                                statusBadge = <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"><Play size={9} />In Progress</span>;
+                                            } else if (altDate) {
+                                                statusBadge = <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"><AlertCircle size={9} />Alt. Date Proposed</span>;
+                                            } else if (confirmedByAccounts) {
+                                                statusBadge = <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800"><ThumbsUp size={9} />Date Confirmed</span>;
+                                            } else if (financialsBy) {
+                                                statusBadge = <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"><Clock size={9} />Date Requested</span>;
+                                            } else if (!hasAgm) {
+                                                statusBadge = isOverdue
+                                                    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"><AlertCircle size={9} />No AGM Scheduled</span>
+                                                    : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">Not Started</span>;
+                                            } else {
+                                                statusBadge = <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">Not Started</span>;
+                                            }
+
+                                            return (
+                                                <tr key={bc.id} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors ${isOverdue ? 'bg-red-50/30 dark:bg-red-950/10' : isUrgent ? 'bg-amber-50/20 dark:bg-amber-950/10' : ''}`}>
+                                                    <td className="px-4 py-3">
+                                                        <div className="font-bold text-slate-800 dark:text-white text-xs">{bc.name}</div>
+                                                        <div className="text-[10px] text-slate-400 font-mono">{bc.bcNumber}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">{bc.financialYearEnd} {fyeYear}</div>
+                                                        {isOverdue && <div className="text-[10px] text-red-500 font-bold">{Math.abs(daysUntilFYE)}d overdue</div>}
+                                                        {isUrgent && <div className="text-[10px] text-amber-500 font-bold">in {daysUntilFYE}d</div>}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {agmDate
+                                                            ? <div className="text-xs text-slate-700 dark:text-slate-200">{new Date(agmDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                                                            : <span className="text-[10px] text-slate-400 italic">Not scheduled</span>}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {financialsBy
+                                                            ? <div>
+                                                                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">{new Date(financialsBy + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                                                                {altDate && <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">Alt: {new Date(altDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</div>}
+                                                                {notes && <div className="text-[10px] text-slate-400 mt-0.5 max-w-[140px] truncate" title={notes}>{notes}</div>}
+                                                              </div>
+                                                            : <span className="text-[10px] text-slate-400 italic">Suggested: {defaultBy.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</span>}
+                                                    </td>
+                                                    <td className="px-4 py-3">{statusBadge}</td>
+                                                    <td className="px-4 py-3">
+                                                        {isLoading ? (
+                                                            <Loader2 size={14} className="animate-spin text-slate-400" />
+                                                        ) : (
+                                                            <div className="flex flex-col gap-1.5">
+                                                                {/* Manager: accept alt date */}
+                                                                {isManager && altDate && (
+                                                                    <button onClick={() => handleFyeAcceptAlt(bc)} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors whitespace-nowrap">
+                                                                        <ThumbsUp size={9} /> Accept {new Date(altDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
+                                                                    </button>
+                                                                )}
+                                                                {/* Accounts: confirm date */}
+                                                                {isAccounts && financialsBy && !confirmedByAccounts && !altDate && finStatus !== 'done' && finStatus !== 'in_progress' && (
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <button onClick={() => handleFyeConfirm(bc)} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors whitespace-nowrap">
+                                                                            <ThumbsUp size={9} /> Confirm Date
+                                                                        </button>
+                                                                        {altDateInputId === bc.id ? (
+                                                                            <div className="flex gap-1">
+                                                                                <input type="date" value={altDateValue} onChange={e => setAltDateValue(e.target.value)} className="text-[10px] border dark:border-slate-700 dark:bg-slate-800 rounded-lg px-1.5 py-1 outline-none w-28" />
+                                                                                <button onClick={() => handleFyeAltDate(bc)} disabled={!altDateValue} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-40 transition-colors">Send</button>
+                                                                                <button onClick={() => { setAltDateInputId(null); setAltDateValue(''); }} className="text-[10px] px-1.5 py-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><X size={10} /></button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <button onClick={() => { setAltDateInputId(bc.id); setAltDateValue(''); }} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors whitespace-nowrap">
+                                                                                <ThumbsDown size={9} /> Can't Make It
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {/* Accounts: mark in progress */}
+                                                                {isAccounts && confirmedByAccounts && finStatus !== 'in_progress' && finStatus !== 'done' && (
+                                                                    <button onClick={() => handleFyeMarkStatus(bc, 'in_progress')} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors whitespace-nowrap">
+                                                                        <Play size={9} /> Start Work
+                                                                    </button>
+                                                                )}
+                                                                {/* Accounts: mark done */}
+                                                                {isAccounts && finStatus === 'in_progress' && (
+                                                                    <button onClick={() => handleFyeMarkStatus(bc, 'done')} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors whitespace-nowrap">
+                                                                        <CheckSquare size={9} /> Mark Done
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'invoices' && (<>
 
             {/* Filters */}
             <div className="flex flex-wrap gap-3">
@@ -435,6 +680,8 @@ const Financial: React.FC = () => {
                     )}
                 </div>
             )}
+
+            </>)}
 
             {/* Recover confirmation modal */}
             {confirmRecoverId && confirmInvoice && (

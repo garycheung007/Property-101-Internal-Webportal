@@ -258,6 +258,14 @@ export interface BodyCorporate {
 
   notes?: string;
   meetingDateSettings?: Partial<MeetingDateSettings>;
+
+  // AGM Cycle / Financial Year End workflow
+  agmCycleYear?: number;
+  agmCycleFinancialsNeededBy?: string;
+  agmCycleFinancialsNotes?: string;
+  agmCycleFinancialsConfirmedByAccounts?: boolean;
+  agmCycleFinancialsAltDate?: string;
+  agmCycleFinancialsStatus?: 'not_started' | 'in_progress' | 'done';
 }
 
 export type UserRole = 'admin' | 'account_manager' | 'support' | 'accounts';
@@ -294,6 +302,7 @@ export interface SystemSettings {
   waterRateOptions?: string[];
   conflictRegisterTemplate?: string;
   meetingDateSettings?: { bc: MeetingDateSettings; rs: MeetingDateSettings };
+  financialStatementLeadTimeWeeks?: number;
   invoicePricingTiers?: InvoicePricingTier[];
   postMeetingFields?: PostMeetingField[];
   emailDigestEnabled?: boolean;
@@ -324,8 +333,10 @@ export enum ReminderType {
   INSURANCE_VALUATION = 'INSURANCE_VALUATION',
   BWOF = 'BWOF',
   AGM = 'AGM',
+  AGM_DUE = 'AGM_DUE',
   LTMP = 'LTMP',
   FINANCIAL = 'FINANCIAL',
+  FINANCIALS_READY = 'FINANCIALS_READY',
   COMPLIANCE = 'COMPLIANCE',
   UPCOMING_ACTION = 'UPCOMING_ACTION',
   LEVY = 'LEVY'
