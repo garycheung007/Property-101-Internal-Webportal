@@ -40,6 +40,7 @@ const Dashboard: React.FC = () => {
   const [snoozeGroupItems, setSnoozeGroupItems] = useState<Reminder[]>([]);
   const [selectedAlerts, setSelectedAlerts] = useState<Set<string>>(new Set());
   const [agmModalReminder, setAgmModalReminder] = useState<Reminder | null>(null);
+  const [showAgmRemainingModal, setShowAgmRemainingModal] = useState(false);
 
   useEffect(() => { loadMeetings(); }, [loadMeetings]);
 
@@ -166,6 +167,12 @@ const Dashboard: React.FC = () => {
     count + (c.meetings || []).filter(m =>
       m.type === 'AGM' && new Date(m.date) >= today && new Date(m.date).getFullYear() === currentYear
     ).length, 0);
+
+  const agmRemainingList = filteredComplexes.flatMap(c =>
+    (c.meetings || [])
+      .filter(m => m.type === 'AGM' && new Date(m.date) >= today && new Date(m.date).getFullYear() === currentYear)
+      .map(m => ({ id: c.id, name: c.name, date: m.date }))
+  ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const meetingChecklistItems = filteredComplexes.flatMap(c => {
     const tplKey = c.type === 'Incorporated Society' ? 'rs' : 'bc';
@@ -443,7 +450,7 @@ const Dashboard: React.FC = () => {
         {[
           { label: 'Upcoming Actions', val: upcomingActions.length + meetingChecklistItems.length + levyReminders.length, icon: <ClipboardList />, color: 'pink', onClick: () => upcomingActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
           { label: 'Critical Alerts', val: criticalAlerts.length, icon: <AlertTriangle />, color: 'amber', onClick: () => criticalAlertsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
-          { label: 'AGMs Remaining This Year', val: agmsRemainingThisYear, icon: <Calendar />, color: 'blue', onClick: () => navigate('/complexes') }
+          { label: 'AGMs Remaining This Year', val: agmsRemainingThisYear, icon: <Calendar />, color: 'blue', onClick: () => setShowAgmRemainingModal(true) }
         ].map((stat, i) => (
           <div key={i} onClick={stat.onClick} className="cursor-pointer hover:shadow-md bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-all text-left group">
             <div className="flex items-center gap-4">
@@ -532,185 +539,129 @@ const Dashboard: React.FC = () => {
                         {totalActions} upcoming
                       </span>
                     )}
+                    {isOpen && alerts.length > 0 && (
+                      <>
+                        <button
+                          className="text-[9px] font-semibold text-amber-500 hover:underline ml-1"
+                          onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); const allSelected = alerts.every(a => next.has(a.id)); alerts.forEach(a => allSelected ? next.delete(a.id) : next.add(a.id)); return next; }); }}
+                        >{alerts.every(a => selectedAlerts.has(a.id)) ? 'Deselect all' : 'Select all'}</button>
+                        {selectedAlerts.size > 0 && (
+                          <button
+                            className="flex items-center gap-1 px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded hover:bg-amber-600 transition-colors"
+                            onClick={e => { e.stopPropagation(); const items = criticalAlerts.filter(a => selectedAlerts.has(a.id)); setSnoozeGroupItems(items); setSnoozeTarget(items[0]); }}
+                          ><BellOff size={10} /> Snooze {selectedAlerts.size} selected</button>
+                        )}
+                      </>
+                    )}
                     <div className="ml-auto text-slate-300 dark:text-slate-600">
                       {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </div>
                   </div>
 
-                  {/* Section body */}
+                  {/* Section body — unified list grouped by complex */}
                   {isOpen && (
                     <div className="border-t border-slate-100 dark:border-slate-800">
-
-                      {/* Alert zone (top) — only rendered when alerts exist */}
-                      {alerts.length > 0 && (
-                        <div className="bg-red-50/30 dark:bg-red-950/10 border-b border-slate-100 dark:border-slate-800">
-                          <div className="px-4 py-1.5 border-b border-red-100/60 dark:border-red-900/20 flex items-center gap-2">
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-red-500">⚠ Critical Alerts</span>
-                            <button
-                              className="text-[9px] font-semibold text-amber-500 hover:underline ml-1"
-                              onClick={() => setSelectedAlerts(prev => {
-                                const next = new Set(prev);
-                                const allSelected = alerts.every(a => next.has(a.id));
-                                alerts.forEach(a => allSelected ? next.delete(a.id) : next.add(a.id));
-                                return next;
-                              })}
-                            >{alerts.every(a => selectedAlerts.has(a.id)) ? 'Deselect all' : 'Select all'}</button>
-                            {selectedAlerts.size > 0 && (
-                              <button
-                                className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded hover:bg-amber-600 transition-colors"
-                                onClick={() => {
-                                  const items = criticalAlerts.filter(a => selectedAlerts.has(a.id));
-                                  setSnoozeGroupItems(items);
-                                  setSnoozeTarget(items[0]);
-                                }}
-                              ><BellOff size={10} /> Snooze {selectedAlerts.size} selected</button>
-                            )}
-                          </div>
-                          <div className="divide-y divide-red-50 dark:divide-red-900/20">
-                            {Object.entries(
-                              alerts.reduce((acc: Record<string, { bcName: string; items: typeof alerts }>, a) => {
-                                if (!acc[a.bcId]) acc[a.bcId] = { bcName: a.bcName, items: [] };
-                                acc[a.bcId].items.push(a);
-                                return acc;
-                              }, {})
-                            ).map(([bcId, { bcName, items }]) => (
+                      {(() => {
+                        type UnifiedEntry =
+                          | { kind: 'alert'; id: string; bcId: string; bcName: string; rem: Reminder }
+                          | { kind: 'levy'; id: string; bcId: string; bcName: string; rem: Reminder }
+                          | { kind: 'action'; id: string; bcId: string; bcName: string; rem: Reminder }
+                          | { kind: 'checklist'; id: string; bcId: string; bcName: string; ci: any };
+                        const allUnified: UnifiedEntry[] = [
+                          ...alerts.map(rem => ({ kind: 'alert' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
+                          ...actions.filter(r => r.type === ReminderType.LEVY).map(rem => ({ kind: 'levy' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
+                          ...actions.filter(r => r.type !== ReminderType.LEVY).map(rem => ({ kind: 'action' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
+                          ...checklistItems.map(ci => ({ kind: 'checklist' as const, id: ci.key, bcId: ci.bcId, bcName: ci.bcName, ci })),
+                        ];
+                        const groupedMap: Record<string, { bcName: string; entries: UnifiedEntry[] }> = {};
+                        allUnified.forEach(e => {
+                          if (!groupedMap[e.bcId]) groupedMap[e.bcId] = { bcName: e.bcName, entries: [] };
+                          groupedMap[e.bcId].entries.push(e);
+                        });
+                        return (
+                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {Object.entries(groupedMap).map(([bcId, { bcName, entries }]) => (
                               <div key={bcId}>
-                                <div className="px-4 py-1 bg-red-100/30 dark:bg-red-900/20 border-b border-red-100/60 dark:border-red-900/20">
+                                <div className="px-4 py-1 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                                   <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">{bcName}</span>
                                 </div>
-                                {items.map(alert => {
-                                  const chip = getDueChip(alert.dueDate);
+                                {entries.map(entry => {
+                                  if (entry.kind === 'alert') {
+                                    const chip = getDueChip(entry.rem.dueDate);
+                                    return (
+                                      <div
+                                        key={entry.id}
+                                        className={`flex items-start gap-2 px-4 py-2.5 border-l-2 border-red-400 dark:border-red-600 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors ${selectedAlerts.has(entry.rem.id) ? 'bg-red-100/40 dark:bg-red-900/20' : ''}`}
+                                        onClick={() => entry.rem.type === ReminderType.AGM_DUE ? setAgmModalReminder(entry.rem) : navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}
+                                      >
+                                        <div className="p-1.5 -m-1.5 shrink-0 cursor-pointer" onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); next.has(entry.rem.id) ? next.delete(entry.rem.id) : next.add(entry.rem.id); return next; }); }}>
+                                          <input type="checkbox" checked={selectedAlerts.has(entry.rem.id)} onChange={() => {}} className="mt-0.5 accent-amber-500 cursor-pointer pointer-events-none" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-snug">{entry.rem.message}</div>
+                                        </div>
+                                        {entry.rem.type === ReminderType.AGM_DUE && (
+                                          <button onClick={e => { e.stopPropagation(); setAgmModalReminder(entry.rem); }} className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors mt-0.5"><Play size={9} /> Start AGM</button>
+                                        )}
+                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
+                                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                                          <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze"><BellOff size={12} /></button>
+                                          <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors" title="Audit Trail"><MessageCircle size={12} /></button>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  if (entry.kind === 'levy') {
+                                    const chip = getDueChip(entry.rem.dueDate);
+                                    return (
+                                      <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
+                                        </div>
+                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
+                                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                                          <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
+                                          <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Mark Done" aria-label="Mark Done"><CheckCircle2 size={12} /></button>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  if (entry.kind === 'action') {
+                                    const chip = getDueChip(entry.rem.dueDate);
+                                    const isAgmDue = entry.rem.message.startsWith('AGM DUE:');
+                                    return (
+                                      <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => isAgmDue ? setAgmModalReminder(entry.rem) : navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
+                                        </div>
+                                        {isAgmDue && (
+                                          <button onClick={e => { e.stopPropagation(); setAgmModalReminder(entry.rem); }} className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors mt-0.5"><Play size={9} /> Start AGM</button>
+                                        )}
+                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
+                                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
+                                          <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
+                                          <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors" title="Log Details" aria-label="Log Details"><MessageCircle size={12} /></button>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  const chip = getDueChip(entry.ci.dueDate);
+                                  const stageLabel = entry.ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
                                   return (
-                                    <div
-                                      key={alert.id}
-                                      className={`flex items-start gap-2 px-4 py-2.5 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors ${selectedAlerts.has(alert.id) ? 'bg-red-100/40 dark:bg-red-900/20' : ''}`}
-                                      onClick={() => alert.type === ReminderType.AGM_DUE ? setAgmModalReminder(alert) : navigateToProperty(alert.bcId, alert.type, alert.message)}
-                                    >
-                                      <div className="p-1.5 -m-1.5 shrink-0 cursor-pointer" onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); next.has(alert.id) ? next.delete(alert.id) : next.add(alert.id); return next; }); }}>
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedAlerts.has(alert.id)}
-                                          onChange={() => {}}
-                                          className="mt-0.5 accent-amber-500 cursor-pointer pointer-events-none"
-                                        />
-                                      </div>
+                                    <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigate(`/complexes?id=${entry.ci.bcId}&tab=meetings&from=dashboard`)}>
                                       <div className="flex-1 min-w-0">
-                                        <div className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-snug">{alert.message}</div>
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{stageLabel}: {entry.ci.item.label}</div>
                                       </div>
-                                      {alert.type === ReminderType.AGM_DUE && (
-                                        <button
-                                          onClick={e => { e.stopPropagation(); setAgmModalReminder(alert); }}
-                                          className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors mt-0.5"
-                                        ><Play size={9} /> Start AGM</button>
-                                      )}
                                       <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                                        <button
-                                          onClick={e => { e.stopPropagation(); setSnoozeTarget(alert); setSnoozeGroupItems([alert]); }}
-                                          className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
-                                          title="Snooze"
-                                        ><BellOff size={12} /></button>
-                                        <button
-                                          onClick={e => { e.stopPropagation(); setSelectedReminder(alert); }}
-                                          className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
-                                          title="Audit Trail"
-                                        ><MessageCircle size={12} /></button>
-                                      </div>
+                                      <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0 mt-0.5" />
                                     </div>
                                   );
                                 })}
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Action zone (bottom) — only rendered when actions exist */}
-                      {totalActions > 0 && (
-                        <div>
-                          <div className="px-4 py-1.5 border-b border-slate-100 dark:border-slate-800">
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">↗ Upcoming Actions</span>
-                          </div>
-                          {(() => {
-                            type ActionEntry =
-                              | { kind: 'levy'; id: string; bcId: string; bcName: string; rem: Reminder }
-                              | { kind: 'action'; id: string; bcId: string; bcName: string; rem: Reminder }
-                              | { kind: 'checklist'; id: string; bcId: string; bcName: string; ci: any };
-                            const allEntries: ActionEntry[] = [
-                              ...actions.filter(r => r.type === ReminderType.LEVY).map(rem => ({ kind: 'levy' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
-                              ...actions.filter(r => r.type !== ReminderType.LEVY).map(rem => ({ kind: 'action' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
-                              ...checklistItems.map(ci => ({ kind: 'checklist' as const, id: ci.key, bcId: ci.bcId, bcName: ci.bcName, ci })),
-                            ];
-                            const groupedMap: Record<string, { bcName: string; entries: ActionEntry[] }> = {};
-                            allEntries.forEach(e => {
-                              if (!groupedMap[e.bcId]) groupedMap[e.bcId] = { bcName: e.bcName, entries: [] };
-                              groupedMap[e.bcId].entries.push(e);
-                            });
-                            return (
-                              <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {Object.entries(groupedMap).map(([bcId, { bcName, entries }]) => (
-                                  <div key={bcId}>
-                                    <div className="px-4 py-1 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">{bcName}</span>
-                                    </div>
-                                    {entries.map(entry => {
-                                      if (entry.kind === 'levy') {
-                                        const chip = getDueChip(entry.rem.dueDate);
-                                        return (
-                                          <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
-                                            <div className="flex-1 min-w-0">
-                                              <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
-                                            </div>
-                                            <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                                              <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
-                                              <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Mark Done" aria-label="Mark Done"><CheckCircle2 size={12} /></button>
-                                            </div>
-                                          </div>
-                                        );
-                                      }
-                                      if (entry.kind === 'action') {
-                                        const chip = getDueChip(entry.rem.dueDate);
-                                        const isAgmDue = entry.rem.message.startsWith('AGM DUE:');
-                                        return (
-                                          <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => isAgmDue ? setAgmModalReminder(entry.rem) : navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
-                                            <div className="flex-1 min-w-0">
-                                              <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
-                                            </div>
-                                            {isAgmDue && (
-                                              <button
-                                                onClick={e => { e.stopPropagation(); setAgmModalReminder(entry.rem); }}
-                                                className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors mt-0.5"
-                                              ><Play size={9} /> Start AGM</button>
-                                            )}
-                                            <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                                              <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
-                                              <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors" title="Log Details" aria-label="Log Details"><MessageCircle size={12} /></button>
-                                            </div>
-                                          </div>
-                                        );
-                                      }
-                                      const chip = getDueChip(entry.ci.dueDate);
-                                      const stageLabel = entry.ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
-                                      return (
-                                        <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigate(`/complexes?id=${entry.ci.bcId}&tab=meetings&from=dashboard`)}>
-                                          <div className="flex-1 min-w-0">
-                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{stageLabel}: {entry.ci.item.label}</div>
-                                          </div>
-                                          <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                          <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0 mt-0.5" />
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -967,6 +918,53 @@ const Dashboard: React.FC = () => {
           />
         );
       })()}
+      {showAgmRemainingModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAgmRemainingModal(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"><Calendar size={18} /></div>
+              <div>
+                <div className="font-bold text-slate-800 dark:text-white text-sm">AGMs Remaining This Year</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">{agmRemainingList.length} complex{agmRemainingList.length !== 1 ? 'es' : ''} with upcoming AGMs — sorted by date</div>
+              </div>
+              <button onClick={() => setShowAgmRemainingModal(false)} className="ml-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"><X size={18} /></button>
+            </div>
+            <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+              {agmRemainingList.length === 0 ? (
+                <div className="p-8 text-center text-sm text-slate-400">No upcoming AGMs found for this year.</div>
+              ) : (
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Complex</th>
+                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">AGM Date</th>
+                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Days Away</th>
+                      <th className="px-5 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agmRemainingList.map(item => {
+                      const agmDate = new Date(item.date + 'T00:00:00');
+                      const diffDays = Math.round((agmDate.getTime() - today.getTime()) / 86400000);
+                      const chipCls = diffDays <= 30
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
+                        : 'bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/50';
+                      return (
+                        <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="px-5 py-2.5 font-semibold text-slate-800 dark:text-white text-[12px]">{item.name}</td>
+                          <td className="px-5 py-2.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">{agmDate.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                          <td className="px-5 py-2.5"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chipCls}`}>{diffDays} day{diffDays !== 1 ? 's' : ''}</span></td>
+                          <td className="px-5 py-2.5 text-right"><button onClick={() => { setShowAgmRemainingModal(false); navigate(`/complexes?id=${item.id}&tab=meetings`); }} className="text-[11px] font-bold text-pink-600 dark:text-pink-400 hover:underline">Go →</button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
