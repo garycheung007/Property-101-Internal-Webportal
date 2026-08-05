@@ -7,6 +7,7 @@ import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, S
 import { Reminder, ReminderType } from '../types';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 import StartAgmProcessModal from '../components/StartAgmProcessModal';
+import { parseFyeDate } from '../utils/generateReminders';
 
 type DashboardCat = 'MEETING' | 'COMPLIANCE' | 'INSURANCE' | 'DEBT' | 'OTHER';
 const ALL_CATS: DashboardCat[] = ['MEETING', 'COMPLIANCE', 'INSURANCE', 'DEBT', 'OTHER'];
@@ -163,16 +164,24 @@ const Dashboard: React.FC = () => {
 
   const totalUnits = filteredComplexes.reduce((sum, c) => sum + c.units, 0);
   const currentYear = today.getFullYear();
-  const agmsRemainingThisYear = filteredComplexes.reduce((count, c) =>
-    count + (c.meetings || []).filter(m =>
-      m.type === 'AGM' && new Date(m.date) >= today && new Date(m.date).getFullYear() === currentYear
-    ).length, 0);
 
-  const agmRemainingList = filteredComplexes.flatMap(c =>
-    (c.meetings || [])
-      .filter(m => m.type === 'AGM' && new Date(m.date) >= today && new Date(m.date).getFullYear() === currentYear)
-      .map(m => ({ id: c.id, name: c.name, date: m.date }))
-  ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // AGMs Remaining — complexes whose FYE is in the current calendar year and have no AGM scheduled/held since their last FYE
+  const agmRemainingList = filteredComplexes.flatMap(c => {
+    if (!c.financialYearEnd) return [];
+    const fyeThisYear = parseFyeDate(c.financialYearEnd, currentYear);
+    if (!fyeThisYear) return [];
+    const lastFYE = new Date(fyeThisYear);
+    lastFYE.setFullYear(lastFYE.getFullYear() - 1);
+    const hasAgmThisCycle = (c.meetings || []).some(m => {
+      if (m.type !== 'AGM') return false;
+      const d = new Date(m.date);
+      return !isNaN(d.getTime()) && d >= lastFYE;
+    });
+    if (hasAgmThisCycle) return [];
+    return [{ id: c.id, name: c.name, fye: c.financialYearEnd, fyeDate: fyeThisYear }];
+  }).sort((a, b) => a.fyeDate.getTime() - b.fyeDate.getTime());
+
+  const agmsRemainingThisYear = agmRemainingList.length;
 
   const meetingChecklistItems = filteredComplexes.flatMap(c => {
     const tplKey = c.type === 'Incorporated Society' ? 'rs' : 'bc';
@@ -925,35 +934,38 @@ const Dashboard: React.FC = () => {
               <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"><Calendar size={18} /></div>
               <div>
                 <div className="font-bold text-slate-800 dark:text-white text-sm">AGMs Remaining This Year</div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">{agmRemainingList.length} complex{agmRemainingList.length !== 1 ? 'es' : ''} with upcoming AGMs — sorted by date</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">{agmRemainingList.length} complex{agmRemainingList.length !== 1 ? 'es' : ''} with FYE this year and no AGM scheduled — sorted by FYE</div>
               </div>
               <button onClick={() => setShowAgmRemainingModal(false)} className="ml-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"><X size={18} /></button>
             </div>
             <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
               {agmRemainingList.length === 0 ? (
-                <div className="p-8 text-center text-sm text-slate-400">No upcoming AGMs found for this year.</div>
+                <div className="p-8 text-center text-sm text-slate-400">All complexes with a FYE this year have an AGM scheduled.</div>
               ) : (
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
                       <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Complex</th>
-                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">AGM Date</th>
-                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Days Away</th>
+                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">FYE</th>
+                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
                       <th className="px-5 py-2"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {agmRemainingList.map(item => {
-                      const agmDate = new Date(item.date + 'T00:00:00');
-                      const diffDays = Math.round((agmDate.getTime() - today.getTime()) / 86400000);
-                      const chipCls = diffDays <= 30
+                      const diffDays = Math.round((item.fyeDate.getTime() - today.getTime()) / 86400000);
+                      const isOverdue = diffDays < 0;
+                      const chipCls = isOverdue
+                        ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50'
+                        : diffDays <= 30
                         ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
                         : 'bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/50';
+                      const chipLabel = isOverdue ? `${Math.abs(diffDays)}d overdue` : `${diffDays}d to go`;
                       return (
                         <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                           <td className="px-5 py-2.5 font-semibold text-slate-800 dark:text-white text-[12px]">{item.name}</td>
-                          <td className="px-5 py-2.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">{agmDate.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                          <td className="px-5 py-2.5"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chipCls}`}>{diffDays} day{diffDays !== 1 ? 's' : ''}</span></td>
+                          <td className="px-5 py-2.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">{item.fyeDate.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                          <td className="px-5 py-2.5"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chipCls}`}>{chipLabel}</span></td>
                           <td className="px-5 py-2.5 text-right"><button onClick={() => { setShowAgmRemainingModal(false); navigate(`/complexes?id=${item.id}&tab=meetings`); }} className="text-[11px] font-bold text-pink-600 dark:text-pink-400 hover:underline">Go →</button></td>
                         </tr>
                       );

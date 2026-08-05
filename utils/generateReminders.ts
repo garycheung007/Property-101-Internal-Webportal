@@ -29,7 +29,7 @@ type StageTemplates = { NOI: MeetingChecklistItem[]; NOM: MeetingChecklistItem[]
 type ChecklistTemplates = { bc: StageTemplates; rs: StageTemplates; };
 type MeetingDateConfig = { bc: MeetingDateSettings; rs: MeetingDateSettings; };
 
-const parseFyeDate = (fyeStr: string, year: number): Date | null => {
+export const parseFyeDate = (fyeStr: string, year: number): Date | null => {
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const parts = fyeStr.trim().split(' ');
   if (parts.length !== 2) return null;
