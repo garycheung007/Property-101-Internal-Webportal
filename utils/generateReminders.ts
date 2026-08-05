@@ -31,10 +31,14 @@ type MeetingDateConfig = { bc: MeetingDateSettings; rs: MeetingDateSettings; };
 
 export const parseFyeDate = (fyeStr: string, year: number): Date | null => {
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const parts = fyeStr.trim().split(' ');
+  const monthAbbr = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Normalise separator: "17-Sep" → "17 Sep"
+  const normalized = fyeStr.trim().replace('-', ' ');
+  const parts = normalized.split(' ');
   if (parts.length !== 2) return null;
   const day = parseInt(parts[0]);
-  const monthIdx = months.findIndex(m => m.toLowerCase() === parts[1].toLowerCase());
+  let monthIdx = months.findIndex(m => m.toLowerCase() === parts[1].toLowerCase());
+  if (monthIdx === -1) monthIdx = monthAbbr.findIndex(m => m.toLowerCase() === parts[1].toLowerCase());
   if (monthIdx === -1 || isNaN(day)) return null;
   return new Date(year, monthIdx, day);
 };

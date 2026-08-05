@@ -165,22 +165,37 @@ const Dashboard: React.FC = () => {
   const totalUnits = filteredComplexes.reduce((sum, c) => sum + c.units, 0);
   const currentYear = today.getFullYear();
 
-  // AGMs Remaining — complexes whose FYE is in the current calendar year and have no AGM scheduled/held since their last FYE
-  const agmRemainingList = filteredComplexes.flatMap(c => {
+  // AGMs Remaining — two groups:
+  // Group A: future AGMs already scheduled this calendar year (not yet happened)
+  // Group B: complexes with FYE in this calendar year, no AGM scheduled or held since last FYE
+  type AgmRemainingEntry = { id: string; name: string; kind: 'scheduled' | 'unscheduled'; sortDate: Date; agmDate?: string; fyeDate?: Date; fye?: string; };
+  const agmScheduledIds = new Set<string>();
+  const groupA: AgmRemainingEntry[] = filteredComplexes.flatMap(c =>
+    (c.meetings || [])
+      .filter(m => m.type === 'AGM' && new Date(m.date) >= today && new Date(m.date).getFullYear() === currentYear)
+      .map(m => {
+        agmScheduledIds.add(c.id);
+        return { id: c.id, name: c.name, kind: 'scheduled' as const, sortDate: new Date(m.date + 'T00:00:00'), agmDate: m.date };
+      })
+  );
+  const groupB: AgmRemainingEntry[] = filteredComplexes.flatMap(c => {
+    if (agmScheduledIds.has(c.id)) return []; // already in group A
     if (!c.financialYearEnd) return [];
     const fyeThisYear = parseFyeDate(c.financialYearEnd, currentYear);
     if (!fyeThisYear) return [];
-    const lastFYE = new Date(fyeThisYear);
-    lastFYE.setFullYear(lastFYE.getFullYear() - 1);
+    const lastFYE = new Date(fyeThisYear); lastFYE.setFullYear(lastFYE.getFullYear() - 1);
     const hasAgmThisCycle = (c.meetings || []).some(m => {
       if (m.type !== 'AGM') return false;
       const d = new Date(m.date);
       return !isNaN(d.getTime()) && d >= lastFYE;
     });
     if (hasAgmThisCycle) return [];
-    return [{ id: c.id, name: c.name, fye: c.financialYearEnd, fyeDate: fyeThisYear }];
-  }).sort((a, b) => a.fyeDate.getTime() - b.fyeDate.getTime());
-
+    return [{ id: c.id, name: c.name, kind: 'unscheduled' as const, sortDate: fyeThisYear, fyeDate: fyeThisYear, fye: c.financialYearEnd }];
+  });
+  const agmRemainingList: AgmRemainingEntry[] = [
+    ...groupA.sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime()),
+    ...groupB.sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime()),
+  ];
   const agmsRemainingThisYear = agmRemainingList.length;
 
   const meetingChecklistItems = filteredComplexes.flatMap(c => {
@@ -934,41 +949,58 @@ const Dashboard: React.FC = () => {
               <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"><Calendar size={18} /></div>
               <div>
                 <div className="font-bold text-slate-800 dark:text-white text-sm">AGMs Remaining This Year</div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">{agmRemainingList.length} complex{agmRemainingList.length !== 1 ? 'es' : ''} with FYE this year and no AGM scheduled — sorted by FYE</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">{agmRemainingList.length} AGM{agmRemainingList.length !== 1 ? 's' : ''} remaining — {groupA.length} scheduled, {groupB.length} not yet scheduled</div>
               </div>
               <button onClick={() => setShowAgmRemainingModal(false)} className="ml-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"><X size={18} /></button>
             </div>
             <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
               {agmRemainingList.length === 0 ? (
-                <div className="p-8 text-center text-sm text-slate-400">All complexes with a FYE this year have an AGM scheduled.</div>
+                <div className="p-8 text-center text-sm text-slate-400">No AGMs remaining — all complexes with a FYE this year have held or scheduled their AGM.</div>
               ) : (
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
                       <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Complex</th>
-                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">FYE</th>
+                      <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Date</th>
                       <th className="px-5 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
                       <th className="px-5 py-2"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {agmRemainingList.map(item => {
-                      const diffDays = Math.round((item.fyeDate.getTime() - today.getTime()) / 86400000);
-                      const isOverdue = diffDays < 0;
-                      const chipCls = isOverdue
-                        ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50'
-                        : diffDays <= 30
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
-                        : 'bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/50';
-                      const chipLabel = isOverdue ? `${Math.abs(diffDays)}d overdue` : `${diffDays}d to go`;
-                      return (
-                        <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                          <td className="px-5 py-2.5 font-semibold text-slate-800 dark:text-white text-[12px]">{item.name}</td>
-                          <td className="px-5 py-2.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">{item.fyeDate.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                          <td className="px-5 py-2.5"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chipCls}`}>{chipLabel}</span></td>
-                          <td className="px-5 py-2.5 text-right"><button onClick={() => { setShowAgmRemainingModal(false); navigate(`/complexes?id=${item.id}&tab=meetings`); }} className="text-[11px] font-bold text-pink-600 dark:text-pink-400 hover:underline">Go →</button></td>
-                        </tr>
-                      );
+                      if (item.kind === 'scheduled') {
+                        const agmDate = new Date(item.agmDate! + 'T00:00:00');
+                        const diffDays = Math.round((agmDate.getTime() - today.getTime()) / 86400000);
+                        const chipCls = diffDays <= 14
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50';
+                        return (
+                          <tr key={item.id + item.agmDate} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="px-5 py-2.5 font-semibold text-slate-800 dark:text-white text-[12px]">{item.name}</td>
+                            <td className="px-5 py-2.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">{agmDate.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                            <td className="px-5 py-2.5"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chipCls}`}>Scheduled · {diffDays}d</span></td>
+                            <td className="px-5 py-2.5 text-right"><button onClick={() => { setShowAgmRemainingModal(false); navigate(`/complexes?id=${item.id}&tab=meetings`); }} className="text-[11px] font-bold text-pink-600 dark:text-pink-400 hover:underline">Go →</button></td>
+                          </tr>
+                        );
+                      } else {
+                        const fyeDate = item.fyeDate!;
+                        const diffDays = Math.round((fyeDate.getTime() - today.getTime()) / 86400000);
+                        const isOverdue = diffDays < 0;
+                        const chipCls = isOverdue
+                          ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50'
+                          : diffDays <= 30
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700';
+                        const chipLabel = isOverdue ? `FYE ${Math.abs(diffDays)}d ago` : `FYE in ${diffDays}d`;
+                        return (
+                          <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="px-5 py-2.5 font-semibold text-slate-800 dark:text-white text-[12px]">{item.name}</td>
+                            <td className="px-5 py-2.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap italic">Not scheduled</td>
+                            <td className="px-5 py-2.5"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chipCls}`}>{chipLabel}</span></td>
+                            <td className="px-5 py-2.5 text-right"><button onClick={() => { setShowAgmRemainingModal(false); navigate(`/complexes?id=${item.id}&tab=meetings`); }} className="text-[11px] font-bold text-pink-600 dark:text-pink-400 hover:underline">Go →</button></td>
+                          </tr>
+                        );
+                      }
                     })}
                   </tbody>
                 </table>
