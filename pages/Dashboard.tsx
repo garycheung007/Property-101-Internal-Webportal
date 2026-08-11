@@ -563,16 +563,16 @@ const Dashboard: React.FC = () => {
                         {totalActions} upcoming
                       </span>
                     )}
-                    {isOpen && alerts.length > 0 && (
+                    {isOpen && (alerts.length > 0 || actions.filter(r => r.type !== ReminderType.LEVY).length > 0) && (
                       <>
                         <button
                           className="text-[9px] font-semibold text-amber-500 hover:underline ml-1"
-                          onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); const allSelected = alerts.every(a => next.has(a.id)); alerts.forEach(a => allSelected ? next.delete(a.id) : next.add(a.id)); return next; }); }}
-                        >{alerts.every(a => selectedAlerts.has(a.id)) ? 'Deselect all' : 'Select all'}</button>
+                          onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); const all = [...alerts, ...actions.filter(r => r.type !== ReminderType.LEVY)]; const allSelected = all.every(a => next.has(a.id)); all.forEach(a => allSelected ? next.delete(a.id) : next.add(a.id)); return next; }); }}
+                        >{[...alerts, ...actions.filter(r => r.type !== ReminderType.LEVY)].every(a => selectedAlerts.has(a.id)) ? 'Deselect all' : 'Select all'}</button>
                         {selectedAlerts.size > 0 && (
                           <button
                             className="flex items-center gap-1 px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded hover:bg-amber-600 transition-colors"
-                            onClick={e => { e.stopPropagation(); const items = criticalAlerts.filter(a => selectedAlerts.has(a.id)); setSnoozeGroupItems(items); setSnoozeTarget(items[0]); }}
+                            onClick={e => { e.stopPropagation(); const items = [...criticalAlerts, ...upcomingActions].filter(a => selectedAlerts.has(a.id)); setSnoozeGroupItems(items); setSnoozeTarget(items[0]); }}
                           ><BellOff size={10} /> Snooze {selectedAlerts.size} selected</button>
                         )}
                       </>
@@ -654,7 +654,10 @@ const Dashboard: React.FC = () => {
                                     const chip = getDueChip(entry.rem.dueDate);
                                     const isAgmDue = entry.rem.message.startsWith('AGM DUE:');
                                     return (
-                                      <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => isAgmDue ? setAgmModalReminder(entry.rem) : navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
+                                      <div key={entry.id} className={`flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors ${selectedAlerts.has(entry.rem.id) ? 'bg-amber-50/60 dark:bg-amber-900/10' : ''}`} onClick={() => isAgmDue ? setAgmModalReminder(entry.rem) : navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
+                                        <div className="p-1.5 -m-1.5 shrink-0 cursor-pointer" onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); next.has(entry.rem.id) ? next.delete(entry.rem.id) : next.add(entry.rem.id); return next; }); }}>
+                                          <input type="checkbox" checked={selectedAlerts.has(entry.rem.id)} onChange={() => {}} className="mt-0.5 accent-amber-500 cursor-pointer pointer-events-none" />
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                           <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
                                         </div>
