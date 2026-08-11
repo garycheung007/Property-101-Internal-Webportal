@@ -114,6 +114,7 @@ const MeetingCalendar: React.FC = () => {
         map[d].push(m);
       }
     });
+    Object.values(map).forEach(arr => arr.sort((a, b) => (a.meeting.time || '').localeCompare(b.meeting.time || '')));
     return map;
   }, [filtered, year, month]);
 
