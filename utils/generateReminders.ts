@@ -68,13 +68,14 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
         .sort((a, b) => a.offsetDays - b.offsetDays)[0];
       const lastPriorStepDone = lastPriorStep ? !!progress[lastPriorStep.id!]?.completed : false;
 
+      const insDueDateStr = insDate.toISOString().split('T')[0];
       if (diffDays < 0) {
         if (!hasCompletedAnyStep) {
-          reminders.push({ id: `ins-exp-${bc.id}`, bcId: bc.id, bcName: bc.name, type: ReminderType.INSURANCE, dueDate: bc.insuranceExpiry, message: `EXPIRED: Insurance on ${bc.insuranceExpiry}`, severity: 'high' });
+          reminders.push({ id: `ins-exp-${bc.id}`, bcId: bc.id, bcName: bc.name, type: ReminderType.INSURANCE, dueDate: insDueDateStr, message: `EXPIRED: Insurance on ${bc.insuranceExpiry}`, severity: 'high' });
         }
       } else if (diffDays <= 90) {
         if (!lastPriorStepDone) {
-          reminders.push({ id: `ins-${bc.id}`, bcId: bc.id, bcName: bc.name, type: diffDays < 30 ? ReminderType.INSURANCE : ReminderType.UPCOMING_ACTION, dueDate: bc.insuranceExpiry, message: `Insurance due in ${diffDays} days.`, severity: diffDays < 30 ? 'high' : 'medium' });
+          reminders.push({ id: `ins-${bc.id}`, bcId: bc.id, bcName: bc.name, type: diffDays < 30 ? ReminderType.INSURANCE : ReminderType.UPCOMING_ACTION, dueDate: insDueDateStr, message: `Insurance due in ${diffDays} days.`, severity: diffDays < 30 ? 'high' : 'medium' });
         }
       }
 
