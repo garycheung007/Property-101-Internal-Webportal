@@ -107,7 +107,7 @@ const buildIframeSrcDoc = (html: string) =>
     })();</script></body></html>`;
 
 const DisclosureGenerator: React.FC = () => {
-  const { complexes, contractors, managers, invoices, addInvoice, pricingTiers } = useData();
+  const { complexes, contractors, managers, invoices, addInvoice, pricingTiers, systemSettings } = useData();
   const { user } = useAuth();
 
   const [selectedBcId, setSelectedBcId] = useState<string>('');
@@ -214,10 +214,9 @@ const DisclosureGenerator: React.FC = () => {
   const buildMergeData = (): Record<string, string> => {
     if (!selectedComplex) return {};
     const fyDates = deriveFyDates(selectedComplex.financialYearStart || '1 April', selectedComplex.financialYearEnd || '31 March');
-    const hasRemediation = selectedComplex.weathertightnessClaimMade || selectedComplex.weathertightnessRemediatedWithoutClaim || selectedComplex.weathertightnessNotRemediated || selectedComplex.remedialWorkDone;
-    const remediationText = hasRemediation
-      ? 'You will need to arrange for the statement to be signed before providing it to any interested parties. Therefore, please ensure the document is checked for accuracy prior to signing. Especially with regard to item (1)(a) & disclosing information on the levies & remedial project as per updates provided to owners by the Body Corporate.'
-      : 'You will need to arrange for the statement to be signed before providing it to any interested parties. Therefore, please ensure the document is checked for accuracy prior to signing.';
+    const remediationText = selectedComplex.remedialWorkDone
+      ? (systemSettings.disclosureRemediationParagraph || 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing. Especially with regard to item (1)(a) & disclosing information on the levies & remedial project as per updates provided to owners by the Body Corporate.')
+      : (systemSettings.disclosureStandardParagraph || 'You will need to arrange for the statement to be signed before providing it to any interested parties. The responsibility for disclosure rests with the vendor, therefore, please ensure all documents are checked for accuracy prior to signing.');
     const vals = {
       bcName:               selectedComplex.name,
       bcNumber:             selectedComplex.bcNumber,
