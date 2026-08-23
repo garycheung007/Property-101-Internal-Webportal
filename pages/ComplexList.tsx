@@ -54,6 +54,23 @@ const formatDateNZ = (dateStr?: string) => {
   return parsed.toLocaleDateString('en-NZ');
 };
 
+const FY_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const FY_MONTHS_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const parseFyField = (str: string): { day: string; month: string } => {
+  if (!str) return { day: '', month: '' };
+  const normalized = str.trim().replace('-', ' ');
+  const parts = normalized.split(' ');
+  if (parts.length < 2) return { day: str, month: '' };
+  const day = parts[0];
+  const monthStr = parts[1];
+  const fullIdx = FY_MONTHS.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+  if (fullIdx !== -1) return { day, month: FY_MONTHS[fullIdx] };
+  const abbrIdx = FY_MONTHS_ABBR.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+  if (abbrIdx !== -1) return { day, month: FY_MONTHS[abbrIdx] };
+  return { day, month: '' };
+};
+
 /**
  * Checks if a date is today or in the future using timestamp comparison.
  */
@@ -343,11 +360,21 @@ const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">FY Start</label>
-                  <input type="text" value={form.financialYearStart} onChange={e => setForm(f => ({ ...f, financialYearStart: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none" placeholder="e.g. 1 May" />
+                  <div className="flex gap-1.5">
+                    <input type="number" min="1" max="31" placeholder="D" value={parseFyField(form.financialYearStart).day} onChange={e => setForm(f => ({ ...f, financialYearStart: `${e.target.value} ${parseFyField(f.financialYearStart).month || 'April'}` }))} className="w-14 px-2 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none text-center" />
+                    <select value={parseFyField(form.financialYearStart).month} onChange={e => setForm(f => ({ ...f, financialYearStart: `${parseFyField(f.financialYearStart).day || '1'} ${e.target.value}` }))} className="flex-1 px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
+                      {FY_MONTHS.map(m => <option key={m}>{m}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">FY End</label>
-                  <input type="text" value={form.financialYearEnd} onChange={e => setForm(f => ({ ...f, financialYearEnd: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none" placeholder="e.g. 30 April" />
+                  <div className="flex gap-1.5">
+                    <input type="number" min="1" max="31" placeholder="D" value={parseFyField(form.financialYearEnd).day} onChange={e => setForm(f => ({ ...f, financialYearEnd: `${e.target.value} ${parseFyField(f.financialYearEnd).month || 'March'}` }))} className="w-14 px-2 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none text-center" />
+                    <select value={parseFyField(form.financialYearEnd).month} onChange={e => setForm(f => ({ ...f, financialYearEnd: `${parseFyField(f.financialYearEnd).day || '31'} ${e.target.value}` }))} className="flex-1 px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
+                      {FY_MONTHS.map(m => <option key={m}>{m}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
             </>
@@ -1097,7 +1124,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY Start</label>
                                                     {portfolioEditing && currentUser?.role === 'admin' ? (
-                                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearStart || ''} onChange={e => setForm({...form, financialYearStart: e.target.value})} placeholder="e.g. 1-May" />
+                                                        <div className="flex gap-1.5">
+                                                            <input type="number" min="1" max="31" placeholder="D" value={parseFyField(form.financialYearStart || '').day} onChange={e => setForm(f => ({ ...f, financialYearStart: `${e.target.value} ${parseFyField(f.financialYearStart || '').month || 'April'}` }))} className="w-14 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm text-center outline-none" />
+                                                            <select value={parseFyField(form.financialYearStart || '').month} onChange={e => setForm(f => ({ ...f, financialYearStart: `${parseFyField(f.financialYearStart || '').day || '1'} ${e.target.value}` }))} className="flex-1 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none">
+                                                                {FY_MONTHS.map(m => <option key={m}>{m}</option>)}
+                                                            </select>
+                                                        </div>
                                                     ) : (
                                                         <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearStart || 'N/A'}</p>
                                                     )}
@@ -1105,7 +1137,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">FY End</label>
                                                     {portfolioEditing && currentUser?.role === 'admin' ? (
-                                                        <input type="text" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={form.financialYearEnd || ''} onChange={e => setForm({...form, financialYearEnd: e.target.value})} placeholder="e.g. 30-Apr" />
+                                                        <div className="flex gap-1.5">
+                                                            <input type="number" min="1" max="31" placeholder="D" value={parseFyField(form.financialYearEnd || '').day} onChange={e => setForm(f => ({ ...f, financialYearEnd: `${e.target.value} ${parseFyField(f.financialYearEnd || '').month || 'March'}` }))} className="w-14 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm text-center outline-none" />
+                                                            <select value={parseFyField(form.financialYearEnd || '').month} onChange={e => setForm(f => ({ ...f, financialYearEnd: `${parseFyField(f.financialYearEnd || '').day || '31'} ${e.target.value}` }))} className="flex-1 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm outline-none">
+                                                                {FY_MONTHS.map(m => <option key={m}>{m}</option>)}
+                                                            </select>
+                                                        </div>
                                                     ) : (
                                                         <p className="text-sm font-medium text-slate-700 dark:text-slate-200 px-1 py-1">{form.financialYearEnd || 'N/A'}</p>
                                                     )}
