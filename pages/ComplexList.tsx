@@ -343,15 +343,11 @@ const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">FY Start</label>
-                  <select value={form.financialYearStart} onChange={e => setForm(f => ({ ...f, financialYearStart: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
-                    {['1 January','1 February','1 March','1 April','1 May','1 June','1 July','1 August','1 September','1 October','1 November','1 December'].map(m => <option key={m}>{m}</option>)}
-                  </select>
+                  <input type="text" value={form.financialYearStart} onChange={e => setForm(f => ({ ...f, financialYearStart: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none" placeholder="e.g. 1 May" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">FY End</label>
-                  <select value={form.financialYearEnd} onChange={e => setForm(f => ({ ...f, financialYearEnd: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none">
-                    {['31 January','28/29 February','31 March','30 April','31 May','30 June','31 July','31 August','30 September','31 October','30 November','31 December'].map(m => <option key={m}>{m}</option>)}
-                  </select>
+                  <input type="text" value={form.financialYearEnd} onChange={e => setForm(f => ({ ...f, financialYearEnd: e.target.value }))} className="w-full px-3 py-2.5 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl text-sm outline-none" placeholder="e.g. 30 April" />
                 </div>
               </div>
             </>
