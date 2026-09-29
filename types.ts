@@ -306,6 +306,12 @@ export interface SystemSettings {
   invoicePricingTiers?: InvoicePricingTier[];
   postMeetingFields?: PostMeetingField[];
   emailDigestEnabled?: boolean;
+  emailTemplates?: {
+    noticeOfDelegation?: { subject: string; body: string };
+    aigAssociationLiabilityBc?: { subject: string; body: string };
+    aigAssociationLiabilityIsoc?: { subject: string; body: string };
+    meetingNotice?: { subject: string; body: string };
+  };
 }
 
 export type ContractorCategory = string;

@@ -186,15 +186,20 @@ const MeetingDocsTest: React.FC = () => {
     k => isAdmin || (k !== 'debtCollectionFlowchart' && k !== 'debtCollectionFlowchartIsoc')
   );
 
+  const applyEmailTags = (text: string, tags: Record<string, string>) =>
+    Object.entries(tags).reduce((t, [k, v]) => t.split(`{{${k}}}`).join(v), text);
+
   const buildEmailDraft = (key: TemplateKey): { subject: string; body: string; label: string } | null => {
     if (!selectedComplex) return null;
     const managerName = assignedManager?.name || selectedComplex.managerName || 'Body Corporate Manager';
     const address = selectedComplex.address || '';
     if (key === 'noticeOfDelegation') {
+      const tpl = systemSettings.emailTemplates?.noticeOfDelegation;
+      const tags = { BC_NUMBER: selectedComplex.bcNumber, BC_NAME: selectedComplex.name, ADDRESS: address, MANAGER_NAME: managerName };
       return {
         label: 'Notice of Delegation',
-        subject: `Notice of Delegation — BC ${selectedComplex.bcNumber} / ${selectedComplex.name}`,
-        body: `Dear [Recipient],\n\nPlease find attached the Notice of Delegation for Body Corporate ${selectedComplex.bcNumber}, ${selectedComplex.name}, situated at ${address}.\n\nThis document delegates authority to the committee to act on behalf of the body corporate for the matters specified. Please review the attached form and arrange for the required signatures before returning a signed copy to our office.\n\nShould you have any questions, please don't hesitate to get in touch.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`,
+        subject: tpl ? applyEmailTags(tpl.subject, tags) : `Notice of Delegation — BC ${selectedComplex.bcNumber} / ${selectedComplex.name}`,
+        body: tpl ? applyEmailTags(tpl.body, tags) : `Dear [Recipient],\n\nPlease find attached the Notice of Delegation for Body Corporate ${selectedComplex.bcNumber}, ${selectedComplex.name}, situated at ${address}.\n\nThis document delegates authority to the committee to act on behalf of the body corporate for the matters specified. Please review the attached form and arrange for the required signatures before returning a signed copy to our office.\n\nShould you have any questions, please don't hesitate to get in touch.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`,
       };
     }
     if (key === 'aigAssociationLiabilityBc' || key === 'aigAssociationLiabilityIsoc') {
@@ -202,10 +207,14 @@ const MeetingDocsTest: React.FC = () => {
       const num = parseFloat(raw.replace(/[^0-9.]/g, ''));
       const budget = isNaN(num) ? (raw || '[amount]') : '$' + num.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const members = selectedComplex.numberOfCommitteeMembers?.toString() || '[number]';
+      const tpl = key === 'aigAssociationLiabilityBc'
+        ? systemSettings.emailTemplates?.aigAssociationLiabilityBc
+        : systemSettings.emailTemplates?.aigAssociationLiabilityIsoc;
+      const tags = { BC_NUMBER: selectedComplex.bcNumber, BC_NAME: selectedComplex.name, ADDRESS: address, MANAGER_NAME: managerName, APPROVED_BUDGET: budget, COMMITTEE_MEMBERS: members };
       return {
         label: 'AIG Association Liability Form',
-        subject: `AIG Association Liability Proposal — BC ${selectedComplex.bcNumber} / ${selectedComplex.name}`,
-        body: `Dear [Broker / AIG Contact],\n\nPlease find attached the completed AIG Association Liability proposal form for Body Corporate ${selectedComplex.bcNumber}, ${selectedComplex.name}.\n\nKey details:\n  • Gross Income (Approved Budget): ${budget}\n  • Number of Committee Members: ${members}\n  • Activities: Body Corporate\n\nPlease process this renewal at your earliest convenience and confirm receipt. If any additional information is required, feel free to contact me directly.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`,
+        subject: tpl ? applyEmailTags(tpl.subject, tags) : `AIG Association Liability Proposal — BC ${selectedComplex.bcNumber} / ${selectedComplex.name}`,
+        body: tpl ? applyEmailTags(tpl.body, tags) : `Dear [Broker / AIG Contact],\n\nPlease find attached the completed AIG Association Liability proposal form for Body Corporate ${selectedComplex.bcNumber}, ${selectedComplex.name}.\n\nKey details:\n  • Gross Income (Approved Budget): ${budget}\n  • Number of Committee Members: ${members}\n  • Activities: Body Corporate\n\nPlease process this renewal at your earliest convenience and confirm receipt. If any additional information is required, feel free to contact me directly.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`,
       };
     }
     return null;

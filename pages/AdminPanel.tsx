@@ -13,7 +13,7 @@ import {
     Users, Building, Plus, Upload, Search, Settings,
     UserPlus, Archive, Edit2, ArchiveRestore, Save, X, Trash2, Database, ShieldCheck, Terminal,
     LayoutGrid, Loader2, HardHat, ClipboardCheck, PlusCircle, AlertTriangle, FileText,
-    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar, DollarSign, Bell, Wrench
+    Activity, CheckCircle2, MinusCircle, AlertCircle, FileSignature, Droplets, Download, GripVertical, Calendar, DollarSign, Bell, Wrench, Mail
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import FieldHint from '../components/FieldHint';
@@ -314,6 +314,25 @@ const POST_MEETING_FIELD_OPTIONS: Array<{ fieldKey: string; label: string }> = [
     { fieldKey: 'numberOfCommitteeMembers',  label: 'No. of Committee Members' },
 ];
 
+const DEFAULT_EMAIL_TEMPLATES = {
+    noticeOfDelegation: {
+        subject: 'Notice of Delegation — BC {{BC_NUMBER}} / {{BC_NAME}}',
+        body: 'Dear [Recipient],\n\nPlease find attached the Notice of Delegation for Body Corporate {{BC_NUMBER}}, {{BC_NAME}}, situated at {{ADDRESS}}.\n\nThis document delegates authority to the committee to act on behalf of the body corporate for the matters specified. Please review the attached form and arrange for the required signatures before returning a signed copy to our office.\n\nShould you have any questions, please don\'t hesitate to get in touch.\n\nKind regards,\n{{MANAGER_NAME}}\nBody Corporate Manager\nProperty 101 Group',
+    },
+    aigAssociationLiabilityBc: {
+        subject: 'AIG Association Liability Proposal — BC {{BC_NUMBER}} / {{BC_NAME}}',
+        body: 'Dear [Broker / AIG Contact],\n\nPlease find attached the completed AIG Association Liability proposal form for Body Corporate {{BC_NUMBER}}, {{BC_NAME}}.\n\nKey details:\n  • Gross Income (Approved Budget): {{APPROVED_BUDGET}}\n  • Number of Committee Members: {{COMMITTEE_MEMBERS}}\n  • Activities: Body Corporate\n\nPlease process this renewal at your earliest convenience and confirm receipt. If any additional information is required, feel free to contact me directly.\n\nKind regards,\n{{MANAGER_NAME}}\nBody Corporate Manager\nProperty 101 Group',
+    },
+    aigAssociationLiabilityIsoc: {
+        subject: 'AIG Association Liability Proposal — ISOC {{BC_NUMBER}} / {{BC_NAME}}',
+        body: 'Dear [Broker / AIG Contact],\n\nPlease find attached the completed AIG Association Liability proposal form for Incorporated Society {{BC_NUMBER}}, {{BC_NAME}}.\n\nKey details:\n  • Gross Income (Approved Budget): {{APPROVED_BUDGET}}\n  • Number of Committee Members: {{COMMITTEE_MEMBERS}}\n  • Activities: Incorporated Society\n\nPlease process this renewal at your earliest convenience and confirm receipt. If any additional information is required, feel free to contact me directly.\n\nKind regards,\n{{MANAGER_NAME}}\nBody Corporate Manager\nProperty 101 Group',
+    },
+    meetingNotice: {
+        subject: '{{MEETING_TYPE}} Notice — BC {{BC_NUMBER}} / {{BC_NAME}}',
+        body: 'Dear Owner,\n\nWe are pleased to advise that the {{MEETING_TYPE}} for Body Corporate {{BC_NUMBER}}, {{BC_NAME}}, has been scheduled as follows:\n\n  Date:   {{MEETING_DAY}}, {{MEETING_DATE}}\n  Time:   {{MEETING_TIME}}\n  Venue:  {{VENUE}}\n\nNominations for the committee must be received no later than {{NOI_RESPONSE_DUE_DATE}}.\n\nFurther documentation including the Notice of Intention, agenda, and financial reports will be sent to you in due course. If you are unable to attend in person, a proxy form will be included with the meeting pack.\n\nPlease do not hesitate to contact our office if you have any questions.\n\nKind regards,\n{{MANAGER_NAME}}\nBody Corporate Manager\nProperty 101 Group',
+    },
+};
+
 const AdminPanel: React.FC = () => {
     const navigate = useNavigate();
     const { user: currentUser } = useAuth();
@@ -326,7 +345,7 @@ const AdminPanel: React.FC = () => {
     
     const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<'properties' | 'contractors' | 'users' | 'settings' | 'meetings' | 'templates' | 'diagnostics' | 'data'>('properties');
-    const [templateSubTab, setTemplateSubTab] = useState<'bc' | 'isoc' | 'disclosure' | 'conflict' | 'invoicePricing'>('bc');
+    const [templateSubTab, setTemplateSubTab] = useState<'bc' | 'isoc' | 'disclosure' | 'conflict' | 'invoicePricing' | 'emailTemplates'>('bc');
     const [searchTerm, setSearchTerm] = useState('');
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -367,6 +386,8 @@ const AdminPanel: React.FC = () => {
     );
     const [localPricingTiers, setLocalPricingTiers] = useState<InvoicePricingTier[]>(pricingTiers);
     const [newTierName, setNewTierName] = useState('');
+    const [localEmailTemplates, setLocalEmailTemplates] = useState({ ...DEFAULT_EMAIL_TEMPLATES });
+    const [savingEmailTemplates, setSavingEmailTemplates] = useState(false);
     const [newTierAmount, setNewTierAmount] = useState('');
     const [savingTiers, setSavingTiers] = useState(false);
     const [tierAddError, setTierAddError] = useState('');
@@ -428,6 +449,7 @@ const AdminPanel: React.FC = () => {
             })
         );
         if (systemSettings.emailDigestEnabled !== undefined) setLocalEmailDigestEnabled(systemSettings.emailDigestEnabled);
+        if (systemSettings.emailTemplates) setLocalEmailTemplates({ ...DEFAULT_EMAIL_TEMPLATES, ...systemSettings.emailTemplates });
     }, [systemSettings]);
 
     useEffect(() => {
@@ -740,6 +762,13 @@ const AdminPanel: React.FC = () => {
             emailDigestEnabled: localEmailDigestEnabled,
         });
         showToast('System settings saved.', 'success');
+    };
+
+    const handleSaveEmailTemplates = async () => {
+        setSavingEmailTemplates(true);
+        await updateSystemSettings({ ...systemSettings, emailTemplates: localEmailTemplates });
+        setSavingEmailTemplates(false);
+        showToast('Email templates saved.', 'success');
     };
 
     const filteredUsers = users.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -1174,6 +1203,7 @@ const AdminPanel: React.FC = () => {
                                     <button onClick={() => setTemplateSubTab('disclosure')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'disclosure' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Disclosure & CPL</button>
                                     <button onClick={() => setTemplateSubTab('conflict')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'conflict' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Conflict Register</button>
                                     <button onClick={() => setTemplateSubTab('invoicePricing')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'invoicePricing' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Invoice Pricing</button>
+                                    <button onClick={() => setTemplateSubTab('emailTemplates')} className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${templateSubTab === 'emailTemplates' ? 'bg-white dark:bg-slate-700 shadow-sm text-pink-600' : 'text-slate-400'}`}>Email Templates</button>
                                 </div>
                             </div>
 
@@ -1235,6 +1265,92 @@ const AdminPanel: React.FC = () => {
                                                 <Save size={16} /> Save Template
                                             </button>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {templateSubTab === 'emailTemplates' && (
+                                <div className="space-y-4 animate-in fade-in duration-300">
+                                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border dark:border-slate-800 shadow-sm space-y-6">
+                                        <div className="flex items-start gap-3 border-b dark:border-slate-800 pb-4">
+                                            <Mail size={20} className="text-pink-600 mt-0.5 shrink-0" />
+                                            <div>
+                                                <h3 className="font-bold text-sm dark:text-white">Email Draft Templates</h3>
+                                                <p className="text-xs text-slate-400 mt-1">Customise the default subject and body text for each email draft. Use merge tags like <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-pink-600">{'{{BC_NAME}}'}</code> to insert live values — staff can still edit the text before copying.</p>
+                                            </div>
+                                        </div>
+                                        {([
+                                            {
+                                                key: 'noticeOfDelegation' as const,
+                                                label: 'Notice of Delegation',
+                                                context: 'Document Preparation → Notice of Delegation → Email button',
+                                                tags: ['{{BC_NUMBER}}', '{{BC_NAME}}', '{{ADDRESS}}', '{{MANAGER_NAME}}'],
+                                            },
+                                            {
+                                                key: 'aigAssociationLiabilityBc' as const,
+                                                label: 'AIG Association Liability — Body Corporate',
+                                                context: 'Document Preparation → AIG Association Liability Form (BC) → Email button',
+                                                tags: ['{{BC_NUMBER}}', '{{BC_NAME}}', '{{ADDRESS}}', '{{MANAGER_NAME}}', '{{APPROVED_BUDGET}}', '{{COMMITTEE_MEMBERS}}'],
+                                            },
+                                            {
+                                                key: 'aigAssociationLiabilityIsoc' as const,
+                                                label: 'AIG Association Liability — Incorporated Society',
+                                                context: 'Document Preparation → AIG Association Liability Form (ISOC) → Email button',
+                                                tags: ['{{BC_NUMBER}}', '{{BC_NAME}}', '{{ADDRESS}}', '{{MANAGER_NAME}}', '{{APPROVED_BUDGET}}', '{{COMMITTEE_MEMBERS}}'],
+                                            },
+                                            {
+                                                key: 'meetingNotice' as const,
+                                                label: 'Meeting Notice (AGM / EGM / SGM)',
+                                                context: 'Complex → Meetings tab → Draft Meeting Email button',
+                                                tags: ['{{BC_NUMBER}}', '{{BC_NAME}}', '{{MANAGER_NAME}}', '{{MEETING_TYPE}}', '{{MEETING_DATE}}', '{{MEETING_DAY}}', '{{MEETING_TIME}}', '{{VENUE}}', '{{NOI_RESPONSE_DUE_DATE}}'],
+                                            },
+                                        ] as const).map(({ key, label, context, tags }) => (
+                                            <div key={key} className="border dark:border-slate-700 rounded-xl p-4 space-y-3">
+                                                <div>
+                                                    <p className="font-semibold text-sm dark:text-white">{label}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">{context}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Subject</p>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500"
+                                                        value={localEmailTemplates[key].subject}
+                                                        onChange={e => setLocalEmailTemplates(prev => ({ ...prev, [key]: { ...prev[key], subject: e.target.value } }))}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Body</p>
+                                                    <textarea
+                                                        className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500 resize-y min-h-[140px] leading-relaxed"
+                                                        value={localEmailTemplates[key].body}
+                                                        onChange={e => setLocalEmailTemplates(prev => ({ ...prev, [key]: { ...prev[key], body: e.target.value } }))}
+                                                    />
+                                                </div>
+                                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                                    <span className="text-[10px] text-slate-400 font-semibold self-center">Tags:</span>
+                                                    {tags.map(tag => (
+                                                        <code key={tag} className="bg-slate-100 dark:bg-slate-800 text-pink-600 text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">{tag}</code>
+                                                    ))}
+                                                </div>
+                                                <div className="pt-1 flex justify-end gap-2">
+                                                    <button
+                                                        onClick={() => setLocalEmailTemplates(prev => ({ ...prev, [key]: DEFAULT_EMAIL_TEMPLATES[key] }))}
+                                                        className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline transition-colors"
+                                                    >
+                                                        Reset to default
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <button
+                                            onClick={handleSaveEmailTemplates}
+                                            disabled={savingEmailTemplates}
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-50"
+                                        >
+                                            {savingEmailTemplates ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                            Save Email Templates
+                                        </button>
                                     </div>
                                 </div>
                             )}

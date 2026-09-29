@@ -454,6 +454,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
     const [meetingForm, setMeetingForm] = useState<Partial<Meeting>>({});
     const [agmEmailModal, setAgmEmailModal] = useState(false);
+    const [agmEmailSubject, setAgmEmailSubject] = useState('');
     const [agmEmailBody, setAgmEmailBody] = useState('');
     const [agmEmailCopied, setAgmEmailCopied] = useState(false);
     const [renewalPrompt, setRenewalPrompt] = useState<{ show: boolean, nextExpiry: string }>({ show: false, nextExpiry: '' });
@@ -1849,7 +1850,22 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                             const fmtTime = (t: string) => t ? new Date(`2000-01-01T${t}`).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase() : '';
                                                             const managerName = form.managerName || currentUser?.name || 'Body Corporate Manager';
                                                             const nomDue = meetingForm.noiResponseDueDate ? fmtDate(meetingForm.noiResponseDueDate) : '[date]';
-                                                            const body = `Dear Owner,\n\nWe are pleased to advise that the ${meetingForm.type} for Body Corporate ${form.bcNumber}, ${form.name}, has been scheduled as follows:\n\n  Date:   ${fmtDay(meetingForm.date!)}, ${fmtDate(meetingForm.date!)}\n  Time:   ${meetingForm.time ? fmtTime(meetingForm.time) : '[time]'}\n  Venue:  ${meetingForm.venue || '[venue]'}\n\nNominations for the committee must be received no later than ${nomDue}.\n\nFurther documentation including the Notice of Intention, agenda, and financial reports will be sent to you in due course. If you are unable to attend in person, a proxy form will be included with the meeting pack.\n\nPlease do not hesitate to contact our office if you have any questions.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`;
+                                                            const tags: Record<string, string> = {
+                                                                MEETING_TYPE: meetingForm.type || '',
+                                                                BC_NUMBER: form.bcNumber || '',
+                                                                BC_NAME: form.name || '',
+                                                                MANAGER_NAME: managerName,
+                                                                MEETING_DAY: fmtDay(meetingForm.date!),
+                                                                MEETING_DATE: fmtDate(meetingForm.date!),
+                                                                MEETING_TIME: meetingForm.time ? fmtTime(meetingForm.time) : '[time]',
+                                                                VENUE: meetingForm.venue || '[venue]',
+                                                                NOI_RESPONSE_DUE_DATE: nomDue,
+                                                            };
+                                                            const applyTags = (text: string) => Object.entries(tags).reduce((t, [k, v]) => t.split(`{{${k}}}`).join(v), text);
+                                                            const tpl = systemSettings.emailTemplates?.meetingNotice;
+                                                            const body = tpl ? applyTags(tpl.body) : `Dear Owner,\n\nWe are pleased to advise that the ${meetingForm.type} for Body Corporate ${form.bcNumber}, ${form.name}, has been scheduled as follows:\n\n  Date:   ${fmtDay(meetingForm.date!)}, ${fmtDate(meetingForm.date!)}\n  Time:   ${meetingForm.time ? fmtTime(meetingForm.time) : '[time]'}\n  Venue:  ${meetingForm.venue || '[venue]'}\n\nNominations for the committee must be received no later than ${nomDue}.\n\nFurther documentation including the Notice of Intention, agenda, and financial reports will be sent to you in due course. If you are unable to attend in person, a proxy form will be included with the meeting pack.\n\nPlease do not hesitate to contact our office if you have any questions.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`;
+                                                            const subject = tpl ? applyTags(tpl.subject) : `${meetingForm.type} Notice — BC ${form.bcNumber} / ${form.name}`;
+                                                            setAgmEmailSubject(subject);
                                                             setAgmEmailBody(body);
                                                             setAgmEmailCopied(false);
                                                             setAgmEmailModal(true);
@@ -2241,8 +2257,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     <p className="text-[10px] text-slate-400">BC: <span className="font-semibold text-slate-500">{form.bcNumber} — {form.name}</span></p>
                                     <button
                                         onClick={() => {
-                                            const subject = `${meetingForm.type} Notice — BC ${form.bcNumber} / ${form.name}`;
-                                            navigator.clipboard.writeText(`Subject: ${subject}\n\n${agmEmailBody}`).then(() => {
+                                            navigator.clipboard.writeText(`Subject: ${agmEmailSubject}\n\n${agmEmailBody}`).then(() => {
                                                 setAgmEmailCopied(true);
                                                 setTimeout(() => setAgmEmailCopied(false), 2200);
                                             });
