@@ -4,7 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
-import { FlaskConical, Download, Loader2, Eye, X } from 'lucide-react';
+import { FlaskConical, Download, Loader2, Eye, X, Mail, Copy, Check } from 'lucide-react';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -80,7 +80,7 @@ const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager
     Manager_Name: manager?.name || complex.managerName || '',
     Manager_Title: manager?.title || 'Body Corporate Manager',
     Financial_Year_End: financialYearEnd,
-    Approved_Budget: complex.approvedBudget || '',
+    Approved_Budget: (() => { const raw = complex.approvedBudget || ''; const num = parseFloat(raw.replace(/[^0-9.]/g, '')); return isNaN(num) ? raw : '$' + num.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); })(),
     Number_Of_Committee_Members: complex.numberOfCommitteeMembers?.toString() || '',
   };
 };
@@ -149,6 +149,9 @@ const MeetingDocsTest: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const [emailModal, setEmailModal] = useState<{ subject: string; body: string; label: string } | null>(null);
+  const [emailBody, setEmailBody] = useState('');
+  const [emailCopied, setEmailCopied] = useState(false);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -182,6 +185,31 @@ const MeetingDocsTest: React.FC = () => {
   const activeKeys: TemplateKey[] = (isIsoc ? IS_KEYS : BC_KEYS).filter(
     k => isAdmin || (k !== 'debtCollectionFlowchart' && k !== 'debtCollectionFlowchartIsoc')
   );
+
+  const buildEmailDraft = (key: TemplateKey): { subject: string; body: string; label: string } | null => {
+    if (!selectedComplex) return null;
+    const managerName = assignedManager?.name || selectedComplex.managerName || 'Body Corporate Manager';
+    const address = selectedComplex.address || '';
+    if (key === 'noticeOfDelegation') {
+      return {
+        label: 'Notice of Delegation',
+        subject: `Notice of Delegation — BC ${selectedComplex.bcNumber} / ${selectedComplex.name}`,
+        body: `Dear [Recipient],\n\nPlease find attached the Notice of Delegation for Body Corporate ${selectedComplex.bcNumber}, ${selectedComplex.name}, situated at ${address}.\n\nThis document delegates authority to the committee to act on behalf of the body corporate for the matters specified. Please review the attached form and arrange for the required signatures before returning a signed copy to our office.\n\nShould you have any questions, please don't hesitate to get in touch.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`,
+      };
+    }
+    if (key === 'aigAssociationLiabilityBc' || key === 'aigAssociationLiabilityIsoc') {
+      const raw = selectedComplex.approvedBudget || '';
+      const num = parseFloat(raw.replace(/[^0-9.]/g, ''));
+      const budget = isNaN(num) ? (raw || '[amount]') : '$' + num.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const members = selectedComplex.numberOfCommitteeMembers?.toString() || '[number]';
+      return {
+        label: 'AIG Association Liability Form',
+        subject: `AIG Association Liability Proposal — BC ${selectedComplex.bcNumber} / ${selectedComplex.name}`,
+        body: `Dear [Broker / AIG Contact],\n\nPlease find attached the completed AIG Association Liability proposal form for Body Corporate ${selectedComplex.bcNumber}, ${selectedComplex.name}.\n\nKey details:\n  • Gross Income (Approved Budget): ${budget}\n  • Number of Committee Members: ${members}\n  • Activities: Body Corporate\n\nPlease process this renewal at your earliest convenience and confirm receipt. If any additional information is required, feel free to contact me directly.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`,
+      };
+    }
+    return null;
+  };
 
   const handlePreview = async (key: TemplateKey) => {
     const tpl = templates[key];
@@ -311,30 +339,43 @@ const MeetingDocsTest: React.FC = () => {
     }
   };
 
-  const renderActionButtons = (key: TemplateKey) => (
-    <div key={key} className="space-y-1.5">
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{LABELS[key]}</p>
-      <div className="flex gap-2">
-        <button
-          onClick={() => handlePreview(key)}
-          disabled={previewing || !templates[key]}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
-        >
-          {previewing && previewKey === key ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
-          Preview
-        </button>
-        <button
-          onClick={() => handleDownloadDocx(key)}
-          disabled={!templates[key]}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[#2b579a] hover:bg-[#1e3f72] text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
-        >
-          <Download size={12} /> Word
-        </button>
+  const renderActionButtons = (key: TemplateKey) => {
+    const hasEmail = key === 'noticeOfDelegation' || key === 'aigAssociationLiabilityBc' || key === 'aigAssociationLiabilityIsoc';
+    return (
+      <div key={key} className="space-y-1.5">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{LABELS[key]}</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handlePreview(key)}
+            disabled={previewing || !templates[key]}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
+          >
+            {previewing && previewKey === key ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
+            Preview
+          </button>
+          <button
+            onClick={() => handleDownloadDocx(key)}
+            disabled={!templates[key]}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[#2b579a] hover:bg-[#1e3f72] text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
+          >
+            <Download size={12} /> Word
+          </button>
+          {hasEmail && (
+            <button
+              onClick={() => { const d = buildEmailDraft(key); if (d) { setEmailModal(d); setEmailBody(d.body); setEmailCopied(false); } }}
+              disabled={!selectedBcId}
+              className="flex items-center gap-1.5 py-2 px-3 bg-pink-50 dark:bg-pink-900/20 hover:bg-pink-600 hover:text-white border border-pink-200 dark:border-pink-800 text-pink-600 text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
+            >
+              <Mail size={12} /> Email
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
+    <>
     <div className="h-[calc(100vh-8rem)]">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
 
@@ -501,6 +542,64 @@ const MeetingDocsTest: React.FC = () => {
 
       </div>
     </div>
+
+    {/* Email draft modal */}
+
+    {emailModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        onClick={e => { if (e.target === e.currentTarget) { setEmailModal(null); setEmailCopied(false); } }}
+      >
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg">
+          <div className="flex items-center justify-between p-5 border-b dark:border-slate-700">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-pink-50 dark:bg-pink-900/30 flex items-center justify-center">
+                <Mail size={16} className="text-pink-600" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-800 dark:text-white text-sm">Draft Email</p>
+                <p className="text-xs text-slate-500">{emailModal.label}</p>
+              </div>
+            </div>
+            <button onClick={() => { setEmailModal(null); setEmailCopied(false); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Subject</p>
+              <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 select-all">
+                {emailModal.subject}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Body — edit before copying</p>
+              <textarea
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 resize-y min-h-[200px] outline-none focus:ring-2 focus:ring-pink-500 leading-relaxed"
+                value={emailBody}
+                onChange={e => setEmailBody(e.target.value)}
+              />
+            </div>
+            <p className="text-[10px] text-slate-400">Text is fully editable — adjust wording before copying.</p>
+          </div>
+          <div className="flex items-center justify-between px-5 pb-5">
+            <p className="text-[10px] text-slate-400">BC: <span className="font-semibold text-slate-500">{selectedComplex?.bcNumber} — {selectedComplex?.name}</span></p>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`Subject: ${emailModal.subject}\n\n${emailBody}`).then(() => {
+                  setEmailCopied(true);
+                  setTimeout(() => setEmailCopied(false), 2200);
+                });
+              }}
+              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-colors ${emailCopied ? 'bg-emerald-500 text-white' : 'bg-pink-600 hover:bg-pink-700 text-white'}`}
+            >
+              {emailCopied ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy to Clipboard</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

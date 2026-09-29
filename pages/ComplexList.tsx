@@ -10,7 +10,7 @@ import {
     ToggleLeft, Check, AlertCircle, MapPinHouse,
     User, Building, HardHat, Contact, Phone, Mail, ClipboardCheck,
     Briefcase, Shield, UserCircle, PartyPopper, CalendarRange, Sparkles,
-    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2, Settings2
+    FileSignature, Activity, AlertOctagon, Info, Pencil, ChevronRight, Droplets, Download, Edit2, Settings2, Copy
 } from 'lucide-react';
 import { BodyCorporate, Meeting, InsuranceStepStatus, WorkflowStepConfig, MeetingChecklistItem, ConflictEntry, MeetingDateSettings, PostMeetingField } from '../types';
 import { DEFAULT_CONFLICT_REGISTER_TEMPLATE } from '../constants/defaultTemplates';
@@ -453,6 +453,9 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const [conflictForm, setConflictForm] = useState<Partial<ConflictEntry>>({});
     const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
     const [meetingForm, setMeetingForm] = useState<Partial<Meeting>>({});
+    const [agmEmailModal, setAgmEmailModal] = useState(false);
+    const [agmEmailBody, setAgmEmailBody] = useState('');
+    const [agmEmailCopied, setAgmEmailCopied] = useState(false);
     const [renewalPrompt, setRenewalPrompt] = useState<{ show: boolean, nextExpiry: string }>({ show: false, nextExpiry: '' });
     const [bwofRenewalPrompt, setBwofRenewalPrompt] = useState<{ show: boolean, pendingDate: string }>({ show: false, pendingDate: '' });
     const [feeEditing, setFeeEditing] = useState(false);
@@ -1836,6 +1839,27 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                     )}
                                                 </div>
                                             </fieldset>
+                                            {/* Draft email button — AGM / EGM / SGM only, existing meetings */}
+                                            {selectedMeetingId !== 'new' && meetingForm.type !== 'Committee' && meetingForm.date && (
+                                                <div className="mt-3 pt-3 border-t dark:border-slate-800 flex justify-end">
+                                                    <button
+                                                        onClick={() => {
+                                                            const fmtDate = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+                                                            const fmtDay = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long' }) : '';
+                                                            const fmtTime = (t: string) => t ? new Date(`2000-01-01T${t}`).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase() : '';
+                                                            const managerName = form.managerName || currentUser?.name || 'Body Corporate Manager';
+                                                            const nomDue = meetingForm.noiResponseDueDate ? fmtDate(meetingForm.noiResponseDueDate) : '[date]';
+                                                            const body = `Dear Owner,\n\nWe are pleased to advise that the ${meetingForm.type} for Body Corporate ${form.bcNumber}, ${form.name}, has been scheduled as follows:\n\n  Date:   ${fmtDay(meetingForm.date!)}, ${fmtDate(meetingForm.date!)}\n  Time:   ${meetingForm.time ? fmtTime(meetingForm.time) : '[time]'}\n  Venue:  ${meetingForm.venue || '[venue]'}\n\nNominations for the committee must be received no later than ${nomDue}.\n\nFurther documentation including the Notice of Intention, agenda, and financial reports will be sent to you in due course. If you are unable to attend in person, a proxy form will be included with the meeting pack.\n\nPlease do not hesitate to contact our office if you have any questions.\n\nKind regards,\n${managerName}\nBody Corporate Manager\nProperty 101 Group`;
+                                                            setAgmEmailBody(body);
+                                                            setAgmEmailCopied(false);
+                                                            setAgmEmailModal(true);
+                                                        }}
+                                                        className="flex items-center gap-1.5 px-3 py-2 bg-pink-50 dark:bg-pink-900/20 hover:bg-pink-600 hover:text-white border border-pink-200 dark:border-pink-800 text-pink-600 text-[10px] font-bold rounded-lg transition-colors"
+                                                    >
+                                                        <Mail size={11} /> Draft Meeting Email
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Key deadlines strip */}
@@ -2173,6 +2197,63 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 )}
                             </div>
                         </>
+                    )}
+
+                    {/* AGM email draft modal */}
+                    {agmEmailModal && (
+                        <div
+                            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                            onClick={e => { if (e.target === e.currentTarget) { setAgmEmailModal(false); setAgmEmailCopied(false); } }}
+                        >
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg">
+                                <div className="flex items-center justify-between p-5 border-b dark:border-slate-700">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-pink-50 dark:bg-pink-900/30 flex items-center justify-center">
+                                            <Mail size={16} className="text-pink-600" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-800 dark:text-white text-sm">Draft Email</p>
+                                            <p className="text-xs text-slate-500">{meetingForm.type} Notification — {form.name}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => { setAgmEmailModal(false); setAgmEmailCopied(false); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                <div className="p-5 space-y-4">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Subject</p>
+                                        <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 select-all">
+                                            {meetingForm.type} Notice — BC {form.bcNumber} / {form.name}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Body — edit before copying</p>
+                                        <textarea
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 resize-y min-h-[220px] outline-none focus:ring-2 focus:ring-pink-500 leading-relaxed"
+                                            value={agmEmailBody}
+                                            onChange={e => setAgmEmailBody(e.target.value)}
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400">Text is fully editable — adjust wording before copying.</p>
+                                </div>
+                                <div className="flex items-center justify-between px-5 pb-5">
+                                    <p className="text-[10px] text-slate-400">BC: <span className="font-semibold text-slate-500">{form.bcNumber} — {form.name}</span></p>
+                                    <button
+                                        onClick={() => {
+                                            const subject = `${meetingForm.type} Notice — BC ${form.bcNumber} / ${form.name}`;
+                                            navigator.clipboard.writeText(`Subject: ${subject}\n\n${agmEmailBody}`).then(() => {
+                                                setAgmEmailCopied(true);
+                                                setTimeout(() => setAgmEmailCopied(false), 2200);
+                                            });
+                                        }}
+                                        className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-colors ${agmEmailCopied ? 'bg-emerald-500 text-white' : 'bg-pink-600 hover:bg-pink-700 text-white'}`}
+                                    >
+                                        {agmEmailCopied ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy to Clipboard</>}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {activeTab === 'conflict' && (
