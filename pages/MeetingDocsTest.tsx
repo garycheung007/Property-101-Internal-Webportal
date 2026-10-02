@@ -82,6 +82,7 @@ const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager
     Financial_Year_End: financialYearEnd,
     Approved_Budget: (() => { const raw = complex.approvedBudget || ''; const num = parseFloat(raw.replace(/[^0-9.]/g, '')); return isNaN(num) ? raw : '$' + num.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); })(),
     Number_Of_Committee_Members: complex.numberOfCommitteeMembers?.toString() || '',
+    Activities: complex.type === 'Incorporated Society' ? 'Incorporated Society' : 'Body Corporate',
   };
 };
 
