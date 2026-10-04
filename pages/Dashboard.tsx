@@ -335,7 +335,7 @@ const Dashboard: React.FC = () => {
     let hasOverdue = false, hasWeek = false, hasFuture = false;
     card.items.forEach(item => {
       const d = new Date(item.dueDate + 'T00:00:00');
-      if (d < today) { hasOverdue = true; card.overdueCount++; }
+      if (d <= today) { hasOverdue = true; card.overdueCount++; }
       else if (d <= nextWeek) { hasWeek = true; card.weekCount++; }
       else hasFuture = true;
     });
