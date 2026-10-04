@@ -1413,7 +1413,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         type="number"
                                                         min={1}
                                                         max={31}
-                                                        className="w-14 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center"
+                                                        className="w-12 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center"
                                                         value={entry.day}
                                                         onChange={e => {
                                                             const schedule = [...(form.levyDueDateSchedule || [])];
@@ -1434,6 +1434,19 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                             <option key={mi + 1} value={mi + 1}>{m}</option>
                                                         ))}
                                                     </select>
+                                                    <input
+                                                        type="number"
+                                                        min={2020}
+                                                        max={2099}
+                                                        className="w-20 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center"
+                                                        value={entry.year ?? new Date().getFullYear()}
+                                                        onChange={e => {
+                                                            const schedule = [...(form.levyDueDateSchedule || [])];
+                                                            const yr = parseInt(e.target.value);
+                                                            schedule[idx] = { ...schedule[idx], year: yr >= 2020 ? yr : undefined };
+                                                            setForm({ ...form, levyDueDateSchedule: schedule });
+                                                        }}
+                                                    />
                                                 </div>
                                             ))}
                                         </div>

@@ -253,7 +253,7 @@ export interface BodyCorporate {
   bcAccountNumber?: string;
   levyInstalments?: string;
   levyDueDates?: string;
-  levyDueDateSchedule?: Array<{ month: number; day: number }>;
+  levyDueDateSchedule?: Array<{ month: number; day: number; year?: number }>;
   debtCollectionReminderDays?: number;
 
   notes?: string;

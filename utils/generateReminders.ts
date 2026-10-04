@@ -227,7 +227,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
     const lagDays = bc.debtCollectionReminderDays ?? 7;
 
     bc.levyDueDateSchedule.forEach((entry, idx) => {
-      const dueDate = new Date(today.getFullYear(), entry.month - 1, entry.day);
+      const dueDate = new Date(entry.year ?? today.getFullYear(), entry.month - 1, entry.day);
       const reminderDate = new Date(dueDate);
       reminderDate.setDate(reminderDate.getDate() + lagDays);
 
