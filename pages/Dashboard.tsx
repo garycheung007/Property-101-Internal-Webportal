@@ -12,6 +12,19 @@ import { parseFyeDate } from '../utils/generateReminders';
 type DashboardCat = 'MEETING' | 'COMPLIANCE' | 'INSURANCE' | 'DEBT' | 'OTHER';
 const ALL_CATS: DashboardCat[] = ['MEETING', 'COMPLIANCE', 'INSURANCE', 'DEBT', 'OTHER'];
 
+type PropertyItem =
+  | { kind: 'alert';     id: string; rem: Reminder; cat: DashboardCat; dueDate: string }
+  | { kind: 'action';    id: string; rem: Reminder; cat: DashboardCat; dueDate: string }
+  | { kind: 'levy';      id: string; rem: Reminder; cat: DashboardCat; dueDate: string }
+  | { kind: 'checklist'; id: string; ci: any;       cat: DashboardCat; dueDate: string };
+
+type PropertyCard = {
+  bcId: string; bcName: string; bcNumber: string; bcType?: string;
+  urgencyTier: 'overdue' | 'week' | 'future' | 'clear';
+  items: PropertyItem[]; cats: DashboardCat[];
+  overdueCount: number; weekCount: number;
+};
+
 const subtractWorkingDays = (date: Date, days: number): Date => {
   const result = new Date(date);
   let remaining = days;
@@ -42,6 +55,9 @@ const Dashboard: React.FC = () => {
   const [selectedAlerts, setSelectedAlerts] = useState<Set<string>>(new Set());
   const [agmModalReminder, setAgmModalReminder] = useState<Reminder | null>(null);
   const [showAgmRemainingModal, setShowAgmRemainingModal] = useState(false);
+  const [dashUrgencyTab, setDashUrgencyTab] = useState<'overdue' | 'week' | 'all' | 'snoozed'>('overdue');
+  const [dashCatFilter, setDashCatFilter] = useState<'all' | DashboardCat>('all');
+  const [selectedBcId, setSelectedBcId] = useState<string | null>(null);
 
   useEffect(() => { loadMeetings(); }, [loadMeetings]);
 
@@ -282,6 +298,57 @@ const Dashboard: React.FC = () => {
     return { cat, alerts: catAlerts, actions: catActions, checklistItems: catChecklist };
   }).filter(s => s.alerts.length > 0 || s.actions.length > 0 || s.checklistItems.length > 0);
 
+  // Build per-complex property cards for the new grid view
+  const nextWeek = new Date(today); nextWeek.setDate(nextWeek.getDate() + 7);
+  const cardMap: Record<string, PropertyCard> = {};
+  const ensureCard = (bcId: string, bcName: string) => {
+    if (!cardMap[bcId]) {
+      const cx = filteredComplexes.find(c => c.id === bcId);
+      cardMap[bcId] = { bcId, bcName, bcNumber: cx?.bcNumber || '', bcType: cx?.type, urgencyTier: 'clear', items: [], cats: [], overdueCount: 0, weekCount: 0 };
+    }
+    return cardMap[bcId];
+  };
+  criticalAlerts.forEach(rem => {
+    const card = ensureCard(rem.bcId, rem.bcName);
+    const cat = getCatForAlert(rem.type, rem.message);
+    card.items.push({ kind: 'alert', id: rem.id, rem, cat, dueDate: rem.dueDate });
+    if (!card.cats.includes(cat)) card.cats.push(cat);
+  });
+  levyReminders.forEach(rem => {
+    const card = ensureCard(rem.bcId, rem.bcName);
+    card.items.push({ kind: 'levy', id: rem.id, rem, cat: 'DEBT', dueDate: rem.dueDate });
+    if (!card.cats.includes('DEBT')) card.cats.push('DEBT');
+  });
+  upcomingActions.forEach(rem => {
+    const card = ensureCard(rem.bcId, rem.bcName);
+    const cat = getCatForAction(rem.message);
+    card.items.push({ kind: 'action', id: rem.id, rem, cat, dueDate: rem.dueDate });
+    if (!card.cats.includes(cat)) card.cats.push(cat);
+  });
+  meetingChecklistItems.forEach(ci => {
+    const card = ensureCard(ci.bcId, ci.bcName);
+    card.items.push({ kind: 'checklist', id: ci.key, ci, cat: 'MEETING', dueDate: ci.dueDate });
+    if (!card.cats.includes('MEETING')) card.cats.push('MEETING');
+  });
+  filteredComplexes.forEach(c => ensureCard(c.id, c.name));
+  Object.values(cardMap).forEach(card => {
+    let hasOverdue = false, hasWeek = false, hasFuture = false;
+    card.items.forEach(item => {
+      const d = new Date(item.dueDate + 'T00:00:00');
+      if (d < today) { hasOverdue = true; card.overdueCount++; }
+      else if (d <= nextWeek) { hasWeek = true; card.weekCount++; }
+      else hasFuture = true;
+    });
+    card.urgencyTier = hasOverdue ? 'overdue' : hasWeek ? 'week' : hasFuture ? 'future' : 'clear';
+  });
+  const propertyCards = Object.values(cardMap).sort((a, b) => {
+    const order: Record<string, number> = { overdue: 0, week: 1, future: 2, clear: 3 };
+    return (order[a.urgencyTier] - order[b.urgencyTier]) || a.bcName.localeCompare(b.bcName);
+  });
+  const overdueTabCount = propertyCards.filter(c => c.urgencyTier === 'overdue').length;
+  const weekTabCount = propertyCards.filter(c => c.urgencyTier === 'overdue' || c.urgencyTier === 'week').length;
+  const snoozedAll = [...snoozedCriticalAlerts, ...snoozedUpcomingActions];
+
   const CAT_CONFIG: Record<DashboardCat, { label: string; icon: React.ReactNode; bgColor: string; textColor: string; borderColor: string }> = {
     MEETING:    { label: 'Meetings',        icon: <Calendar size={15} />,      bgColor: 'bg-blue-50 dark:bg-blue-900/20',       textColor: 'text-blue-600 dark:text-blue-400',       borderColor: '#3B82F6' },
     COMPLIANCE: { label: 'Compliance',      icon: <FileCheck size={15} />,     bgColor: 'bg-amber-50 dark:bg-amber-900/20',     textColor: 'text-amber-600 dark:text-amber-400',     borderColor: '#D97706' },
@@ -520,259 +587,184 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Category Work Sections */}
+        {/* ── Property Card Dashboard ── */}
         <div
-          className="space-y-3"
           ref={(el) => {
             (upcomingActionsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
             (criticalAlertsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
           }}
         >
-          {categorySections.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-10 text-center flex flex-col items-center gap-2 shadow-sm transition-colors">
-              <CheckCircle2 size={32} className="text-emerald-400 opacity-60" />
-              <p className="text-sm text-slate-400">No pending actions or alerts.</p>
-            </div>
-          ) : (
-            categorySections.map(({ cat, alerts, actions, checklistItems }) => {
-              const cfg = CAT_CONFIG[cat as DashboardCat];
-              const isOpen = openSections.has(cat);
-              const totalActions = actions.length + checklistItems.length;
-              return (
-                <div
-                  key={cat}
-                  className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm transition-all"
-                  style={{ borderLeft: `4px solid ${cfg.borderColor}` }}
-                >
-                  {/* Section header */}
-                  <div
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors select-none"
-                    onClick={() => toggleSection(cat)}
+          {/* Urgency tabs */}
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex items-center flex-wrap gap-2">
+              <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1 gap-0.5 shadow-sm">
+                {([
+                  { key: 'overdue' as const, label: 'Overdue + Today', count: overdueTabCount,       chipCls: 'bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400' },
+                  { key: 'week'    as const, label: 'This Week',        count: weekTabCount,          chipCls: 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400' },
+                  { key: 'all'     as const, label: 'All Properties',   count: propertyCards.length,  chipCls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+                  { key: 'snoozed' as const, label: 'Snoozed',          count: snoozedAll.length,     chipCls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+                ]).map(tab => (
+                  <button key={tab.key}
+                    onClick={() => { setDashUrgencyTab(tab.key); setSelectedBcId(null); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                      dashUrgencyTab === tab.key ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white font-semibold' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                    }`}
                   >
-                    <div className={`p-1.5 rounded-lg ${cfg.bgColor}`}>
-                      <span className={cfg.textColor}>{cfg.icon}</span>
-                    </div>
-                    <span className="font-bold text-slate-800 dark:text-white text-sm">{cfg.label}</span>
-                    {alerts.length > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50">
-                        {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {totalActions > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
-                        {totalActions} upcoming
-                      </span>
-                    )}
-                    {isOpen && (alerts.length > 0 || actions.filter(r => r.type !== ReminderType.LEVY).length > 0) && (
-                      <>
-                        <button
-                          className="text-[9px] font-semibold text-amber-500 hover:underline ml-1"
-                          onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); const all = [...alerts, ...actions.filter(r => r.type !== ReminderType.LEVY)]; const allSelected = all.every(a => next.has(a.id)); all.forEach(a => allSelected ? next.delete(a.id) : next.add(a.id)); return next; }); }}
-                        >{[...alerts, ...actions.filter(r => r.type !== ReminderType.LEVY)].every(a => selectedAlerts.has(a.id)) ? 'Deselect all' : 'Select all'}</button>
-                        {selectedAlerts.size > 0 && (
-                          <button
-                            className="flex items-center gap-1 px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded hover:bg-amber-600 transition-colors"
-                            onClick={e => { e.stopPropagation(); const items = [...criticalAlerts, ...upcomingActions].filter(a => selectedAlerts.has(a.id)); setSnoozeGroupItems(items); setSnoozeTarget(items[0]); }}
-                          ><BellOff size={10} /> Snooze {selectedAlerts.size} selected</button>
-                        )}
-                      </>
-                    )}
-                    <div className="ml-auto text-slate-300 dark:text-slate-600">
-                      {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                    </div>
-                  </div>
+                    {tab.label}
+                    {tab.count > 0 && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${tab.chipCls}`}>{tab.count}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {dashUrgencyTab !== 'snoozed' && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Filter:</span>
+                {([
+                  ['all',        'All types',  ''],
+                  ['MEETING',    'Meetings',   '#3B82F6'],
+                  ['INSURANCE',  'Insurance',  '#10B981'],
+                  ['COMPLIANCE', 'Compliance', '#D97706'],
+                  ['DEBT',       'Debt',       '#EF4444'],
+                  ['OTHER',      'Other',      '#94A3B8'],
+                ] as [string, string, string][]).map(([cat, label, color]) => (
+                  <button key={cat}
+                    onClick={() => { setDashCatFilter(cat as 'all' | DashboardCat); setSelectedBcId(null); }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-colors ${
+                      dashCatFilter === cat
+                        ? 'bg-pink-50 border-pink-200 text-pink-700 dark:bg-pink-950/20 dark:border-pink-900/40 dark:text-pink-400'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-pink-300'
+                    }`}
+                  >
+                    {color && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-                  {/* Section body — unified list grouped by complex */}
-                  {isOpen && (
-                    <div className="border-t border-slate-100 dark:border-slate-800">
-                      {(() => {
-                        type UnifiedEntry =
-                          | { kind: 'alert'; id: string; bcId: string; bcName: string; rem: Reminder }
-                          | { kind: 'levy'; id: string; bcId: string; bcName: string; rem: Reminder }
-                          | { kind: 'action'; id: string; bcId: string; bcName: string; rem: Reminder }
-                          | { kind: 'checklist'; id: string; bcId: string; bcName: string; ci: any };
-                        const allUnified: UnifiedEntry[] = [
-                          ...alerts.map(rem => ({ kind: 'alert' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
-                          ...actions.filter(r => r.type === ReminderType.LEVY).map(rem => ({ kind: 'levy' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
-                          ...actions.filter(r => r.type !== ReminderType.LEVY).map(rem => ({ kind: 'action' as const, id: rem.id, bcId: rem.bcId, bcName: rem.bcName, rem })),
-                          ...checklistItems.map(ci => ({ kind: 'checklist' as const, id: ci.key, bcId: ci.bcId, bcName: ci.bcName, ci })),
-                        ];
-                        const groupedMap: Record<string, { bcName: string; entries: UnifiedEntry[] }> = {};
-                        allUnified.forEach(e => {
-                          if (!groupedMap[e.bcId]) groupedMap[e.bcId] = { bcName: e.bcName, entries: [] };
-                          groupedMap[e.bcId].entries.push(e);
-                        });
-                        return (
-                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {Object.entries(groupedMap).map(([bcId, { bcName, entries }]) => (
-                              <div key={bcId}>
-                                <div className="px-4 py-1 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">{bcName}</span>
-                                </div>
-                                {entries.map(entry => {
-                                  if (entry.kind === 'alert') {
-                                    const chip = getDueChip(entry.rem.dueDate);
-                                    return (
-                                      <div
-                                        key={entry.id}
-                                        className={`flex items-start gap-2 px-4 py-2.5 border-l-2 border-red-400 dark:border-red-600 hover:bg-red-50/60 dark:hover:bg-red-950/20 cursor-pointer group transition-colors ${selectedAlerts.has(entry.rem.id) ? 'bg-red-100/40 dark:bg-red-900/20' : ''}`}
-                                        onClick={() => entry.rem.type === ReminderType.AGM_DUE ? setAgmModalReminder(entry.rem) : navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}
-                                      >
-                                        <div className="p-1.5 -m-1.5 shrink-0 cursor-pointer" onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); next.has(entry.rem.id) ? next.delete(entry.rem.id) : next.add(entry.rem.id); return next; }); }}>
-                                          <input type="checkbox" checked={selectedAlerts.has(entry.rem.id)} onChange={() => {}} className="mt-0.5 accent-amber-500 cursor-pointer pointer-events-none" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-snug">{entry.rem.message}</div>
-                                        </div>
-                                        {entry.rem.type === ReminderType.AGM_DUE && (
-                                          <button onClick={e => { e.stopPropagation(); setAgmModalReminder(entry.rem); }} className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors mt-0.5"><Play size={9} /> Start AGM</button>
-                                        )}
-                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                                          <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze"><BellOff size={12} /></button>
-                                          <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors" title="Audit Trail"><MessageCircle size={12} /></button>
-                                        </div>
-                                      </div>
-                                    );
-                                  }
-                                  if (entry.kind === 'levy') {
-                                    const chip = getDueChip(entry.rem.dueDate);
-                                    return (
-                                      <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
-                                        </div>
-                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                                          <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
-                                          <button onClick={() => handleLevyMarkDone(entry.rem.bcId)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Mark Done" aria-label="Mark Done"><CheckCircle2 size={12} /></button>
-                                        </div>
-                                      </div>
-                                    );
-                                  }
-                                  if (entry.kind === 'action') {
-                                    const chip = getDueChip(entry.rem.dueDate);
-                                    const isAgmDue = entry.rem.message.startsWith('AGM DUE:');
-                                    return (
-                                      <div key={entry.id} className={`flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors ${selectedAlerts.has(entry.rem.id) ? 'bg-amber-50/60 dark:bg-amber-900/10' : ''}`} onClick={() => isAgmDue ? setAgmModalReminder(entry.rem) : navigateToProperty(entry.rem.bcId, entry.rem.type, entry.rem.message)}>
-                                        <div className="p-1.5 -m-1.5 shrink-0 cursor-pointer" onClick={e => { e.stopPropagation(); setSelectedAlerts(prev => { const next = new Set(prev); next.has(entry.rem.id) ? next.delete(entry.rem.id) : next.add(entry.rem.id); return next; }); }}>
-                                          <input type="checkbox" checked={selectedAlerts.has(entry.rem.id)} onChange={() => {}} className="mt-0.5 accent-amber-500 cursor-pointer pointer-events-none" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{entry.rem.message}</div>
-                                        </div>
-                                        {isAgmDue && (
-                                          <button onClick={e => { e.stopPropagation(); setAgmModalReminder(entry.rem); }} className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors mt-0.5"><Play size={9} /> Start AGM</button>
-                                        )}
-                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5">
-                                          <button onClick={e => { e.stopPropagation(); setSnoozeTarget(entry.rem); setSnoozeGroupItems([entry.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Snooze" aria-label="Snooze"><BellOff size={12} /></button>
-                                          <button onClick={e => { e.stopPropagation(); setSelectedReminder(entry.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors" title="Log Details" aria-label="Log Details"><MessageCircle size={12} /></button>
-                                        </div>
-                                      </div>
-                                    );
-                                  }
-                                  const chip = getDueChip(entry.ci.dueDate);
-                                  const stageLabel = entry.ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
-                                  return (
-                                    <div key={entry.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors" onClick={() => navigate(`/complexes?id=${entry.ci.bcId}&tab=meetings&from=dashboard`)}>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">{stageLabel}: {entry.ci.item.label}</div>
-                                      </div>
-                                      <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0 mt-0.5 ${chip.cls}`}>{chip.label}</span>
-                                      <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0 mt-0.5" />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
+          {/* Snoozed view */}
+          {dashUrgencyTab === 'snoozed' && (
+            <div className="space-y-2">
+              {snoozedAll.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-10 text-center flex flex-col items-center gap-2 shadow-sm">
+                  <CheckCircle2 size={28} className="text-emerald-400 opacity-60" />
+                  <p className="text-sm text-slate-400">No snoozed items.</p>
+                </div>
+              ) : snoozedAll.map(rem => {
+                const snooze = snoozedAlerts.find(s => s.reminderId === rem.id);
+                return (
+                  <div key={rem.id} className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 shadow-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate">{rem.bcName}</p>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{rem.message}</p>
+                      {snooze && <p className="text-[10px] text-amber-500 flex items-center gap-1 mt-0.5"><BellOff size={9} /> Resumes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}</p>}
                     </div>
-                  )}
+                    <button onClick={() => unsnoozeAlert(rem.id)} className="text-[10px] px-2 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 hover:text-red-500 hover:border-red-200 transition-colors">Unsnooze</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Property card grid */}
+          {dashUrgencyTab !== 'snoozed' && (() => {
+            const filteredCards = propertyCards.filter(card => {
+              const urgencyMatch =
+                dashUrgencyTab === 'all' ||
+                (dashUrgencyTab === 'overdue' && card.urgencyTier === 'overdue') ||
+                (dashUrgencyTab === 'week'    && (card.urgencyTier === 'overdue' || card.urgencyTier === 'week'));
+              const catMatch = dashCatFilter === 'all' || card.cats.includes(dashCatFilter as DashboardCat);
+              return urgencyMatch && catMatch;
+            });
+
+            const CAT_COLORS: Record<DashboardCat, string> = { MEETING: '#3B82F6', COMPLIANCE: '#D97706', INSURANCE: '#10B981', DEBT: '#EF4444', OTHER: '#94A3B8' };
+
+            const renderSection = (tier: 'overdue' | 'week' | 'future' | 'clear', sectionLabel: string) => {
+              const cards = filteredCards.filter(c => c.urgencyTier === tier);
+              if (cards.length === 0) return null;
+              const borderColor = tier === 'overdue' ? '#EF4444' : tier === 'week' ? '#D97706' : tier === 'future' ? '#3B82F6' : '#10B981';
+              return (
+                <div key={tier} className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{sectionLabel}</span>
+                    <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {cards.map(card => {
+                      const isSelected = selectedBcId === card.bcId;
+                      return (
+                        <div key={card.bcId}
+                          onClick={() => setSelectedBcId(isSelected ? null : card.bcId)}
+                          className={`bg-white dark:bg-slate-900 rounded-xl border shadow-sm cursor-pointer transition-all hover:shadow-md ${
+                            isSelected ? 'border-pink-400 dark:border-pink-600 ring-2 ring-pink-200 dark:ring-pink-900/40' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                          }`}
+                          style={{ borderLeft: `3px solid ${borderColor}` }}
+                        >
+                          <div className="p-4">
+                            <div className="flex items-start justify-between gap-2 mb-3">
+                              <div className="font-semibold text-slate-800 dark:text-white text-sm leading-snug">{card.bcName}</div>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${
+                                card.bcType === 'Incorporated Society'
+                                  ? 'bg-pink-50 text-pink-700 border-pink-100 dark:bg-pink-950/20 dark:text-pink-400 dark:border-pink-900/30'
+                                  : 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30'
+                              }`}>{card.bcType === 'Incorporated Society' ? 'IS' : 'BC'}</span>
+                            </div>
+                            {tier !== 'clear' ? (
+                              <div className="flex flex-col gap-1 mb-3">
+                                {card.overdueCount > 0 && <div className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" /><span className="font-semibold text-red-600 dark:text-red-400">{card.overdueCount}</span><span className="text-slate-500 dark:text-slate-400">overdue</span></div>}
+                                {card.weekCount > 0  && <div className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" /><span className="font-semibold text-amber-600 dark:text-amber-400">{card.weekCount}</span><span className="text-slate-500 dark:text-slate-400">due this week</span></div>}
+                                {card.items.length - card.overdueCount - card.weekCount > 0 && <div className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0" /><span className="font-semibold text-slate-500">{card.items.length - card.overdueCount - card.weekCount}</span><span className="text-slate-400">upcoming</span></div>}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 mb-3"><CheckCircle2 size={13} /><span className="font-medium">No outstanding tasks</span></div>
+                            )}
+                            {card.cats.length > 0 && (
+                              <div className="flex gap-1.5 flex-wrap">
+                                {card.cats.map(cat => (
+                                  <span key={cat} className="flex items-center gap-1 text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-1.5 py-0.5 rounded-full">
+                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: CAT_COLORS[cat] }} />
+                                    {CAT_CONFIG[cat].label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="px-4 pb-3">
+                            <span className="text-[10px] text-pink-500 dark:text-pink-400 font-semibold">{isSelected ? '← Close' : 'View tasks →'}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
-            })
-          )}
+            };
 
-          {/* Snoozed upcoming actions */}
-          {snoozedUpcomingActions.length > 0 && (
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm transition-colors">
-              <button
-                onClick={() => setShowSnoozedActions(!showSnoozedActions)}
-                className="w-full flex items-center gap-2 px-4 py-3 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-              >
-                <BellOff size={13} />
-                <span className="font-bold">{snoozedUpcomingActions.length} snoozed action{snoozedUpcomingActions.length !== 1 ? 's' : ''}</span>
-                <span className="ml-auto">{showSnoozedActions ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
-              </button>
-              {showSnoozedActions && (
-                <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
-                  {snoozedUpcomingActions.map(rem => {
-                    const snooze = snoozedAlerts.find(s => s.reminderId === rem.id);
-                    return (
-                      <div key={rem.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{rem.bcName}</p>
-                          {snooze && (
-                            <p className="text-[10px] text-amber-500 flex items-center gap-1 mt-0.5">
-                              <BellOff size={9} /> Resumes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => unsnoozeAlert(rem.id)}
-                          className="text-[10px] px-2 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900/50 transition-colors"
-                        >
-                          Unsnooze
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+            if (filteredCards.length === 0) return (
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-10 text-center flex flex-col items-center gap-2 shadow-sm">
+                <CheckCircle2 size={28} className="text-emerald-400 opacity-60" />
+                <p className="text-sm text-slate-400">No matching items.</p>
+              </div>
+            );
 
-          {/* Snoozed alerts */}
-          {snoozedCriticalAlerts.length > 0 && (
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm transition-colors">
-              <button
-                onClick={() => setShowSnoozed(!showSnoozed)}
-                className="w-full flex items-center gap-2 px-4 py-3 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-              >
-                <BellOff size={13} />
-                <span className="font-bold">{snoozedCriticalAlerts.length} snoozed alert{snoozedCriticalAlerts.length !== 1 ? 's' : ''}</span>
-                <span className="ml-auto">{showSnoozed ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
-              </button>
-              {showSnoozed && (
-                <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
-                  {snoozedCriticalAlerts.map(rem => {
-                    const snooze = snoozedAlerts.find(s => s.reminderId === rem.id);
-                    return (
-                      <div key={rem.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate">{rem.bcName}</p>
-                          {snooze && (
-                            <p className="text-[10px] text-amber-500 flex items-center gap-1 mt-0.5">
-                              <BellOff size={9} /> Resumes {new Date(snooze.snoozedUntil).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => unsnoozeAlert(rem.id)}
-                          className="text-[10px] px-2 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900/50 transition-colors"
-                        >
-                          Unsnooze
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+            return (
+              <div className="space-y-5">
+                {dashUrgencyTab === 'all' ? (<>
+                  {renderSection('overdue', '● Overdue')}
+                  {renderSection('week',    '▲ Due This Week')}
+                  {renderSection('future',  '◆ Upcoming')}
+                  {renderSection('clear',   '✓ All Clear')}
+                </>) : dashUrgencyTab === 'overdue' ? (
+                  renderSection('overdue', '● Overdue + Today')
+                ) : (<>
+                  {renderSection('overdue', '● Overdue')}
+                  {renderSection('week',    '▲ Due This Week')}
+                </>)}
+              </div>
+            );
+          })()}
+
         </div>
 
         {/* Meetings Section */}
@@ -908,6 +900,139 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Property Task Drawer */}
+      {selectedBcId && (() => {
+        const card = propertyCards.find(c => c.bcId === selectedBcId);
+        if (!card) return null;
+        const overdueItems = card.items.filter(i => new Date(i.dueDate + 'T00:00:00') < today);
+        const upcomingItems = card.items.filter(i => new Date(i.dueDate + 'T00:00:00') >= today);
+        const allSnoozeableRems = card.items
+          .filter(i => i.kind === 'alert' || i.kind === 'action')
+          .map(i => (i as any).rem as Reminder);
+        const renderDrawerItem = (item: PropertyItem) => {
+          const chip = getDueChip(item.dueDate);
+          if (item.kind === 'alert') {
+            return (
+              <div key={item.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-red-400 dark:border-red-600 hover:bg-red-50/40 dark:hover:bg-red-950/10 cursor-pointer group transition-colors"
+                onClick={() => item.rem.type === ReminderType.AGM_DUE ? setAgmModalReminder(item.rem) : navigateToProperty(item.rem.bcId, item.rem.type, item.rem.message)}>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-3 leading-snug">{item.rem.message}</div>
+                  <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border mt-1 ${chip.cls}`}>{chip.label}</span>
+                </div>
+                {item.rem.type === ReminderType.AGM_DUE && (
+                  <button onClick={e => { e.stopPropagation(); setAgmModalReminder(item.rem); }} className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors"><Play size={9} /> Start AGM</button>
+                )}
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={e => { e.stopPropagation(); setSnoozeTarget(item.rem); setSnoozeGroupItems([item.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Snooze"><BellOff size={12} /></button>
+                  <button onClick={e => { e.stopPropagation(); setSelectedReminder(item.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20" title="Audit Trail"><MessageCircle size={12} /></button>
+                </div>
+              </div>
+            );
+          }
+          if (item.kind === 'levy') {
+            return (
+              <div key={item.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-3 leading-snug">{item.rem.message}</div>
+                  <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border mt-1 ${chip.cls}`}>{chip.label}</span>
+                </div>
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={() => { setSnoozeTarget(item.rem); setSnoozeGroupItems([item.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Snooze"><BellOff size={12} /></button>
+                  <button onClick={() => handleLevyMarkDone(item.rem.bcId)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" title="Mark Done"><CheckCircle2 size={12} /></button>
+                </div>
+              </div>
+            );
+          }
+          if (item.kind === 'action') {
+            const isAgmDue = item.rem.message.startsWith('AGM DUE:');
+            return (
+              <div key={item.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors"
+                onClick={() => isAgmDue ? setAgmModalReminder(item.rem) : navigateToProperty(item.rem.bcId, item.rem.type, item.rem.message)}>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-3 leading-snug">{item.rem.message}</div>
+                  <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border mt-1 ${chip.cls}`}>{chip.label}</span>
+                </div>
+                {isAgmDue && (
+                  <button onClick={e => { e.stopPropagation(); setAgmModalReminder(item.rem); }} className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors"><Play size={9} /> Start AGM</button>
+                )}
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={e => { e.stopPropagation(); setSnoozeTarget(item.rem); setSnoozeGroupItems([item.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Snooze"><BellOff size={12} /></button>
+                  <button onClick={e => { e.stopPropagation(); setSelectedReminder(item.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20" title="Log Details"><MessageCircle size={12} /></button>
+                </div>
+              </div>
+            );
+          }
+          // checklist
+          const stageLabel = item.ci.stage === 'PRIOR_TO_MEETING' ? 'Prior to Meeting' : 'After Meeting';
+          return (
+            <div key={item.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors"
+              onClick={() => navigate(`/complexes?id=${item.ci.bcId}&tab=meetings&from=dashboard`)}>
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-3 leading-snug">{stageLabel}: {item.ci.item.label}</div>
+                <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border mt-1 ${chip.cls}`}>{chip.label}</span>
+              </div>
+              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 shrink-0 mt-1" />
+            </div>
+          );
+        };
+        return (
+          <div className="fixed inset-0 z-40 flex justify-end" onClick={() => setSelectedBcId(null)}>
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
+            <div className="relative z-10 w-full max-w-sm bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden border-l border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+              {/* Drawer header */}
+              <div className="flex items-start gap-3 px-4 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                      card.bcType === 'Incorporated Society'
+                        ? 'bg-pink-50 text-pink-700 border-pink-100 dark:bg-pink-950/20 dark:text-pink-400 dark:border-pink-900/30'
+                        : 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30'
+                    }`}>{card.bcType === 'Incorporated Society' ? 'IS' : 'BC'}</span>
+                    {card.bcNumber && <span className="text-[10px] text-slate-400">{card.bcNumber}</span>}
+                  </div>
+                  <div className="font-bold text-slate-800 dark:text-white text-sm leading-tight">{card.bcName}</div>
+                  <div className="text-[11px] text-slate-400 mt-1">{card.items.length} task{card.items.length !== 1 ? 's' : ''}{card.overdueCount > 0 ? ` · ${card.overdueCount} overdue` : ''}</div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {allSnoozeableRems.length > 0 && (
+                    <button
+                      onClick={() => { setSnoozeGroupItems(allSnoozeableRems); setSnoozeTarget(allSnoozeableRems[0]); }}
+                      className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                    ><BellOff size={11} /> Snooze all</button>
+                  )}
+                  <button onClick={() => { setSelectedBcId(null); navigate(`/complexes?id=${card.bcId}&from=dashboard`); }} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 border border-pink-200 dark:border-pink-900/50 hover:bg-pink-100 dark:hover:bg-pink-900/40 transition-colors"><ExternalLink size={11} /> Open</button>
+                  <button onClick={() => setSelectedBcId(null)} className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"><X size={16} /></button>
+                </div>
+              </div>
+              {/* Drawer body */}
+              <div className="flex-1 overflow-y-auto">
+                {card.items.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
+                    <CheckCircle2 size={24} className="text-emerald-400 opacity-60" />
+                    <p className="text-sm">No outstanding tasks</p>
+                  </div>
+                ) : (
+                  <>
+                    {overdueItems.length > 0 && (
+                      <>
+                        <div className="px-4 py-2 bg-red-50 dark:bg-red-950/20 border-b border-red-100 dark:border-red-900/30 text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">● Overdue</div>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">{overdueItems.map(renderDrawerItem)}</div>
+                      </>
+                    )}
+                    {upcomingItems.length > 0 && (
+                      <>
+                        <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">▲ Upcoming</div>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">{upcomingItems.map(renderDrawerItem)}</div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Comment Modal */}
       {selectedReminder && (
