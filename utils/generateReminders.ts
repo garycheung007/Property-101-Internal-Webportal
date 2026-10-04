@@ -241,7 +241,7 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
         bcId: bc.id,
         bcName: bc.name,
         type: ReminderType.LEVY,
-        dueDate: dueDate.toISOString().split('T')[0],
+        dueDate: `${entry.year ?? today.getFullYear()}-${String(entry.month).padStart(2, '0')}-${String(entry.day).padStart(2, '0')}`,
         message: `DEBT COLLECTION: Levy instalment ${idx + 1} was due ${dueDate.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`,
         severity: 'medium',
       });
