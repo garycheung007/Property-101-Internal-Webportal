@@ -110,7 +110,8 @@ const Dashboard: React.FC = () => {
   const snoozedCriticalAlerts = filteredReminders.filter(r => r.type !== ReminderType.UPCOMING_ACTION && r.type !== ReminderType.LEVY && r.type !== ReminderType.FINANCIALS_READY && activeSnoozedIds.has(r.id));
   const upcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION && !activeSnoozedIds.has(r.id));
   const snoozedUpcomingActions = filteredReminders.filter(r => r.type === ReminderType.UPCOMING_ACTION && activeSnoozedIds.has(r.id));
-  const levyReminders = filteredReminders.filter(r => r.type === ReminderType.LEVY);
+  const levyReminders = filteredReminders.filter(r => r.type === ReminderType.LEVY && !activeSnoozedIds.has(r.id));
+  const snoozedLevyReminders = filteredReminders.filter(r => r.type === ReminderType.LEVY && activeSnoozedIds.has(r.id));
 
   const upcomingMeetings = filteredComplexes
     .flatMap(c => {
@@ -347,7 +348,7 @@ const Dashboard: React.FC = () => {
   });
   const overdueTabCount = propertyCards.filter(c => c.urgencyTier === 'overdue').length;
   const weekTabCount = propertyCards.filter(c => c.urgencyTier === 'overdue' || c.urgencyTier === 'week').length;
-  const snoozedAll = [...snoozedCriticalAlerts, ...snoozedUpcomingActions];
+  const snoozedAll = [...snoozedCriticalAlerts, ...snoozedUpcomingActions, ...snoozedLevyReminders];
 
   const CAT_CONFIG: Record<DashboardCat, { label: string; icon: React.ReactNode; bgColor: string; textColor: string; borderColor: string }> = {
     MEETING:    { label: 'Meetings',        icon: <Calendar size={15} />,      bgColor: 'bg-blue-50 dark:bg-blue-900/20',       textColor: 'text-blue-600 dark:text-blue-400',       borderColor: '#3B82F6' },
@@ -481,10 +482,10 @@ const Dashboard: React.FC = () => {
     navigate(`/complexes?id=${bc.id}&tab=meetings&from=dashboard`);
   };
 
-  const handleLevyMarkDone = async (bcId: string) => {
+  const handleLevyMarkDone = async (bcId: string, dueDate: string) => {
       const bc = complexes.find(c => c.id === bcId);
       if (!bc) return;
-      await updateComplex({ ...bc, lastDebtCollectionDate: new Date().toISOString().split('T')[0] });
+      await updateComplex({ ...bc, lastDebtCollectionDate: dueDate });
   };
 
   const toggleSection = (cat: string) => {
@@ -923,23 +924,26 @@ const Dashboard: React.FC = () => {
                 {item.rem.type === ReminderType.AGM_DUE && (
                   <button onClick={e => { e.stopPropagation(); setAgmModalReminder(item.rem); }} className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors"><Play size={9} /> Start AGM</button>
                 )}
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 items-center">
                   <button onClick={e => { e.stopPropagation(); setSnoozeTarget(item.rem); setSnoozeGroupItems([item.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Snooze"><BellOff size={12} /></button>
                   <button onClick={e => { e.stopPropagation(); setSelectedReminder(item.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20" title="Audit Trail"><MessageCircle size={12} /></button>
+                  <ExternalLink size={12} className="text-pink-500 ml-0.5" />
                 </div>
               </div>
             );
           }
           if (item.kind === 'levy') {
             return (
-              <div key={item.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 group transition-colors">
+              <div key={item.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors"
+                onClick={() => navigate(`/complexes?id=${item.rem.bcId}&tab=details&from=dashboard`)}>
                 <div className="flex-1 min-w-0">
                   <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-3 leading-snug">{item.rem.message}</div>
                   <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border mt-1 ${chip.cls}`}>{chip.label}</span>
                 </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button onClick={() => { setSnoozeTarget(item.rem); setSnoozeGroupItems([item.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Snooze"><BellOff size={12} /></button>
-                  <button onClick={() => handleLevyMarkDone(item.rem.bcId)} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" title="Mark Done"><CheckCircle2 size={12} /></button>
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 items-center">
+                  <button onClick={e => { e.stopPropagation(); setSnoozeTarget(item.rem); setSnoozeGroupItems([item.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Snooze"><BellOff size={12} /></button>
+                  <button onClick={e => { e.stopPropagation(); handleLevyMarkDone(item.rem.bcId, item.rem.dueDate); }} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" title="Mark Done"><CheckCircle2 size={12} /></button>
+                  <ExternalLink size={12} className="text-pink-500 ml-0.5" />
                 </div>
               </div>
             );
@@ -956,9 +960,10 @@ const Dashboard: React.FC = () => {
                 {isAgmDue && (
                   <button onClick={e => { e.stopPropagation(); setAgmModalReminder(item.rem); }} className="shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded bg-pink-600 text-white hover:bg-pink-700 transition-colors"><Play size={9} /> Start AGM</button>
                 )}
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 items-center">
                   <button onClick={e => { e.stopPropagation(); setSnoozeTarget(item.rem); setSnoozeGroupItems([item.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Snooze"><BellOff size={12} /></button>
                   <button onClick={e => { e.stopPropagation(); setSelectedReminder(item.rem); }} className="p-1 rounded text-slate-400 hover:text-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20" title="Log Details"><MessageCircle size={12} /></button>
+                  <ExternalLink size={12} className="text-pink-500 ml-0.5" />
                 </div>
               </div>
             );
