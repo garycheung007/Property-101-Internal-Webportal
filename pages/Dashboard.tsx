@@ -560,6 +560,18 @@ const Dashboard: React.FC = () => {
               </div>
               <ChevronRight size={18} className="text-slate-200 dark:text-slate-700 group-hover:text-pink-500 group-hover:translate-x-0.5 transition-all" />
             </div>
+            {i === 2 && (
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-full">
+                  <CheckCircle2 size={11} />
+                  {groupA.length} scheduled
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 rounded-full">
+                  <Clock size={11} />
+                  {groupB.length} to schedule
+                </span>
+              </div>
+            )}
           </div>
         ))}
       </div>
