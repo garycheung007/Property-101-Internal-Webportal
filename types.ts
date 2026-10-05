@@ -100,6 +100,40 @@ export interface InvoicePricingTier {
 
 export type ComplexType = 'Body Corporate' | 'Incorporated Society';
 export type OnboardingType = 'New Development' | 'Takeover';
+export type PipelineStage = 'Lead' | 'Appointed' | 'Onboarding' | 'Ready for Review' | 'Live' | 'On Hold' | 'Lost';
+export type OnboardingTaskStatus = 'Not Started' | 'In Progress' | 'Waiting External' | 'Blocked' | 'Completed' | 'N/A';
+
+export interface OnboardingTaskProgress {
+  status: OnboardingTaskStatus;
+  assigneeName?: string;
+  completedAt?: string;
+  completedBy?: string;
+  note?: string;
+}
+
+export interface OnboardingNote {
+  id: string;
+  text: string;
+  authorId: string;
+  authorName: string;
+  category: string;
+  createdAt: string;
+}
+
+export interface OnboardingTaskTemplate {
+  id: string;
+  label: string;
+  isMandatory?: boolean;
+  isISOCOnly?: boolean;
+  isBCOnly?: boolean;
+}
+
+export interface OnboardingChecklistSection {
+  id: string;
+  label: string;
+  assignedTeam?: string;
+  tasks: OnboardingTaskTemplate[];
+}
 
 export interface InsuranceStepStatus {
   completed: boolean;
@@ -259,6 +293,22 @@ export interface BodyCorporate {
   notes?: string;
   meetingDateSettings?: Partial<MeetingDateSettings>;
 
+  // New Business / Pipeline fields
+  pipelineStage?: PipelineStage;
+  developerCompany?: string;
+  developerContactName?: string;
+  developerContactEmail?: string;
+  developerContactPhone?: string;
+  proposalSubmittedDate?: string;
+  adminFeeExclGst?: number;
+  letterOfAppointmentDate?: string;
+  managementAgreementStatus?: 'Not Started' | 'Draft' | 'Sent' | 'Signed';
+  openingResolutionsStatus?: 'Not Started' | 'Draft' | 'Passed';
+  anticipatedStartDate?: string;
+  confirmedStartDate?: string;
+  onboardingProgress?: Record<string, OnboardingTaskProgress>;
+  onboardingNotes?: OnboardingNote[];
+
   // AGM Cycle / Financial Year End workflow
   agmCycleYear?: number;
   agmCycleFinancialsNeededBy?: string;
@@ -306,6 +356,7 @@ export interface SystemSettings {
   invoicePricingTiers?: InvoicePricingTier[];
   postMeetingFields?: PostMeetingField[];
   emailDigestEnabled?: boolean;
+  onboardingChecklistTemplate?: OnboardingChecklistSection[];
   emailTemplates?: {
     noticeOfDelegation?: { subject: string; body: string };
     aigAssociationLiabilityBc?: { subject: string; body: string };

@@ -225,9 +225,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [meetingsLoaded]);
 
+  const liveComplexes = useMemo(() => complexes.filter(bc => !bc.pipelineStage || bc.pipelineStage === 'Live'), [complexes]);
   const reminders = useMemo(() => (
-    generateReminders(complexes, systemSettings.insuranceSettings || DEFAULT_INSURANCE_SETTINGS, systemSettings.meetingChecklistTemplates, systemSettings.meetingDateSettings, systemSettings)
-  ), [complexes, systemSettings]);
+    generateReminders(liveComplexes, systemSettings.insuranceSettings || DEFAULT_INSURANCE_SETTINGS, systemSettings.meetingChecklistTemplates, systemSettings.meetingDateSettings, systemSettings)
+  ), [liveComplexes, systemSettings]);
 
   const managers = users.filter(u => u.role === 'admin' || u.role === 'account_manager');
 

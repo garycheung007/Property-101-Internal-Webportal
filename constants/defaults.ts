@@ -1,4 +1,123 @@
-import { WorkflowStepConfig, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings, InvoicePricingTier, PostMeetingField } from '../types';
+import { WorkflowStepConfig, InsuranceSettings, MeetingChecklistItem, MeetingDateSettings, InvoicePricingTier, PostMeetingField, OnboardingChecklistSection } from '../types';
+
+export const DEFAULT_ONBOARDING_CHECKLIST: OnboardingChecklistSection[] = [
+  {
+    id: 'admin-file-setup', label: 'Admin & File Setup', assignedTeam: 'Admin',
+    tasks: [
+      { id: 'afs-1', label: 'Transfer electronic folder from Marketing' },
+      { id: 'afs-2', label: 'Update Properties Register', isMandatory: true },
+      { id: 'afs-3', label: 'Save setup / handover documents' },
+      { id: 'afs-4', label: 'Create contractor list (check against approved budget)' },
+      { id: 'afs-5', label: 'Create owners list with unit entitlements', isMandatory: true },
+      { id: 'afs-6', label: 'Create committee list', isMandatory: true },
+      { id: 'afs-7', label: 'Update portfolio calendar — FYE and all meetings' },
+      { id: 'afs-8', label: 'Confirm electricity / power accounts', isMandatory: true },
+    ],
+  },
+  {
+    id: 'required-docs', label: 'Required Documents', assignedTeam: 'Admin',
+    tasks: [
+      { id: 'rd-1', label: 'Management Agreement', isMandatory: true },
+      { id: 'rd-2', label: 'Letter of Appointment', isMandatory: true },
+      { id: 'rd-3', label: 'Constitution', isMandatory: true, isISOCOnly: true },
+      { id: 'rd-4', label: 'Certificate of Incorporation', isMandatory: true, isISOCOnly: true },
+      { id: 'rd-5', label: 'Body Corporate Rules', isMandatory: true, isBCOnly: true },
+      { id: 'rd-6', label: 'Insurance Policy', isMandatory: true },
+      { id: 'rd-7', label: 'Insurance Valuation', isMandatory: true },
+      { id: 'rd-8', label: 'Approved Budget', isMandatory: true },
+      { id: 'rd-9', label: 'Owners list with unit entitlements', isMandatory: true },
+      { id: 'rd-10', label: 'Opening Resolutions', isMandatory: true },
+    ],
+  },
+  {
+    id: 'isoc-requirements', label: 'ISOC Requirements', assignedTeam: 'Admin',
+    tasks: [
+      { id: 'isoc-1', label: 'Read constitution & record key requirements in notes', isMandatory: true, isISOCOnly: true },
+      { id: 'isoc-2', label: 'Record default interest provisions', isMandatory: true, isISOCOnly: true },
+      { id: 'isoc-3', label: 'Confirm Certificate of Incorporation received', isMandatory: true, isISOCOnly: true },
+      { id: 'isoc-4', label: 'Confirm incorporation completed in Societies Register', isMandatory: true, isISOCOnly: true },
+      { id: 'isoc-5', label: 'Obtain garden & landscaping quotes', isISOCOnly: true },
+    ],
+  },
+  {
+    id: 'banking-finance', label: 'Banking & Finance', assignedTeam: 'Finance',
+    tasks: [
+      { id: 'bf-1', label: 'Confirm bank account name & number', isMandatory: true },
+      { id: 'bf-2', label: 'Confirm GST status', isMandatory: true },
+      { id: 'bf-3', label: 'Complete IRD number application (if new entity)', isMandatory: true },
+      { id: 'bf-4', label: 'Enter owner levies & opening balances', isMandatory: true },
+      { id: 'bf-5', label: 'Enter revenue & income' },
+      { id: 'bf-6', label: 'Enter fund surplus / deficit (opening balances)' },
+      { id: 'bf-7', label: 'Set up and load approved budget', isMandatory: true },
+    ],
+  },
+  {
+    id: 'usm-setup', label: 'USM Setup', assignedTeam: 'Admin',
+    tasks: [
+      { id: 'usm-1', label: 'Add property to USM', isMandatory: true },
+      { id: 'usm-2', label: 'Enter important dates & financial year start' },
+      { id: 'usm-3', label: 'Set up bank account details', isMandatory: true },
+      { id: 'usm-4', label: 'Set up levy settings & payment slip message', isMandatory: true },
+      { id: 'usm-5', label: 'Add insurance policy & upload Certificate of Insurance' },
+      { id: 'usm-6', label: 'Add lots & units (OI and UI)', isMandatory: true },
+      { id: 'usm-7', label: 'Add owners (verify against Certificate of Title)', isMandatory: true },
+      { id: 'usm-8', label: 'Set up maintenance contractors in USM' },
+      { id: 'usm-9', label: 'Confirm debt collection reminder settings' },
+      { id: 'usm-10', label: 'Add committee members' },
+      { id: 'usm-11', label: 'Set up correspondence preferences' },
+    ],
+  },
+  {
+    id: 'waste-services', label: 'Waste Services', assignedTeam: 'Admin',
+    tasks: [
+      { id: 'ws-1', label: 'Obtain ICP (Independent Consumer Point) reference', isMandatory: true },
+      { id: 'ws-2', label: 'Confirm waste contractor & collection days', isMandatory: true },
+      { id: 'ws-3', label: 'Arrange recycling and general waste bins' },
+      { id: 'ws-4', label: 'Confirm bin storage area and labelling' },
+    ],
+  },
+  {
+    id: 'mycommunity', label: 'MyCommunity / Resident Portal', assignedTeam: 'Admin',
+    tasks: [
+      { id: 'mc-1', label: 'Create MyCommunity portal site', isMandatory: true },
+      { id: 'mc-2', label: 'Add owners / residents to portal', isMandatory: true },
+      { id: 'mc-3', label: 'Upload key documents (constitution / rules, insurance)' },
+      { id: 'mc-4', label: 'Set up notice board' },
+      { id: 'mc-5', label: 'Configure payment portal (if applicable)' },
+      { id: 'mc-6', label: 'Send welcome email to all owners', isMandatory: true },
+    ],
+  },
+  {
+    id: 'contractors', label: 'Contractors & Critical Services', assignedTeam: 'Admin',
+    tasks: [
+      { id: 'con-1', label: 'Confirm building manager (if applicable)' },
+      { id: 'con-2', label: 'Confirm cleaning contractor' },
+      { id: 'con-3', label: 'Confirm garden / landscaping contractor' },
+      { id: 'con-4', label: 'Confirm lift maintenance contractor (if applicable)' },
+      { id: 'con-5', label: 'Confirm fire protection contractor', isMandatory: true },
+      { id: 'con-6', label: 'Confirm pest control contractor' },
+      { id: 'con-7', label: 'Advise all contractors of management start date', isMandatory: true },
+    ],
+  },
+  {
+    id: 'management-review', label: 'Management Review', assignedTeam: 'Manager',
+    tasks: [
+      { id: 'mr-1', label: 'All mandatory documents received and filed', isMandatory: true },
+      { id: 'mr-2', label: 'Owners list verified against Certificates of Title', isMandatory: true },
+      { id: 'mr-3', label: 'Insurance arranged and Certificate of Insurance received', isMandatory: true },
+      { id: 'mr-4', label: 'Bank account confirmed and entered in USM', isMandatory: true },
+      { id: 'mr-5', label: 'USM setup complete and tested', isMandatory: true },
+      { id: 'mr-6', label: 'Levy schedule entered and tested', isMandatory: true },
+      { id: 'mr-7', label: 'All contractors notified of start date', isMandatory: true },
+      { id: 'mr-8', label: 'Welcome letter / email sent to all owners', isMandatory: true },
+      { id: 'mr-9', label: 'First meeting (AGM/EGM) scheduled', isMandatory: true },
+      { id: 'mr-10', label: 'Committee list confirmed', isMandatory: true },
+      { id: 'mr-11', label: 'MyCommunity portal live', isMandatory: true },
+      { id: 'mr-12', label: 'Financial year end confirmed in USM', isMandatory: true },
+      { id: 'mr-13', label: 'Manager reviewed all setup — sign off', isMandatory: true },
+    ],
+  },
+];
 
 export const DEFAULT_CATEGORIES: string[] = [
   'Insurance Broker',

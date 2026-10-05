@@ -140,7 +140,7 @@ const ComplexList: React.FC = () => {
     }
   }, [searchParams]);
 
-  const filteredComplexes = complexes.filter(c => {
+  const filteredComplexes = complexes.filter(c => !c.pipelineStage || c.pipelineStage === 'Live').filter(c => {
     if (filterStatus === 'active') return !c.isArchived;
     if (filterStatus === 'archived') return !!c.isArchived;
     return true;

@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, FileText, LogOut, BarChart3, Settings, HardHat,
   FileSignature, CloudCheck, AlertCircle, Sun, Moon, DollarSign, Receipt,
-  MessageSquare, Calendar, ChevronLeft, ChevronRight, Menu, X, BookOpen
+  MessageSquare, Calendar, ChevronLeft, ChevronRight, Menu, X, BookOpen, TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
@@ -112,7 +112,8 @@ const Sidebar: React.FC = () => {
         {/* Nav */}
         <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-4'} space-y-1 mt-2 overflow-y-auto`}>
           <NavLink to="/"           icon={<LayoutDashboard size={20} />} label="Dashboard"          badge={criticalCount} />
-          <NavLink to="/complexes"  icon={<Building2 size={20} />}       label="Complexes" />
+          <NavLink to="/complexes"    icon={<Building2 size={20} />}       label="Complexes" />
+          <NavLink to="/new-business" icon={<TrendingUp size={20} />}    label="New Business" />
           <NavLink to="/calendar"   icon={<Calendar size={20} />}        label="Meeting Calendar" />
           <NavLink to="/reports"    icon={<BarChart3 size={20} />}       label="Reports" />
           <NavLink to="/meeting-docs-test" icon={<FileText size={20} />} label="Document Preparation" />
