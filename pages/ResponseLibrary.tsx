@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ResponseTemplate } from '../types';
+import { ResponseTemplate, BodyCorporate } from '../types';
 import { MessageSquare, Search, Plus, Edit2, Trash2, X, Copy, Check, Loader2, Save, Bold, Italic, Underline, List, Link, Unlink } from 'lucide-react';
 
 const CATEGORIES = ['General', 'Insurance', 'Meetings', 'Levy Queries', 'Maintenance', 'Disclosure', 'Complaints', 'Other'];
@@ -103,7 +103,7 @@ const RichEditor: React.FC<{
 // ── Main component ────────────────────────────────────────────────────────────
 
 const ResponseLibrary: React.FC = () => {
-  const { responseTemplates, deleteResponseTemplate } = useData();
+  const { responseTemplates, deleteResponseTemplate, complexes } = useData();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -114,6 +114,29 @@ const ResponseLibrary: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<ResponseTemplate | null>(null);
   const [deletingIds, setDeletingIds]           = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId]                 = useState<string | null>(null);
+  const [mergeComplexId, setMergeComplexId]     = useState('');
+
+  const formatDateStr = (dateStr: string | undefined): string => {
+    if (!dateStr) return '';
+    const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (parts) {
+      const d = new Date(parseInt(parts[1]), parseInt(parts[2]) - 1, parseInt(parts[3]));
+      return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    return dateStr;
+  };
+
+  const applyMergeFields = (text: string, bc: BodyCorporate): string =>
+    text
+      .replace(/\{\{BC_Name\}\}/gi,            bc.name)
+      .replace(/\{\{BC_Number\}\}/gi,          bc.bcNumber)
+      .replace(/\{\{BC_Address\}\}/gi,         bc.address)
+      .replace(/\{\{Manager_Name\}\}/gi,       bc.managerName || '')
+      .replace(/\{\{Manager_Title\}\}/gi,      user?.title || '')
+      .replace(/\{\{Manager_Email\}\}/gi,      user?.email || '')
+      .replace(/\{\{Current_Date\}\}/gi,       new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }))
+      .replace(/\{\{AGM_Date\}\}/gi,           formatDateStr(bc.nextAgmDate))
+      .replace(/\{\{Financial_Year_End\}\}/gi, formatDateStr(bc.financialYearEnd));
 
   const filtered = useMemo(() => (
     responseTemplates
@@ -126,8 +149,8 @@ const ResponseLibrary: React.FC = () => {
       .sort((a, b) => a.title.localeCompare(b.title))
   ), [responseTemplates, searchTerm, filterCategory]);
 
-  const handleCopy = async (template: ResponseTemplate) => {
-    const html = toHtml(template.body);
+  const handleCopy = async (template: ResponseTemplate, overrideHtml?: string) => {
+    const html = overrideHtml ?? toHtml(template.body);
     const plain = stripHtml(html);
     try {
       await navigator.clipboard.write([
@@ -263,53 +286,73 @@ const ResponseLibrary: React.FC = () => {
       )}
 
       {/* Detail Modal */}
-      {selectedTemplate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
-          onClick={() => setSelectedTemplate(null)}
-        >
+      {selectedTemplate && (() => {
+        const mergeComplex = complexes.find(c => c.id === mergeComplexId);
+        const rawHtml = toHtml(selectedTemplate.body);
+        const displayHtml = mergeComplex ? applyMergeFields(rawHtml, mergeComplex) : rawHtml;
+        const displayTitle = mergeComplex ? applyMergeFields(selectedTemplate.title, mergeComplex) : selectedTemplate.title;
+        return (
           <div
-            className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl border dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh]"
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+            onClick={() => setSelectedTemplate(null)}
           >
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg whitespace-nowrap shrink-0 ${categoryColor(selectedTemplate.category)}`}>
-                  {selectedTemplate.category}
-                </span>
-                <h3 className="font-bold text-slate-800 dark:text-white text-sm truncate">{selectedTemplate.title}</h3>
-              </div>
-              <button onClick={() => setSelectedTemplate(null)} className="text-slate-400 hover:text-slate-600 p-1 shrink-0">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              <div
-                className={`text-sm text-slate-700 dark:text-slate-200 leading-relaxed ${RICH_CLASS}`}
-                dangerouslySetInnerHTML={{ __html: toHtml(selectedTemplate.body) }}
-              />
-            </div>
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-950 shrink-0">
-              {isAdmin && (
-                <button
-                  onClick={e => handleEdit(e, selectedTemplate)}
-                  className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors flex items-center gap-2"
-                >
-                  <Edit2 size={15} /> Edit
+            <div
+              className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl border dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg whitespace-nowrap shrink-0 ${categoryColor(selectedTemplate.category)}`}>
+                    {selectedTemplate.category}
+                  </span>
+                  <h3 className="font-bold text-slate-800 dark:text-white text-sm truncate">{displayTitle}</h3>
+                </div>
+                <button onClick={() => setSelectedTemplate(null)} className="text-slate-400 hover:text-slate-600 p-1 shrink-0">
+                  <X size={20} />
                 </button>
-              )}
-              <button
-                onClick={() => handleCopy(selectedTemplate)}
-                className={`px-5 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 ${copiedId === selectedTemplate.id ? 'bg-emerald-600 text-white' : 'bg-pink-600 hover:bg-pink-700 text-white'}`}
-              >
-                {copiedId === selectedTemplate.id
-                  ? <><Check size={15} /> Copied!</>
-                  : <><Copy size={15} /> Copy to Clipboard</>}
-              </button>
+              </div>
+              {/* Merge fields — complex selector */}
+              <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/70 shrink-0 flex items-center gap-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap shrink-0">Fill for</span>
+                <select
+                  className="flex-1 text-sm border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-pink-500"
+                  value={mergeComplexId}
+                  onChange={e => setMergeComplexId(e.target.value)}
+                >
+                  <option value="">— No complex (show raw tags) —</option>
+                  {[...complexes].sort((a, b) => a.name.localeCompare(b.name)).map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1">
+                <div
+                  className={`text-sm text-slate-700 dark:text-slate-200 leading-relaxed ${RICH_CLASS}`}
+                  dangerouslySetInnerHTML={{ __html: displayHtml }}
+                />
+              </div>
+              <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-950 shrink-0">
+                {isAdmin && (
+                  <button
+                    onClick={e => handleEdit(e, selectedTemplate)}
+                    className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors flex items-center gap-2"
+                  >
+                    <Edit2 size={15} /> Edit
+                  </button>
+                )}
+                <button
+                  onClick={() => handleCopy(selectedTemplate, displayHtml)}
+                  className={`px-5 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 ${copiedId === selectedTemplate.id ? 'bg-emerald-600 text-white' : 'bg-pink-600 hover:bg-pink-700 text-white'}`}
+                >
+                  {copiedId === selectedTemplate.id
+                    ? <><Check size={15} /> Copied!</>
+                    : <><Copy size={15} /> Copy to Clipboard</>}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Add / Edit Modal */}
       {isModalOpen && (
@@ -398,6 +441,19 @@ const ResponseModal: React.FC<{
           </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Response Text</label>
+            <div className="flex flex-wrap gap-1 mb-2">
+              {['{{BC_Name}}','{{BC_Number}}','{{BC_Address}}','{{Manager_Name}}','{{Manager_Title}}','{{Manager_Email}}','{{Current_Date}}','{{AGM_Date}}','{{Financial_Year_End}}'].map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  title="Click to copy tag"
+                  onClick={() => navigator.clipboard.writeText(tag)}
+                  className="font-mono text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400 transition-colors"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
             <RichEditor initialValue={template?.body ?? ''} editorRef={editorRef} />
           </div>
           <button
