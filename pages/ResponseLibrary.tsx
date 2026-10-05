@@ -446,8 +446,8 @@ const ResponseModal: React.FC<{
                 <button
                   key={tag}
                   type="button"
-                  title="Click to copy tag"
-                  onClick={() => navigator.clipboard.writeText(tag)}
+                  title="Insert at cursor"
+                  onMouseDown={e => { e.preventDefault(); editorRef.current?.focus(); document.execCommand('insertText', false, tag); }}
                   className="font-mono text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600 dark:hover:text-pink-400 transition-colors"
                 >
                   {tag}
