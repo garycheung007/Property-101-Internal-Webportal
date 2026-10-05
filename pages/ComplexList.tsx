@@ -477,7 +477,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const modalRef = useRef<HTMLDivElement>(null);
     const isDirtyRef = useRef(false);
     const [postMeetingFormData, setPostMeetingFormData] = useState<Record<string, string>>({});
-    const [postMeetingSchedule, setPostMeetingSchedule] = useState<Array<{month: number; day: number}>>([]);
+    const [postMeetingSchedule, setPostMeetingSchedule] = useState<Array<{month: number; day: number; year?: number}>>([]);
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
     const valuers = contractors.filter(c => c.category === 'Insurance Valuer');
@@ -2123,7 +2123,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                             const count = e.target.value;
                                                                             const n = parseInt(count) || 0;
                                                                             setPostMeetingFormData(prev => ({ ...prev, [field.id]: count }));
-                                                                            setPostMeetingSchedule(prev => Array.from({ length: n }, (_, i) => prev[i] || { month: 1, day: 1 }));
+                                                                            setPostMeetingSchedule(prev => Array.from({ length: n }, (_, i) => prev[i] || { month: 1, day: 1, year: new Date().getFullYear() }));
                                                                         }}
                                                                     >
                                                                         <option value="">Select</option>
@@ -2164,6 +2164,19 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                                             <option key={mi + 1} value={mi + 1}>{m}</option>
                                                                                         ))}
                                                                                     </select>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min={2020}
+                                                                                        max={2099}
+                                                                                        className="w-20 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-center"
+                                                                                        value={entry.year ?? new Date().getFullYear()}
+                                                                                        onChange={e => {
+                                                                                            const s = [...postMeetingSchedule];
+                                                                                            const yr = parseInt(e.target.value);
+                                                                                            s[idx] = { ...s[idx], year: yr >= 2020 ? yr : undefined };
+                                                                                            setPostMeetingSchedule(s);
+                                                                                        }}
+                                                                                    />
                                                                                 </div>
                                                                             ))}
                                                                         </div>
