@@ -4,7 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
-import { FlaskConical, Download, Loader2, Eye, X, Mail, Copy, Check } from 'lucide-react';
+import { FlaskConical, Download, Loader2, Eye, X, Mail, Copy, Check, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { db } from '../firebase';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -186,6 +186,30 @@ const MeetingDocsTest: React.FC = () => {
   const activeKeys: TemplateKey[] = (isIsoc ? IS_KEYS : BC_KEYS).filter(
     k => isAdmin || (k !== 'debtCollectionFlowchart' && k !== 'debtCollectionFlowchartIsoc')
   );
+
+  const MEETING_DEPENDENT_KEYS = new Set<TemplateKey>([
+    'noiCoverLetter', 'responseForm', 'noticeOfDelegation',
+    'noiCoverLetterIsoc', 'responseFormIsoc', 'declarationFormIsoc',
+  ]);
+  const hasMeetingDependentDoc = activeKeys.some(k => MEETING_DEPENDENT_KEYS.has(k));
+
+  const meetingWarning = (() => {
+    if (!selectedBcId || !hasMeetingDependentDoc) return null;
+    const effectiveDate = selectedMeeting?.date || selectedComplex?.nextAgmDate || '';
+    const effectiveTime = selectedMeeting?.time || selectedComplex?.nextAgmTime || '';
+    const effectiveVenue = selectedMeeting?.venue || selectedComplex?.nextAgmVenue || '';
+    const effectiveNom = selectedMeeting?.noiResponseDueDate || selectedComplex?.noiResponseDueDate || '';
+    const missing: string[] = [];
+    if (!effectiveDate) missing.push('Meeting Date');
+    if (!effectiveTime) missing.push('Meeting Time');
+    if (!effectiveVenue) missing.push('Meeting Venue');
+    if (!effectiveNom) missing.push('Nomination Due Date');
+    if (missing.length === 0) return { kind: 'complete' as const };
+    return {
+      kind: selectedMeetingId ? 'incomplete' as const : 'no-meeting' as const,
+      missingFields: missing,
+    };
+  })();
 
   const applyEmailTags = (text: string, tags: Record<string, string>) =>
     Object.entries(tags).reduce((t, [k, v]) => t.split(`{{${k}}}`).join(v), text);
@@ -501,6 +525,40 @@ const MeetingDocsTest: React.FC = () => {
                 <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-widest">
                   {isIsoc ? 'Incorporated Society' : 'Body Corporate'} Templates
                 </p>
+                {meetingWarning && (
+                  <div className={`rounded-lg p-3 flex gap-2 items-start text-xs ${
+                    meetingWarning.kind === 'complete'
+                      ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
+                      : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300'
+                  }`}>
+                    {meetingWarning.kind === 'complete'
+                      ? <CheckCircle2 size={13} className="flex-shrink-0 mt-0.5 text-green-600 dark:text-green-400" />
+                      : <AlertTriangle size={13} className="flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    }
+                    <div className="flex-1 min-w-0">
+                      {meetingWarning.kind === 'complete' ? (
+                        <>
+                          <p className="font-semibold">Meeting details complete</p>
+                          <p className="mt-0.5 opacity-80">Date, time, venue and nomination due date are all set.</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold">
+                            {meetingWarning.kind === 'no-meeting' ? 'No meeting selected' : 'Meeting details incomplete'}
+                          </p>
+                          <p className="mt-0.5 opacity-80">These fields will be blank in generated documents:</p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {meetingWarning.missingFields.map(f => (
+                              <span key={f} className="bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {activeKeys.map(renderActionButtons)}
                 {!isIsoc && (
                   <div className="pt-3 border-t dark:border-slate-700 space-y-1.5">
