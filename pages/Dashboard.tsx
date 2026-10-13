@@ -185,14 +185,14 @@ const Dashboard: React.FC = () => {
   // AGMs Remaining — two groups:
   // Group A: future AGMs already scheduled this calendar year (not yet happened)
   // Group B: complexes with FYE in this calendar year, no AGM scheduled or held since last FYE
-  type AgmRemainingEntry = { id: string; name: string; kind: 'scheduled' | 'unscheduled'; sortDate: Date; agmDate?: string; fyeDate?: Date; fye?: string; };
+  type AgmRemainingEntry = { id: string; name: string; kind: 'scheduled' | 'unscheduled'; sortDate: Date; agmDate?: string; fyeDate?: Date; fye?: string; noiIssued?: boolean; nomIssued?: boolean; noiNotApplicable?: boolean; noiIssuedDate?: string; nomIssuedDate?: string; nomDueDate?: string; complexType?: string; };
   const agmScheduledIds = new Set<string>();
   const groupA: AgmRemainingEntry[] = filteredComplexes.flatMap(c =>
     (c.meetings || [])
       .filter(m => m.type === 'AGM' && new Date(m.date) >= today && new Date(m.date).getFullYear() === currentYear)
       .map(m => {
         agmScheduledIds.add(c.id);
-        return { id: c.id, name: c.name, kind: 'scheduled' as const, sortDate: new Date(m.date + 'T00:00:00'), agmDate: m.date };
+        return { id: c.id, name: c.name, kind: 'scheduled' as const, sortDate: new Date(m.date + 'T00:00:00'), agmDate: m.date, noiIssued: m.noiIssued, nomIssued: m.nomIssued, noiNotApplicable: m.noiNotApplicable, noiIssuedDate: m.noiIssuedDate, nomIssuedDate: m.nomIssuedDate, nomDueDate: m.nomDueDate, complexType: c.type };
       })
   );
   const groupB: AgmRemainingEntry[] = filteredComplexes.flatMap(c => {
@@ -1116,14 +1116,49 @@ const Dashboard: React.FC = () => {
                       if (item.kind === 'scheduled') {
                         const agmDate = new Date(item.agmDate! + 'T00:00:00');
                         const diffDays = Math.round((agmDate.getTime() - today.getTime()) / 86400000);
-                        const chipCls = diffDays <= 14
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
-                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50';
+
+                        const nomDeadline = item.nomDueDate
+                          ? new Date(item.nomDueDate + 'T00:00:00')
+                          : (() => { const d = new Date(agmDate); d.setDate(d.getDate() - (item.complexType === 'Incorporated Society' ? 7 : 14)); return d; })();
+                        const noiDeadline = new Date(nomDeadline);
+                        noiDeadline.setDate(noiDeadline.getDate() - 7);
+
+                        const dDiff = (d: Date) => Math.round((d.getTime() - today.getTime()) / 86400000);
+                        const fmtD = (d: Date) => d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+                        const chipBase = 'text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap';
+                        const CG = `${chipBase} bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50`;
+                        const CA = `${chipBase} bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50`;
+                        const CR = `${chipBase} bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50`;
+                        const CB = `${chipBase} bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/50`;
+                        const CS = `${chipBase} bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700`;
+
+                        const noiD = dDiff(noiDeadline);
+                        const noiChip = item.noiNotApplicable
+                          ? <span className={CS}>NOI N/A</span>
+                          : item.noiIssued
+                            ? <span className={CG}>{item.noiIssuedDate ? `✓ NOI ${fmtD(new Date(item.noiIssuedDate + 'T00:00:00'))}` : '✓ NOI sent'}</span>
+                            : <span className={noiD < 0 ? CR : noiD <= 7 ? CA : CS}>{noiD < 0 ? `NOI ${Math.abs(noiD)}d overdue` : noiD === 0 ? 'NOI due today' : `NOI due ${fmtD(noiDeadline)}`}</span>;
+
+                        const nomD = dDiff(nomDeadline);
+                        const nomChip = (item.noiIssued || item.noiNotApplicable)
+                          ? item.nomIssued
+                            ? <span className={CG}>{item.nomIssuedDate ? `✓ NOM ${fmtD(new Date(item.nomIssuedDate + 'T00:00:00'))}` : '✓ NOM sent'}</span>
+                            : <span className={nomD < 0 ? CR : nomD <= 7 ? CA : CS}>{nomD < 0 ? `NOM ${Math.abs(nomD)}d overdue` : nomD === 0 ? 'NOM due today' : `NOM due ${fmtD(nomDeadline)}`}</span>
+                          : null;
+
+                        const countdownChip = <span className={diffDays <= 7 ? CR : diffDays <= 14 ? CA : CB}>{diffDays}d to AGM</span>;
+
                         return (
                           <tr key={item.id + item.agmDate} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             <td className="px-5 py-2.5 font-semibold text-slate-800 dark:text-white text-[12px]">{item.name}</td>
                             <td className="px-5 py-2.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">{agmDate.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                            <td className="px-5 py-2.5"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chipCls}`}>Scheduled · {diffDays}d</span></td>
+                            <td className="px-5 py-3">
+                              <div className="flex flex-wrap gap-1 items-center">
+                                {noiChip}
+                                {nomChip}
+                                {countdownChip}
+                              </div>
+                            </td>
                             <td className="px-5 py-2.5 text-right"><button onClick={() => { setShowAgmRemainingModal(false); navigate(`/complexes?id=${item.id}&tab=meetings`); }} className="text-[11px] font-bold text-pink-600 dark:text-pink-400 hover:underline">Go →</button></td>
                           </tr>
                         );
