@@ -127,7 +127,7 @@ const StatusChip: React.FC<{ status: OnboardingTaskStatus; onClick?: () => void 
 // ─── Add Lead Modal ───────────────────────────────────────────────────────────
 interface AddLeadModalProps { onClose: () => void; onCreated: (id: string) => void; }
 const AddLeadModal: React.FC<AddLeadModalProps> = ({ onClose, onCreated }) => {
-  const { addComplex } = useData();
+  const { addComplex, managers } = useData();
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -135,7 +135,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onClose, onCreated }) => {
     name: '', type: 'Incorporated Society' as 'Body Corporate' | 'Incorporated Society',
     address: '', units: '', bcNumber: '',
     developerCompany: '', developerContactName: '', developerContactEmail: '', developerContactPhone: '',
-    anticipatedStartDate: '', managerName: '',
+    anticipatedStartDate: '', managerName: 'Joanne Barreto',
     onboardingType: 'New Development' as 'New Development' | 'Takeover',
   });
 
@@ -243,7 +243,12 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onClose, onCreated }) => {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Account Manager</label>
-                  <input value={form.managerName} onChange={e => set('managerName', e.target.value)} placeholder={user?.name || ''} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-pink-500" />
+                  <select value={form.managerName} onChange={e => set('managerName', e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-pink-500">
+                    {managers.map(m => <option key={m.id}>{m.name}</option>)}
+                    {!managers.some(m => m.name === form.managerName) && form.managerName && (
+                      <option value={form.managerName}>{form.managerName}</option>
+                    )}
+                  </select>
                 </div>
               </div>
             </>
@@ -289,7 +294,7 @@ const LabeledSelect: React.FC<{ label: string; value: string; onChange: (v: stri
 // ─── Edit Overview Modal ──────────────────────────────────────────────────────
 interface EditOverviewModalProps { complex: BodyCorporate; onClose: () => void; }
 const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose }) => {
-  const { updateComplex } = useData();
+  const { updateComplex, managers } = useData();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     developerCompany: complex.developerCompany || '',
@@ -301,6 +306,7 @@ const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose 
     letterOfAppointmentDate: complex.letterOfAppointmentDate || '',
     managementAgreementStatus: complex.managementAgreementStatus || 'Not Started',
     openingResolutionsStatus: complex.openingResolutionsStatus || 'Not Started',
+    openingResolutionsDate: complex.openingResolutionsDate || '',
     anticipatedStartDate: complex.anticipatedStartDate || '',
     confirmedStartDate: complex.confirmedStartDate || '',
     bcAccountNumber: complex.bcAccountNumber || '',
@@ -310,7 +316,7 @@ const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose 
     financialYearEnd: complex.financialYearEnd || '',
     isGstRegistered: complex.isGstRegistered ? 'Yes' : 'No',
     hasBwof: complex.hasBwof ? 'Yes' : 'No',
-    managerName: complex.managerName || '',
+    managerName: complex.managerName || 'Joanne Barreto',
   });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -327,6 +333,7 @@ const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose 
       letterOfAppointmentDate: form.letterOfAppointmentDate,
       managementAgreementStatus: form.managementAgreementStatus as BodyCorporate['managementAgreementStatus'],
       openingResolutionsStatus: form.openingResolutionsStatus as BodyCorporate['openingResolutionsStatus'],
+      openingResolutionsDate: form.openingResolutionsStatus === 'Passed' ? form.openingResolutionsDate : undefined,
       anticipatedStartDate: form.anticipatedStartDate,
       confirmedStartDate: form.confirmedStartDate,
       bcAccountNumber: form.bcAccountNumber,
@@ -357,7 +364,15 @@ const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose 
               <LabeledInput label="Contact Name" value={form.developerContactName} onChange={v => set('developerContactName', v)} />
               <LabeledInput label="Contact Email" value={form.developerContactEmail} onChange={v => set('developerContactEmail', v)} />
               <LabeledInput label="Contact Phone" value={form.developerContactPhone} onChange={v => set('developerContactPhone', v)} />
-              <LabeledInput label="Account Manager" value={form.managerName} onChange={v => set('managerName', v)} />
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Account Manager</label>
+                <select value={form.managerName} onChange={e => set('managerName', e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-pink-500">
+                  {managers.map(m => <option key={m.id}>{m.name}</option>)}
+                  {!managers.some(m => m.name === form.managerName) && form.managerName && (
+                    <option value={form.managerName}>{form.managerName}</option>
+                  )}
+                </select>
+              </div>
             </div>
           </div>
           <div>
@@ -367,7 +382,15 @@ const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose 
               <LabeledInput label="Admin Fee (excl GST)" value={form.adminFeeExclGst} onChange={v => set('adminFeeExclGst', v)} type="number" />
               <LabeledInput label="Letter of Appointment Date" value={form.letterOfAppointmentDate} onChange={v => set('letterOfAppointmentDate', v)} type="date" />
               <LabeledSelect label="Management Agreement Status" value={form.managementAgreementStatus} onChange={v => set('managementAgreementStatus', v)} options={['Not Started', 'Draft', 'Sent', 'Signed']} />
-              <LabeledSelect label="Opening Resolutions Status" value={form.openingResolutionsStatus} onChange={v => set('openingResolutionsStatus', v)} options={['Not Started', 'Draft', 'Passed']} />
+              <div>
+                <LabeledSelect label="Opening Resolutions Status" value={form.openingResolutionsStatus} onChange={v => set('openingResolutionsStatus', v)} options={['Not Started', 'Draft', 'Passed']} />
+                {form.openingResolutionsStatus === 'Passed' && (
+                  <div className="mt-2">
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">Date Passed</label>
+                    <input type="date" value={form.openingResolutionsDate} onChange={e => set('openingResolutionsDate', e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-pink-500" />
+                  </div>
+                )}
+              </div>
               <LabeledInput label="Insurance Broker" value={form.insuranceBroker} onChange={v => set('insuranceBroker', v)} />
             </div>
           </div>
@@ -377,7 +400,7 @@ const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose 
               <LabeledInput label="Anticipated Start Date" value={form.anticipatedStartDate} onChange={v => set('anticipatedStartDate', v)} type="date" />
               <LabeledInput label="Confirmed Start Date" value={form.confirmedStartDate} onChange={v => set('confirmedStartDate', v)} type="date" />
               <LabeledInput label="Management Start Date" value={form.managementStartDate} onChange={v => set('managementStartDate', v)} type="date" />
-              <LabeledInput label="Financial Year End (e.g. 31 March)" value={form.financialYearEnd} onChange={v => set('financialYearEnd', v)} />
+              <LabeledInput label="Financial Year End" value={form.financialYearEnd} onChange={v => set('financialYearEnd', v)} type="date" />
             </div>
           </div>
           <div>
@@ -504,7 +527,7 @@ const OverviewTab: React.FC<{ complex: BodyCorporate; sections: OnboardingCheckl
           <Field label="Admin Fee (excl GST)" value={complex.adminFeeExclGst ? `$${complex.adminFeeExclGst.toLocaleString()}` : null} status={complex.adminFeeExclGst ? undefined : 'na'} />
           <Field label="Letter of Appointment" value={complex.letterOfAppointmentDate ? fmt(complex.letterOfAppointmentDate) : null} status={complex.letterOfAppointmentDate ? 'ok' : 'na'} />
           <Field label="Management Agreement" value={complex.managementAgreementStatus || null} status={complex.managementAgreementStatus === 'Signed' ? 'ok' : complex.managementAgreementStatus ? 'warn' : 'na'} />
-          <Field label="Opening Resolutions" value={complex.openingResolutionsStatus || null} status={complex.openingResolutionsStatus === 'Passed' ? 'ok' : complex.openingResolutionsStatus ? 'warn' : 'na'} />
+          <Field label="Opening Resolutions" value={complex.openingResolutionsStatus === 'Passed' && complex.openingResolutionsDate ? `Passed — ${fmt(complex.openingResolutionsDate)}` : complex.openingResolutionsStatus || null} status={complex.openingResolutionsStatus === 'Passed' ? 'ok' : complex.openingResolutionsStatus ? 'warn' : 'na'} />
           <Field label="Insurance Broker" value={complex.insuranceBroker || null} status={complex.insuranceBroker ? undefined : 'na'} />
           <Field label="Bank Account" value={complex.bcAccountNumber || null} status={complex.bcAccountNumber ? 'ok' : 'na'} />
         </div>

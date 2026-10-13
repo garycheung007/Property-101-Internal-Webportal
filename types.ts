@@ -304,6 +304,7 @@ export interface BodyCorporate {
   letterOfAppointmentDate?: string;
   managementAgreementStatus?: 'Not Started' | 'Draft' | 'Sent' | 'Signed';
   openingResolutionsStatus?: 'Not Started' | 'Draft' | 'Passed';
+  openingResolutionsDate?: string;
   anticipatedStartDate?: string;
   confirmedStartDate?: string;
   onboardingProgress?: Record<string, OnboardingTaskProgress>;
