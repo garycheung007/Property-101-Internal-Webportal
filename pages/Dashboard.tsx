@@ -600,8 +600,9 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ── Property Card Dashboard ── */}
-        <div
+        {/* ── Cards + Meetings side by side ── */}
+        <div className="flex gap-4 items-start">
+        <div className="flex-1 min-w-0"
           ref={(el) => {
             (upcomingActionsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
             (criticalAlertsRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
@@ -703,7 +704,7 @@ const Dashboard: React.FC = () => {
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{sectionLabel}</span>
                     <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {cards.map(card => {
                       const isSelected = selectedBcId === card.bcId;
                       return (
@@ -714,8 +715,8 @@ const Dashboard: React.FC = () => {
                           }`}
                           style={{ borderLeft: `3px solid ${borderColor}` }}
                         >
-                          <div className="p-4">
-                            <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="p-3">
+                            <div className="flex items-start justify-between gap-2 mb-2">
                               <div className="font-semibold text-slate-800 dark:text-white text-sm leading-snug">{card.bcName}</div>
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${
                                 card.bcType === 'Incorporated Society'
@@ -723,28 +724,22 @@ const Dashboard: React.FC = () => {
                                   : 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30'
                               }`}>{card.bcType === 'Incorporated Society' ? 'IS' : 'BC'}</span>
                             </div>
-                            {tier !== 'clear' ? (
-                              <div className="flex flex-col gap-1 mb-3">
-                                {card.overdueCount > 0 && <div className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" /><span className="font-semibold text-red-600 dark:text-red-400">{card.overdueCount}</span><span className="text-slate-500 dark:text-slate-400">overdue</span></div>}
-                                {card.weekCount > 0  && <div className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" /><span className="font-semibold text-amber-600 dark:text-amber-400">{card.weekCount}</span><span className="text-slate-500 dark:text-slate-400">due this week</span></div>}
-                                {card.items.length - card.overdueCount - card.weekCount > 0 && <div className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0" /><span className="font-semibold text-slate-500">{card.items.length - card.overdueCount - card.weekCount}</span><span className="text-slate-400">upcoming</span></div>}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 mb-3"><CheckCircle2 size={13} /><span className="font-medium">No outstanding tasks</span></div>
-                            )}
-                            {card.cats.length > 0 && (
-                              <div className="flex gap-1.5 flex-wrap">
-                                {card.cats.map(cat => (
-                                  <span key={cat} className="flex items-center gap-1 text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-1.5 py-0.5 rounded-full">
-                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: CAT_COLORS[cat] }} />
-                                    {CAT_CONFIG[cat].label}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <div className="px-4 pb-3">
-                            <span className="text-[10px] text-pink-500 dark:text-pink-400 font-semibold">{isSelected ? '← Close' : 'View tasks →'}</span>
+                            <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
+                              {tier !== 'clear' ? (<>
+                                {card.overdueCount > 0 && <div className="flex items-center gap-1 text-xs"><span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" /><span className="font-semibold text-red-600 dark:text-red-400">{card.overdueCount}</span><span className="text-slate-400 dark:text-slate-500 ml-0.5">overdue</span></div>}
+                                {card.weekCount > 0  && <div className="flex items-center gap-1 text-xs"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" /><span className="font-semibold text-amber-600 dark:text-amber-400">{card.weekCount}</span><span className="text-slate-400 dark:text-slate-500 ml-0.5">this week</span></div>}
+                                {card.items.length - card.overdueCount - card.weekCount > 0 && <div className="flex items-center gap-1 text-xs"><span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0" /><span className="font-semibold text-slate-500">{card.items.length - card.overdueCount - card.weekCount}</span><span className="text-slate-400 ml-0.5">upcoming</span></div>}
+                              </>) : (
+                                <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={11} /><span className="font-medium">All clear</span></div>
+                              )}
+                              {tier !== 'clear' && card.cats.length > 0 && <span className="w-px h-3 bg-slate-200 dark:bg-slate-700 flex-shrink-0" />}
+                              {card.cats.map(cat => (
+                                <span key={cat} className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: CAT_COLORS[cat] }} />
+                                  {CAT_CONFIG[cat].label}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       );
@@ -780,138 +775,69 @@ const Dashboard: React.FC = () => {
 
         </div>
 
-        {/* Meetings Section */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
-           <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-1 flex items-center gap-2">
-            <Clock className="text-pink-500" size={20} />
-            Meetings
-          </h2>
-          <p className="text-xs text-slate-400 mb-4">Upcoming schedule & pending minutes</p>
-
-          <div className="overflow-y-auto max-h-[640px] pr-2 custom-scrollbar">
-              {upcomingMeetings.length === 0 ? (
-                  <div className="text-center text-slate-400 py-10 flex flex-col items-center">
-                      <Calendar size={32} className="mb-2 opacity-50" />
-                      <span>No upcoming meetings or pending minutes.</span>
-                  </div>
-              ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                      {upcomingMeetings.map((m) => {
-                          const docStatus = getNextDocumentStatus(m);
-                          const isUrgent = docStatus.status === 'urgent';
-                          const isComplete = docStatus.status === 'good';
-                          const isNoticeSent = docStatus.label === 'Notices Sent';
-                          const priorItems = meetingChecklistItems.filter(ci => ci.meetingId === m.id && ci.stage === 'PRIOR_TO_MEETING');
-                          
-                          return (
-                            <div key={`${m.bcId}-${m.id}`} className="p-3 group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800 transition-all"
-                            onClick={() => navigate(`/complexes?id=${m.bcId}&tab=meetings&from=dashboard`)}>
-                                    <div className="flex justify-between items-start mb-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{m.bcNumber}</span>
-                                            <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            {m.isPastMeeting && <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase">Past</span>}
-                                            <span className="text-[10px] bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400 px-2 py-0.5 rounded font-bold">{m.type}</span>
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-slate-600 dark:text-slate-400 truncate mb-2">{m.bcName}</p>
-
-                                    <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-1">
-                                        <Calendar size={12} />
-                                        <span>{m.isPastMeeting ? 'Mtg: ' : ''}{new Date(m.date).toLocaleDateString('en-NZ')}{!m.isPastMeeting ? ` at ${m.time}` : ''}</span>
-                                    </div>
-                                    {!m.isPastMeeting && m.noiResponseDueDate && (
-                                        <div className="flex items-center gap-2 text-[10px] text-pink-500 dark:text-pink-400 mb-3">
-                                            <Clock size={12} />
-                                            <span>Response due: {new Date(m.noiResponseDueDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}{m.noiResponseDueTime ? `, ${new Date('1970-01-01T' + m.noiResponseDueTime).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}` : ''}</span>
-                                        </div>
-                                    )}
-                                    {(m.isPastMeeting || !m.noiResponseDueDate) && <div className="mb-3" />}
-
-                                    <div className={`text-[10px] p-2.5 rounded-xl border flex flex-col gap-1 transition-colors ${
-                                        isUrgent ? 'bg-red-50 text-red-700 border-red-100 dark:bg-red-950/20 dark:border-red-900/30' :
-                                        docStatus.status === 'warning' ? 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/30' :
-                                        docStatus.status === 'good' && !isNoticeSent ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/30' :
-                                        'bg-slate-50 text-slate-600 border-slate-100 dark:bg-slate-800 dark:border-slate-700'
-                                    }`}>
-                                        {docStatus.issuedItems && docStatus.issuedItems.length > 0 && (
-                                            <div className="flex flex-col gap-0.5 mb-1 pb-1.5 border-b border-emerald-200/50 dark:border-emerald-900/30">
-                                                {docStatus.issuedItems.map((item: { label: string; date: string }) => (
-                                                    <div key={item.label} className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                                                        <CheckCircle2 size={9} />
-                                                        <span className="font-bold">{item.label} issued: {item.date ? new Date(item.date).toLocaleDateString('en-NZ') : '✓'}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex items-center gap-1.5 font-bold uppercase tracking-tight">
-                                                {isComplete && isNoticeSent && <CheckCircle2 size={10} />}
-                                                {docStatus.label}:
-                                            </div>
-                                            <span className="font-mono font-bold">
-                                                {isNoticeSent ? 'COMPLETE' : ''}
-                                            </span>
-                                        </div>
-                                        {!isNoticeSent && (
-                                            <div className="flex flex-col gap-0.5 mt-1 border-t border-current/10 pt-1.5">
-                                                {docStatus.label === 'Prior to Meeting' ? (
-                                                    <>
-                                                        <div className="flex justify-between">
-                                                            <span className="opacity-70">Due (2 working days prior):</span>
-                                                            <span className="font-bold">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
-                                                        </div>
-                                                        {priorItems.length > 0 && (
-                                                            <div className="mt-1.5 flex flex-col gap-1 border-t border-current/10 pt-1.5">
-                                                                {priorItems.map(ci => (
-                                                                    <div key={ci.key} className="flex items-start gap-1.5">
-                                                                        <div className="w-2.5 h-2.5 rounded border border-current/40 shrink-0 mt-px" />
-                                                                        <span className="opacity-80 leading-tight">{ci.item.label}</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : docStatus.label === 'After Meeting' ? (
-                                                    <>
-                                                        <div className="flex justify-between">
-                                                            <span className="opacity-70">Minutes preferred by:</span>
-                                                            <span className="font-bold">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="opacity-70">Minutes deadline:</span>
-                                                            <span className="font-medium italic">{new Date(docStatus.deadline!).toLocaleDateString('en-NZ')}</span>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <div className="flex justify-between">
-                                                            <span className="opacity-70">Statutory Deadline:</span>
-                                                            <span className="font-bold">{new Date(docStatus.deadline!).toLocaleDateString('en-NZ')}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="opacity-70">Preferred Action Date:</span>
-                                                            <span className="font-medium italic">{new Date(docStatus.pref!).toLocaleDateString('en-NZ')}</span>
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                            </div>
-                          );
-                      })}
-                  </div>
-              )}
+        {/* Meetings Sidebar */}
+        <div className="w-72 xl:w-80 flex-shrink-0 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 sticky top-4 flex flex-col overflow-hidden" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 flex-shrink-0">
+            <Clock className="text-pink-500 flex-shrink-0" size={16} />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold text-slate-800 dark:text-white">Meetings</div>
+              <div className="text-[10px] text-slate-400">Upcoming & pending minutes</div>
+            </div>
+            <button onClick={() => navigate('/meeting-calendar')} className="text-[10px] text-pink-600 dark:text-pink-400 font-bold hover:underline flex-shrink-0">View all</button>
           </div>
-          <div className="pt-3 mt-3 border-t dark:border-slate-800 flex justify-end">
-            <button onClick={() => navigate('/complexes')} className="text-xs text-pink-600 dark:text-pink-400 font-bold hover:underline flex items-center gap-1">
-              View all complexes <ArrowRightCircle size={12} />
-            </button>
+          <div className="overflow-y-auto flex-1 custom-scrollbar divide-y divide-slate-100 dark:divide-slate-800">
+            {upcomingMeetings.length === 0 ? (
+              <div className="text-center text-slate-400 py-10 flex flex-col items-center gap-2">
+                <Calendar size={28} className="opacity-50" />
+                <span className="text-xs">No upcoming meetings or pending minutes.</span>
+              </div>
+            ) : (
+              upcomingMeetings.map((m) => {
+                const docStatus = getNextDocumentStatus(m);
+                const isNoticeSent = docStatus.label === 'Notices Sent';
+                const statusChipCls = docStatus.status === 'urgent'
+                  ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/40'
+                  : docStatus.status === 'warning'
+                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/40'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40';
+                return (
+                  <div key={`${m.bcId}-${m.id}`}
+                    className="px-4 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+                    onClick={() => navigate(`/complexes?id=${m.bcId}&tab=meetings&from=dashboard`)}>
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{m.bcNumber}</span>
+                        <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500" />
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {m.isPastMeeting && <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-bold">Past</span>}
+                        <span className="text-[9px] bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400 px-1.5 py-0.5 rounded font-bold">{m.type}</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mb-1.5">{m.bcName}</p>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1.5">
+                      <Calendar size={10} className="flex-shrink-0" />
+                      <span>{m.isPastMeeting ? 'Mtg: ' : ''}{new Date(m.date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}{!m.isPastMeeting && m.time ? ` · ${m.time}` : ''}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {docStatus.issuedItems && docStatus.issuedItems.map((item: { label: string; date: string }) => (
+                        <span key={item.label} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40">
+                          ✓ {item.label}{item.date ? ` ${new Date(item.date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}` : ''}
+                        </span>
+                      ))}
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${statusChipCls}`}>
+                        {isNoticeSent ? 'Notices complete' : docStatus.label}
+                        {!isNoticeSent && docStatus.deadline && docStatus.deadline !== 'Complete' ? ` · ${new Date(docStatus.deadline).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
+
+        </div>{/* end flex cards+meetings */}
       </div>
 
       {/* Property Task Drawer */}
