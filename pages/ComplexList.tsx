@@ -440,6 +440,13 @@ const AddComplexModal: React.FC<{ managers: import('../types').User[]; onClose: 
   );
 };
 
+function buildMonthlySchedule(n: number, startMonth: number, day: number, startYear: number): Array<{month: number; day: number; year: number}> {
+    return Array.from({ length: n }, (_, i) => {
+        const totalMonth = startMonth - 1 + i;
+        return { month: (totalMonth % 12) + 1, day, year: startYear + Math.floor(totalMonth / 12) };
+    });
+}
+
 const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; onSave: (bc: BodyCorporate) => void; initialTab?: 'details' | 'settings' | 'insurance' | 'meetings' | 'disclosure' | 'logs' | 'conflict' }> = ({ complex, onClose, onSave, initialTab = 'details' }) => {
     const { contractors, actionComments, addActionComment, systemSettings, managers, loadMeetings, meetingsLoaded } = useData();
     const { user: currentUser } = useAuth();
@@ -478,6 +485,8 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
     const isDirtyRef = useRef(false);
     const [postMeetingFormData, setPostMeetingFormData] = useState<Record<string, string>>({});
     const [postMeetingSchedule, setPostMeetingSchedule] = useState<Array<{month: number; day: number; year?: number}>>([]);
+    const [settingsQf, setSettingsQf] = useState({ day: 1, month: 1, year: new Date().getFullYear() + 1 });
+    const [pmQf, setPmQf] = useState({ day: 1, month: 1, year: new Date().getFullYear() + 1 });
     
     const brokers = contractors.filter(c => c.category === 'Insurance Broker');
     const valuers = contractors.filter(c => c.category === 'Insurance Valuer');
@@ -1381,7 +1390,10 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             const count = e.target.value;
                                             const n = parseInt(count) || 0;
                                             const existing = form.levyDueDateSchedule || [];
-                                            const newSchedule = Array.from({ length: n }, (_, i) => existing[i] || { month: 1, day: 1 });
+                                            const baseYear = new Date().getFullYear() + 1;
+                                            const first = existing[0] || { month: 1, day: 1, year: baseYear };
+                                            const monthly = buildMonthlySchedule(n, first.month, first.day, first.year ?? baseYear);
+                                            const newSchedule = Array.from({ length: n }, (_, i) => existing[i] || monthly[i]);
                                             setForm({ ...form, levyInstalments: count, levyDueDateSchedule: n > 0 ? newSchedule : undefined });
                                         }}
                                     >
@@ -1403,9 +1415,27 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                     />
                                 </div>
                                 {(form.levyDueDateSchedule || []).length > 0 && (
-                                    <div className="col-span-full">
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Levy Due Dates</label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div className="col-span-full space-y-3">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Levy Due Dates</label>
+                                        <div className="flex items-end gap-2 flex-wrap bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest self-center">Quick fill:</span>
+                                            <div>
+                                                <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Day</label>
+                                                <input type="number" min={1} max={31} value={settingsQf.day} onChange={e => setSettingsQf(q => ({ ...q, day: parseInt(e.target.value) || 1 }))} className="w-12 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Start month</label>
+                                                <select value={settingsQf.month} onChange={e => setSettingsQf(q => ({ ...q, month: parseInt(e.target.value) }))} className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500">
+                                                    {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, mi) => <option key={mi + 1} value={mi + 1}>{m}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Year</label>
+                                                <input type="number" min={2024} max={2099} value={settingsQf.year} onChange={e => setSettingsQf(q => ({ ...q, year: parseInt(e.target.value) || new Date().getFullYear() + 1 }))} className="w-20 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center" />
+                                            </div>
+                                            <button type="button" onClick={() => { const n = parseInt(form.levyInstalments || '0') || 0; if (n > 0) setForm({ ...form, levyDueDateSchedule: buildMonthlySchedule(n, settingsQf.month, settingsQf.day, settingsQf.year) }); }} className="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold rounded-lg whitespace-nowrap">Fill Monthly →</button>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {(form.levyDueDateSchedule || []).map((entry, idx) => (
                                                 <div key={idx} className="flex items-center gap-2 border dark:border-slate-700 rounded-xl px-3 py-2">
                                                     <span className="text-[11px] font-bold text-slate-400 w-16 shrink-0">Instal. {idx + 1}</span>
@@ -1413,12 +1443,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         type="number"
                                                         min={1}
                                                         max={31}
+                                                        title="Changing this day updates all instalments"
                                                         className="w-12 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center"
                                                         value={entry.day}
                                                         onChange={e => {
-                                                            const schedule = [...(form.levyDueDateSchedule || [])];
-                                                            schedule[idx] = { ...schedule[idx], day: parseInt(e.target.value) || 1 };
-                                                            setForm({ ...form, levyDueDateSchedule: schedule });
+                                                            const day = parseInt(e.target.value) || 1;
+                                                            setForm({ ...form, levyDueDateSchedule: (form.levyDueDateSchedule || []).map(en => ({ ...en, day })) });
                                                         }}
                                                     />
                                                     <select
@@ -1438,7 +1468,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                         type="number"
                                                         min={2020}
                                                         max={2099}
-                                                        className="w-20 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center"
+                                                        className="w-16 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-pink-500 text-center"
                                                         value={entry.year ?? new Date().getFullYear()}
                                                         onChange={e => {
                                                             const schedule = [...(form.levyDueDateSchedule || [])];
@@ -2123,7 +2153,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                             const count = e.target.value;
                                                                             const n = parseInt(count) || 0;
                                                                             setPostMeetingFormData(prev => ({ ...prev, [field.id]: count }));
-                                                                            setPostMeetingSchedule(prev => Array.from({ length: n }, (_, i) => prev[i] || { month: 1, day: 1, year: new Date().getFullYear() }));
+                                                                            setPostMeetingSchedule(prev => {
+                                                                                const baseYear = new Date().getFullYear() + 1;
+                                                                                const first = prev[0] || { month: 1, day: 1, year: baseYear };
+                                                                                const monthly = buildMonthlySchedule(n, first.month, first.day, first.year ?? baseYear);
+                                                                                return Array.from({ length: n }, (_, i) => prev[i] || monthly[i]);
+                                                                            });
                                                                         }}
                                                                     >
                                                                         <option value="">Select</option>
@@ -2133,9 +2168,27 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                     </select>
                                                                 </div>
                                                                 {postMeetingSchedule.length > 0 && (
-                                                                    <div>
-                                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Levy Due Dates</label>
-                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                                    <div className="space-y-3">
+                                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Levy Due Dates</label>
+                                                                        <div className="flex items-end gap-2 flex-wrap bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
+                                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest self-center">Quick fill:</span>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Day</label>
+                                                                                <input type="number" min={1} max={31} value={pmQf.day} onChange={e => setPmQf(q => ({ ...q, day: parseInt(e.target.value) || 1 }))} className="w-12 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-center" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Start month</label>
+                                                                                <select value={pmQf.month} onChange={e => setPmQf(q => ({ ...q, month: parseInt(e.target.value) }))} className="border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500">
+                                                                                    {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, mi) => <option key={mi + 1} value={mi + 1}>{m}</option>)}
+                                                                                </select>
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-semibold text-slate-400 mb-0.5">Year</label>
+                                                                                <input type="number" min={2024} max={2099} value={pmQf.year} onChange={e => setPmQf(q => ({ ...q, year: parseInt(e.target.value) || new Date().getFullYear() + 1 }))} className="w-20 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-center" />
+                                                                            </div>
+                                                                            <button type="button" onClick={() => { const n = postMeetingSchedule.length; if (n > 0) setPostMeetingSchedule(buildMonthlySchedule(n, pmQf.month, pmQf.day, pmQf.year)); }} className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg whitespace-nowrap">Fill Monthly →</button>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                                             {postMeetingSchedule.map((entry, idx) => (
                                                                                 <div key={idx} className="flex items-center gap-2 border dark:border-slate-700 rounded-xl px-3 py-2">
                                                                                     <span className="text-[11px] font-bold text-slate-400 w-16 shrink-0">Instal. {idx + 1}</span>
@@ -2143,12 +2196,12 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                                         type="number"
                                                                                         min={1}
                                                                                         max={31}
-                                                                                        className="w-14 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-center"
+                                                                                        title="Changing this day updates all instalments"
+                                                                                        className="w-12 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-center"
                                                                                         value={entry.day}
                                                                                         onChange={e => {
-                                                                                            const s = [...postMeetingSchedule];
-                                                                                            s[idx] = { ...s[idx], day: parseInt(e.target.value) || 1 };
-                                                                                            setPostMeetingSchedule(s);
+                                                                                            const day = parseInt(e.target.value) || 1;
+                                                                                            setPostMeetingSchedule(postMeetingSchedule.map(en => ({ ...en, day })));
                                                                                         }}
                                                                                     />
                                                                                     <select
@@ -2168,7 +2221,7 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                                                                         type="number"
                                                                                         min={2020}
                                                                                         max={2099}
-                                                                                        className="w-20 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-center"
+                                                                                        className="w-16 border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg p-1.5 text-sm outline-none focus:ring-1 focus:ring-blue-500 text-center"
                                                                                         value={entry.year ?? new Date().getFullYear()}
                                                                                         onChange={e => {
                                                                                             const s = [...postMeetingSchedule];
