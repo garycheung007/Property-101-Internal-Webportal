@@ -350,6 +350,21 @@ const Dashboard: React.FC = () => {
   const weekTabCount = propertyCards.filter(c => c.urgencyTier === 'overdue' || c.urgencyTier === 'week').length;
   const snoozedAll = [...snoozedCriticalAlerts, ...snoozedUpcomingActions, ...snoozedLevyReminders];
 
+  const actionCatCounts: Record<DashboardCat, number> = {
+    MEETING:    meetingChecklistItems.length + upcomingActions.filter(r => getCatForAction(r.message) === 'MEETING').length,
+    COMPLIANCE: upcomingActions.filter(r => getCatForAction(r.message) === 'COMPLIANCE').length,
+    INSURANCE:  upcomingActions.filter(r => getCatForAction(r.message) === 'INSURANCE').length,
+    DEBT:       levyReminders.length,
+    OTHER:      upcomingActions.filter(r => getCatForAction(r.message) === 'OTHER').length,
+  };
+  const alertCatCounts: Record<DashboardCat, number> = {
+    MEETING:    criticalAlerts.filter(r => getCatForAlert(r.type, r.message) === 'MEETING').length,
+    COMPLIANCE: criticalAlerts.filter(r => getCatForAlert(r.type, r.message) === 'COMPLIANCE').length,
+    INSURANCE:  criticalAlerts.filter(r => getCatForAlert(r.type, r.message) === 'INSURANCE').length,
+    DEBT:       0,
+    OTHER:      criticalAlerts.filter(r => getCatForAlert(r.type, r.message) === 'OTHER').length,
+  };
+
   const CAT_CONFIG: Record<DashboardCat, { label: string; icon: React.ReactNode; bgColor: string; textColor: string; borderColor: string }> = {
     MEETING:    { label: 'Meetings',        icon: <Calendar size={15} />,      bgColor: 'bg-blue-50 dark:bg-blue-900/20',       textColor: 'text-blue-600 dark:text-blue-400',       borderColor: '#3B82F6' },
     COMPLIANCE: { label: 'Compliance',      icon: <FileCheck size={15} />,     bgColor: 'bg-amber-50 dark:bg-amber-900/20',     textColor: 'text-amber-600 dark:text-amber-400',     borderColor: '#D97706' },
@@ -560,6 +575,21 @@ const Dashboard: React.FC = () => {
               </div>
               <ChevronRight size={18} className="text-slate-200 dark:text-slate-700 group-hover:text-pink-500 group-hover:translate-x-0.5 transition-all" />
             </div>
+            {(i === 0 || i === 1) && (() => {
+              const counts = i === 0 ? actionCatCounts : alertCatCounts;
+              const nonZero = ALL_CATS.filter(cat => counts[cat] > 0);
+              if (nonZero.length === 0) return null;
+              return (
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5">
+                  {nonZero.map(cat => (
+                    <span key={cat} className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${CAT_CONFIG[cat].bgColor} ${CAT_CONFIG[cat].textColor}`}>
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: CAT_CONFIG[cat].borderColor }} />
+                      {counts[cat]} {CAT_CONFIG[cat].label}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
             {i === 2 && (
               <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-full">
@@ -1015,7 +1045,7 @@ const Dashboard: React.FC = () => {
       })()}
       {showAgmRemainingModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAgmRemainingModal(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
               <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"><Calendar size={18} /></div>
               <div>
