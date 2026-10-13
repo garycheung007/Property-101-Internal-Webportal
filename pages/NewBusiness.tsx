@@ -269,6 +269,23 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onClose, onCreated }) => {
   );
 };
 
+// ─── Shared form primitives (must be at module level to avoid remount-on-rerender) ──
+const LabeledInput: React.FC<{ label: string; value: string; onChange: (v: string) => void; type?: string }> = ({ label, value, onChange, type = 'text' }) => (
+  <div>
+    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">{label}</label>
+    <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-pink-500" />
+  </div>
+);
+
+const LabeledSelect: React.FC<{ label: string; value: string; onChange: (v: string) => void; options: string[] }> = ({ label, value, onChange, options }) => (
+  <div>
+    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">{label}</label>
+    <select value={value} onChange={e => onChange(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-pink-500">
+      {options.map(o => <option key={o}>{o}</option>)}
+    </select>
+  </div>
+);
+
 // ─── Edit Overview Modal ──────────────────────────────────────────────────────
 interface EditOverviewModalProps { complex: BodyCorporate; onClose: () => void; }
 const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose }) => {
@@ -324,22 +341,6 @@ const EditOverviewModal: React.FC<EditOverviewModalProps> = ({ complex, onClose 
     setSaving(false);
     onClose();
   };
-
-  const LabeledInput: React.FC<{ label: string; value: string; onChange: (v: string) => void; type?: string; }> = ({ label, value, onChange, type = 'text' }) => (
-    <div>
-      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-pink-500" />
-    </div>
-  );
-
-  const LabeledSelect: React.FC<{ label: string; value: string; onChange: (v: string) => void; options: string[]; }> = ({ label, value, onChange, options }) => (
-    <div>
-      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-pink-500">
-        {options.map(o => <option key={o}>{o}</option>)}
-      </select>
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center p-4">
