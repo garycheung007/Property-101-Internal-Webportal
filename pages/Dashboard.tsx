@@ -63,6 +63,14 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (!hasInitializedFilter.current && complexes.length > 0 && user) {
+      try {
+        const saved = localStorage.getItem(`dashboard_filter_${user.id}`);
+        if (saved) {
+          setSelectedManager(saved);
+          hasInitializedFilter.current = true;
+          return;
+        }
+      } catch {}
       if (user.role === 'support' && user.supportedManagerName) {
         const managerHasComplexes = complexes.some(c => !c.isArchived && c.managerName?.trim().toLowerCase() === user.supportedManagerName?.trim().toLowerCase());
         if (managerHasComplexes) setSelectedManager(user.supportedManagerName);
@@ -542,7 +550,10 @@ const Dashboard: React.FC = () => {
                 <select 
                     className="text-sm bg-transparent border-none focus:ring-0 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer outline-none"
                     value={selectedManager}
-                    onChange={(e) => setSelectedManager(e.target.value)}
+                    onChange={(e) => {
+                        setSelectedManager(e.target.value);
+                        if (user) try { localStorage.setItem(`dashboard_filter_${user.id}`, e.target.value); } catch {}
+                    }}
                 >
                     <option value="all">All Managers</option>
                     {managers.map(m => (
