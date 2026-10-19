@@ -91,16 +91,6 @@ const isMeetingPassed = (dateStr?: string) => {
   return parsed < today;
 };
 
-/**
- * Calculates a date 21 days prior to the input string.
- */
-const calculateDefaultResponseDueDate = (dateStr?: string) => {
-  const parsed = parseDateSafe(dateStr);
-  if (!parsed) return '';
-  const result = new Date(parsed);
-  result.setDate(result.getDate() - 21);
-  return result.toISOString().split('T')[0];
-};
 
 const ComplexList: React.FC = () => {
   const { complexes, updateComplex, addComplex, managers, initializeDummyData, addMeeting, updateMeeting, deleteMeeting } = useData();
@@ -593,7 +583,17 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
             setVenueOther(false); setSelectedMeetingId('new');
         } else {
             const m = (form.meetings || []).find(x => x.id === target);
-            if (m) { setMeetingForm({ ...m }); setSelectedMeetingId(target); }
+            if (m) {
+                const typeKey = form.type === 'Incorporated Society' ? 'rs' : 'bc';
+                const defaultNOITime = systemSettings.meetingDateSettings?.[typeKey]?.noiResponseDueTime || '';
+                const defaultReminderDays = systemSettings.meetingDateSettings?.[typeKey]?.noiResponseReminderDays ?? 2;
+                setMeetingForm({
+                    ...m,
+                    noiResponseDueTime: m.noiResponseDueTime ?? defaultNOITime,
+                    noiResponseReminderDays: m.noiResponseReminderDays ?? defaultReminderDays,
+                });
+                setSelectedMeetingId(target);
+            }
         }
         setMeetingSwitchPrompt(null);
     };
@@ -1865,7 +1865,13 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                             {/* Type / Date / Time / Venue */}
                                             <fieldset className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={effectiveLocked}>
                                                 <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Type</label><select className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.type || 'AGM'} onChange={e => setMeetingForm({...meetingForm, type: e.target.value as any})}><option value="AGM">AGM</option><option value="EGM">EGM</option><option value="SGM">SGM</option><option value="Committee">Committee</option></select></div>
-                                                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.date || ''} onChange={e => { const newDate = e.target.value; setMeetingForm({ ...meetingForm, date: newDate, noiResponseDueDate: calculateDefaultResponseDueDate(newDate) }); }} /></div>
+                                                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Date</label><input type="date" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.date || ''} onChange={e => {
+                                                        const newDate = e.target.value;
+                                                        const tk = form.type === 'Incorporated Society' ? 'rs' : 'bc';
+                                                        const days = systemSettings.meetingDateSettings?.[tk]?.noiDeadlineDays ?? DEFAULT_MEETING_DATE_SETTINGS[tk].noiDeadlineDays;
+                                                        const responseDue = newDate ? (() => { const d = new Date(newDate + 'T00:00:00'); d.setDate(d.getDate() - days); return d.toISOString().split('T')[0]; })() : '';
+                                                        setMeetingForm({ ...meetingForm, date: newDate, noiResponseDueDate: responseDue });
+                                                    }} /></div>
                                                 <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Time</label><input type="time" className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-2.5 text-sm" value={meetingForm.time || ''} onChange={e => setMeetingForm({...meetingForm, time: e.target.value})} /></div>
                                                 <div>
                                                     <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-widest">Venue</label>
