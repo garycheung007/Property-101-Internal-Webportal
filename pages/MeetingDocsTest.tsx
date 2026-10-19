@@ -75,7 +75,7 @@ const buildMergeData = (complex: BodyCorporate, meeting: Meeting | null, manager
     Meeting_Venue: targetVenue,
     Nomination_Due_Day: fmtDay(nomRaw),
     Nomination_Due_Date: fmtDate(nomRaw),
-    Nomination_Due_Time: complex.noiResponseDueTime ? fmtTime(complex.noiResponseDueTime) : '4:00 pm',
+    Nomination_Due_Time: fmtTime(meeting?.noiResponseDueTime || complex.noiResponseDueTime || '') || '4:00 pm',
     Current_Date: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }),
     Manager_Name: manager?.name || complex.managerName || '',
     Manager_Title: manager?.title || 'Body Corporate Manager',
