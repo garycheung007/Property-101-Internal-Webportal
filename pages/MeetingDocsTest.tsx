@@ -153,6 +153,7 @@ const MeetingDocsTest: React.FC = () => {
   const [emailModal, setEmailModal] = useState<{ subject: string; body: string; label: string } | null>(null);
   const [emailBody, setEmailBody] = useState('');
   const [emailCopied, setEmailCopied] = useState(false);
+  const [pendingDownload, setPendingDownload] = useState<{ key: TemplateKey; format: 'docx' | 'pdf' } | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -199,11 +200,13 @@ const MeetingDocsTest: React.FC = () => {
     const effectiveTime = selectedMeeting?.time || selectedComplex?.nextAgmTime || '';
     const effectiveVenue = selectedMeeting?.venue || selectedComplex?.nextAgmVenue || '';
     const effectiveNom = selectedMeeting?.noiResponseDueDate || selectedComplex?.noiResponseDueDate || '';
+    const effectiveNomTime = selectedMeeting?.noiResponseDueTime || selectedComplex?.noiResponseDueTime || '';
     const missing: string[] = [];
     if (!effectiveDate) missing.push('Meeting Date');
     if (!effectiveTime) missing.push('Meeting Time');
     if (!effectiveVenue) missing.push('Meeting Venue');
     if (!effectiveNom) missing.push('Nomination Due Date');
+    if (!effectiveNomTime) missing.push('Nomination Due Time');
     if (missing.length === 0) return { kind: 'complete' as const };
     return {
       kind: selectedMeetingId ? 'incomplete' as const : 'no-meeting' as const,
@@ -315,18 +318,44 @@ const MeetingDocsTest: React.FC = () => {
     }
   };
 
-  const handleDownloadPdf = (key: TemplateKey) => {
-    if (!previewHtml || previewKey !== key) return;
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(
-      `<!DOCTYPE html><html><head><meta charset="utf-8">` +
-      `<style>@page{margin:20mm;size:A4}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;padding:0;line-height:1.4}a{color:inherit!important;text-decoration:none!important}img{max-width:100%}table{border-collapse:collapse;width:100%}td,th{vertical-align:top;padding:2px 8px}</style>` +
-      `</head><body>${previewHtml}</body></html>`
-    );
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 400);
+  const handleDownloadPdf = async (key: TemplateKey) => {
+    const tpl = templates[key];
+    if (!tpl || !selectedComplex) return;
+    try {
+      const mammoth = await import('mammoth');
+      const buffer = await resolveTemplate(tpl);
+      const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
+      const data = buildMergeData(selectedComplex, selectedMeeting, assignedManager);
+      let html = result.value;
+      const sigHtml = assignedManager?.signatureUrl
+        ? `<img src="${assignedManager.signatureUrl}" style="width:200px;height:auto;display:block;margin:8px 0;" />`
+        : '';
+      html = html.split('{{%Manager_Signature}}').join(sigHtml);
+      html = html.split('{{Manager_Signature}}').join(sigHtml);
+      html = html.replace(/\{\{[\s\S]*?\}\}/g, m => '{{' + m.slice(2, -2).replace(/<[^>]*>/g, '') + '}}');
+      Object.entries(data).forEach(([k, v]) => { html = html.split(`{{${k}}}`).join(v); });
+      const win = window.open('', '_blank');
+      if (!win) { alert('Popup blocked — please allow popups for this site.'); return; }
+      win.document.write(
+        `<!DOCTYPE html><html><head><meta charset="utf-8">` +
+        `<style>@page{margin:20mm;size:A4}body{font-family:Calibri,Arial,sans-serif;font-size:11pt;padding:0;line-height:1.4}a{color:inherit!important;text-decoration:none!important}img{max-width:100%}table{border-collapse:collapse;width:100%}td,th{vertical-align:top;padding:2px 8px}</style>` +
+        `</head><body>${html}</body></html>`
+      );
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 400);
+    } catch {
+      alert('PDF export failed. Ensure the uploaded file is a valid .docx.');
+    }
+  };
+
+  const handleDownloadWithWarning = (key: TemplateKey, format: 'docx' | 'pdf') => {
+    if (MEETING_DEPENDENT_KEYS.has(key) && meetingWarning && meetingWarning.kind !== 'complete') {
+      setPendingDownload({ key, format });
+    } else {
+      if (format === 'docx') handleDownloadDocx(key);
+      else handleDownloadPdf(key);
+    }
   };
 
   const buildConflictRegisterHtml = () => {
@@ -388,11 +417,18 @@ const MeetingDocsTest: React.FC = () => {
             Preview
           </button>
           <button
-            onClick={() => handleDownloadDocx(key)}
+            onClick={() => handleDownloadWithWarning(key, 'docx')}
             disabled={!templates[key]}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[#2b579a] hover:bg-[#1e3f72] text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
           >
             <Download size={12} /> Word
+          </button>
+          <button
+            onClick={() => handleDownloadWithWarning(key, 'pdf')}
+            disabled={!templates[key]}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
+          >
+            <Download size={12} /> PDF
           </button>
           {hasEmail && (
             <button
@@ -610,6 +646,67 @@ const MeetingDocsTest: React.FC = () => {
 
       </div>
     </div>
+
+    {/* Missing meeting fields warning modal */}
+    {pendingDownload && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        onClick={e => { if (e.target === e.currentTarget) setPendingDownload(null); }}
+      >
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md">
+          <div className="flex items-center gap-3 p-5 border-b dark:border-slate-700">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle size={16} className="text-amber-500" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-800 dark:text-white text-sm">
+                {meetingWarning?.kind === 'no-meeting' ? 'No meeting selected' : 'Meeting details incomplete'}
+              </p>
+              <p className="text-xs text-slate-500">{DOC_LABELS[pendingDownload.key]}</p>
+            </div>
+          </div>
+          <div className="p-5 space-y-3">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {meetingWarning?.kind === 'no-meeting'
+                ? 'This document contains meeting-specific fields. Without a meeting selected, those fields will be blank in the downloaded file.'
+                : 'The selected meeting is missing some fields. These will be blank in the downloaded file. You may want to update the meeting first.'}
+            </p>
+            {meetingWarning?.missingFields && meetingWarning.missingFields.length > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3">
+                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-2">Fields that will be blank</p>
+                <div className="space-y-1">
+                  {meetingWarning.missingFields.map(f => (
+                    <div key={f} className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                      {f}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 justify-end p-5 pt-0">
+            <button
+              onClick={() => setPendingDownload(null)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                const { key, format } = pendingDownload;
+                setPendingDownload(null);
+                if (format === 'docx') handleDownloadDocx(key);
+                else handleDownloadPdf(key);
+              }}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700 transition-colors"
+            >
+              Download anyway
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Email draft modal */}
 
