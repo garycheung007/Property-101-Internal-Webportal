@@ -233,15 +233,21 @@ export function generateReminders(complexes: BodyCorporate[], settings: Insuranc
 
       if (today < reminderDate) return;
 
-      const lastDone = bc.lastDebtCollectionDate ? new Date(bc.lastDebtCollectionDate) : null;
-      if (lastDone && lastDone >= dueDate) return;
+      const dueDateStr = `${entry.year ?? today.getFullYear()}-${String(entry.month).padStart(2, '0')}-${String(entry.day).padStart(2, '0')}`;
+      const instalmentStatus = bc.levyInstalmentStatuses?.find(s => s.dueDate === dueDateStr);
+      if (instalmentStatus?.status === 'resolved') return;
+      // Backward compat: if no per-instalment data, fall back to single lastDebtCollectionDate
+      if (!bc.levyInstalmentStatuses?.length) {
+        const lastDone = bc.lastDebtCollectionDate ? new Date(bc.lastDebtCollectionDate) : null;
+        if (lastDone && lastDone >= dueDate) return;
+      }
 
       reminders.push({
         id: `levy-${bc.id}-${entry.month}-${entry.day}`,
         bcId: bc.id,
         bcName: bc.name,
         type: ReminderType.LEVY,
-        dueDate: `${entry.year ?? today.getFullYear()}-${String(entry.month).padStart(2, '0')}-${String(entry.day).padStart(2, '0')}`,
+        dueDate: dueDateStr,
         message: `DEBT COLLECTION: Levy instalment ${idx + 1} was due ${dueDate.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`,
         severity: 'medium',
       });

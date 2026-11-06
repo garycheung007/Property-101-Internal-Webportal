@@ -1352,6 +1352,68 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                 </div>
                             </div>
                         </div>
+                        {/* Debt Collection History */}
+                        {(form.levyDueDateSchedule || []).length > 0 && (
+                        <div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[.14em] mb-3 flex items-center gap-2 after:content-[''] after:flex-1 after:h-px after:bg-slate-200 dark:after:bg-slate-800">Debt Collection</p>
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border dark:border-slate-800 overflow-hidden">
+                                <div className="flex items-center justify-between px-5 py-3 border-b dark:border-slate-800 bg-red-50/50 dark:bg-red-950/10">
+                                    <h3 className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest flex items-center gap-2">
+                                        <DollarSign size={13} /> Levy Debt Collection History
+                                    </h3>
+                                    <span className="text-[10px] text-slate-400">{form.levyInstalments || '?'} instalments/yr · Reminder: {form.debtCollectionReminderDays ?? 7}d after due</span>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs border-collapse">
+                                        <thead>
+                                            <tr className="border-b dark:border-slate-800">
+                                                <th className="px-4 py-2 text-left text-[9px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">#</th>
+                                                <th className="px-4 py-2 text-left text-[9px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Due Date</th>
+                                                <th className="px-4 py-2 text-left text-[9px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Status</th>
+                                                <th className="px-4 py-2 text-left text-[9px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Last Updated By</th>
+                                                <th className="px-4 py-2 text-left text-[9px] font-bold uppercase tracking-widest text-slate-400">Note</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(form.levyDueDateSchedule || []).map((entry, idx) => {
+                                                const yr = entry.year ?? new Date().getFullYear();
+                                                const dueDateStr = `${yr}-${String(entry.month).padStart(2,'0')}-${String(entry.day).padStart(2,'0')}`;
+                                                const dueDate = new Date(yr, entry.month - 1, entry.day);
+                                                const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+                                                const daysOverdue = Math.ceil((todayDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+                                                const instStatus = (form.levyInstalmentStatuses || []).find(s => s.dueDate === dueDateStr);
+                                                const statusCfg: Record<string, { label: string; cls: string }> = {
+                                                    new: { label: 'New', cls: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' },
+                                                    contacted: { label: 'Contacted', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' },
+                                                    letter_sent: { label: 'Letter Sent', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400' },
+                                                    resolved: { label: 'Resolved', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
+                                                    escalated: { label: 'Escalated', cls: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400' },
+                                                };
+                                                const sc = instStatus ? (statusCfg[instStatus.status] || statusCfg.new) : null;
+                                                return (
+                                                    <tr key={dueDateStr} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                                        <td className="px-4 py-2.5 font-semibold text-slate-700 dark:text-slate-200">#{idx + 1}</td>
+                                                        <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">{dueDate.toLocaleDateString('en-NZ')}</td>
+                                                        <td className="px-4 py-2.5">
+                                                            {sc ? (
+                                                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${sc.cls}`}>{sc.label}</span>
+                                                            ) : daysOverdue > 0 ? (
+                                                                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400">{daysOverdue}d overdue</span>
+                                                            ) : (
+                                                                <span className="text-slate-400 text-[10px]">Not yet due</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{instStatus?.updatedBy || '—'}</td>
+                                                        <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400 max-w-[200px] truncate">{instStatus?.note || '—'}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        )}
                         </div>
                     )}
 

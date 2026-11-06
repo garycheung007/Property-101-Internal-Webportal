@@ -254,6 +254,7 @@ export interface BodyCorporate {
 
   lastDebtCollectionDate?: string;
   debtCollectionNote?: string;
+  levyInstalmentStatuses?: Array<{ dueDate: string; status: 'new' | 'contacted' | 'letter_sent' | 'resolved' | 'escalated'; lastUpdated?: string; updatedBy?: string; note?: string }>;
 
   // Statutory Disclosure Fields
   weathertightnessClaimMade?: boolean;

@@ -3,7 +3,7 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, ChevronDown, ChevronUp, BellOff, Play } from 'lucide-react';
+import { AlertTriangle, Calendar, FileCheck, DollarSign, Clock, MessageCircle, Send, Trash2, X, History, Filter, User, CheckCircle2, ClipboardList, ArrowRightCircle, ExternalLink, ChevronRight, ChevronDown, ChevronUp, BellOff, Play, FileText } from 'lucide-react';
 import { Reminder, ReminderType } from '../types';
 import { DEFAULT_MEETING_CHECKLIST, DEFAULT_MEETING_DATE_SETTINGS } from '../constants/defaults';
 import StartAgmProcessModal from '../components/StartAgmProcessModal';
@@ -58,6 +58,9 @@ const Dashboard: React.FC = () => {
   const [dashUrgencyTab, setDashUrgencyTab] = useState<'overdue' | 'week' | 'all' | 'snoozed'>('overdue');
   const [dashCatFilter, setDashCatFilter] = useState<'all' | DashboardCat>('all');
   const [selectedBcId, setSelectedBcId] = useState<string | null>(null);
+  const [levyLogTarget, setLevyLogTarget] = useState<{ bcId: string; dueDate: string; instalmentLabel: string } | null>(null);
+  const [levyLogAction, setLevyLogAction] = useState('');
+  const [levyLogNote, setLevyLogNote] = useState('');
 
   useEffect(() => { loadMeetings(); }, [loadMeetings]);
 
@@ -508,7 +511,48 @@ const Dashboard: React.FC = () => {
   const handleLevyMarkDone = async (bcId: string, dueDate: string) => {
       const bc = complexes.find(c => c.id === bcId);
       if (!bc) return;
-      await updateComplex({ ...bc, lastDebtCollectionDate: dueDate });
+      const existing = bc.levyInstalmentStatuses || [];
+      const updated = existing.filter(s => s.dueDate !== dueDate);
+      updated.push({ dueDate, status: 'resolved' as const, lastUpdated: new Date().toISOString().split('T')[0], updatedBy: user?.name || '' });
+      await updateComplex({ ...bc, lastDebtCollectionDate: dueDate, levyInstalmentStatuses: updated });
+  };
+
+  const handleSaveLevyLog = async () => {
+      if (!levyLogTarget || !levyLogAction) return;
+      const bc = complexes.find(c => c.id === levyLogTarget.bcId);
+      if (!bc) return;
+      const existing = bc.levyInstalmentStatuses || [];
+      const statusMap: Record<string, 'contacted' | 'letter_sent' | 'resolved' | 'escalated'> = { letter_sent: 'letter_sent', phone_call: 'contacted', owner_responded: 'contacted', waived: 'resolved' };
+      const newStatus = statusMap[levyLogAction] ?? 'contacted';
+      const updated = existing.filter(s => s.dueDate !== levyLogTarget.dueDate);
+      updated.push({ dueDate: levyLogTarget.dueDate, status: newStatus, lastUpdated: new Date().toISOString().split('T')[0], updatedBy: user?.name || '', note: levyLogNote || undefined });
+      await updateComplex({ ...bc, levyInstalmentStatuses: updated });
+      setLevyLogTarget(null); setLevyLogAction(''); setLevyLogNote('');
+  };
+
+  const getEscalationStage = (dueDateStr: string) => {
+      const due = new Date(dueDateStr + 'T00:00:00');
+      const now = new Date(); now.setHours(0, 0, 0, 0);
+      const days = Math.ceil((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+      if (days <= 14) return { label: 'Initial Notice', cls: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/40' };
+      if (days <= 30) return { label: 'Follow Up', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40' };
+      if (days <= 60) return { label: 'Final Notice', cls: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/40' };
+      return { label: 'Legal', cls: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40' };
+  };
+
+  const getLevyStatusChip = (bcId: string, dueDate: string) => {
+      const bc = complexes.find(c => c.id === bcId);
+      const inst = bc?.levyInstalmentStatuses?.find(s => s.dueDate === dueDate);
+      if (!inst) return null;
+      const cfg: Record<string, string> = {
+          new: 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
+          contacted: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40',
+          letter_sent: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/40',
+          resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/40',
+          escalated: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40',
+      };
+      const labels: Record<string, string> = { new: 'New', contacted: 'Contacted', letter_sent: 'Letter Sent', resolved: 'Resolved', escalated: 'Escalated' };
+      return { label: labels[inst.status] ?? inst.status, cls: cfg[inst.status] ?? cfg.new };
   };
 
   const toggleSection = (cat: string) => {
@@ -912,15 +956,22 @@ const Dashboard: React.FC = () => {
             );
           }
           if (item.kind === 'levy') {
+            const levyStatusChip = getLevyStatusChip(item.rem.bcId, item.rem.dueDate);
+            const escStage = getEscalationStage(item.rem.dueDate);
             return (
               <div key={item.id} className="flex items-start gap-2 px-4 py-2.5 border-l-2 border-amber-400 dark:border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-colors"
                 onClick={() => navigate(`/complexes?id=${item.rem.bcId}&tab=details&from=dashboard`)}>
                 <div className="flex-1 min-w-0">
                   <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-3 leading-snug">{item.rem.message}</div>
-                  <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border mt-1 ${chip.cls}`}>{chip.label}</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${chip.cls}`}>{chip.label}</span>
+                    <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${escStage.cls}`}>{escStage.label}</span>
+                    {levyStatusChip && <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${levyStatusChip.cls}`}>{levyStatusChip.label}</span>}
+                  </div>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 items-center">
                   <button onClick={e => { e.stopPropagation(); setSnoozeTarget(item.rem); setSnoozeGroupItems([item.rem]); }} className="p-1 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20" title="Snooze"><BellOff size={12} /></button>
+                  <button onClick={e => { e.stopPropagation(); setLevyLogTarget({ bcId: item.rem.bcId, dueDate: item.rem.dueDate, instalmentLabel: item.rem.message.replace('DEBT COLLECTION: ', '') }); setLevyLogAction(''); setLevyLogNote(''); }} className="p-1 rounded text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20" title="Log Action"><FileText size={12} /></button>
                   <button onClick={e => { e.stopPropagation(); handleLevyMarkDone(item.rem.bcId, item.rem.dueDate); }} className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" title="Mark Done"><CheckCircle2 size={12} /></button>
                   <ExternalLink size={12} className="text-pink-500 ml-0.5" />
                 </div>
@@ -1054,6 +1105,38 @@ const Dashboard: React.FC = () => {
           />
         );
       })()}
+      {levyLogTarget && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setLevyLogTarget(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"><FileText size={16} /></div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-slate-800 dark:text-white text-sm">Log Debt Collection Action</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{levyLogTarget.instalmentLabel}</div>
+              </div>
+              <button onClick={() => setLevyLogTarget(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Action Type</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['letter_sent', '📄 Letter Sent'], ['phone_call', '📞 Phone Call'], ['owner_responded', '💬 Owner Responded'], ['waived', '✗ Waived']].map(([val, label]) => (
+                    <button key={val} onClick={() => setLevyLogAction(val)} className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${levyLogAction === val ? 'bg-pink-600 text-white border-pink-600' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-pink-400 hover:text-pink-600'}`}>{label}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Note (optional)</div>
+                <textarea className="w-full border dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl p-3 text-xs resize-none outline-none focus:ring-1 focus:ring-pink-500 min-h-[72px]" placeholder="e.g. Sent final notice to Lot 4, 14 days to respond..." value={levyLogNote} onChange={e => setLevyLogNote(e.target.value)} />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setLevyLogTarget(null)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                <button onClick={handleSaveLevyLog} disabled={!levyLogAction} className="px-4 py-2 rounded-xl text-xs font-bold bg-pink-600 hover:bg-pink-700 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors">Save Log</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {showAgmRemainingModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAgmRemainingModal(false)}>
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl overflow-hidden" onClick={e => e.stopPropagation()}>
