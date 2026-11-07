@@ -1072,6 +1072,53 @@ const EditComplexModal: React.FC<{ complex: BodyCorporate; onClose: () => void; 
                                         {alertCount > 0 ? 'View on Dashboard →' : 'All clear'}
                                     </p>
                                 </button>
+                                {/* Debt Collection card — only when levy schedule exists */}
+                                {(() => {
+                                    const schedule = form.levyDueDateSchedule || [];
+                                    if (!schedule.length) return null;
+                                    const todayDC = new Date(); todayDC.setHours(0,0,0,0);
+                                    const overdueInstalments = schedule.filter(entry => {
+                                        const yr = entry.year ?? todayDC.getFullYear();
+                                        const dueDateStr = `${yr}-${String(entry.month).padStart(2,'0')}-${String(entry.day).padStart(2,'0')}`;
+                                        const resolved = (form.levyInstalmentStatuses || []).find(s => s.dueDate === dueDateStr)?.status === 'resolved';
+                                        if (resolved) return false;
+                                        const due = new Date(yr, entry.month - 1, entry.day);
+                                        return due < todayDC;
+                                    });
+                                    const overdueCount = overdueInstalments.length;
+                                    // Worst escalation stage across overdue instalments
+                                    let worstDays = 0;
+                                    overdueInstalments.forEach(entry => {
+                                        const yr = entry.year ?? todayDC.getFullYear();
+                                        const due = new Date(yr, entry.month - 1, entry.day);
+                                        const days = Math.ceil((todayDC.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+                                        if (days > worstDays) worstDays = days;
+                                    });
+                                    const stage = worstDays > 60 ? { label: 'Legal', cls: 'text-red-600 dark:text-red-400' }
+                                        : worstDays > 30 ? { label: 'Final Notice', cls: 'text-orange-600 dark:text-orange-400' }
+                                        : worstDays > 14 ? { label: 'Follow Up', cls: 'text-amber-600 dark:text-amber-400' }
+                                        : overdueCount > 0 ? { label: 'Initial Notice', cls: 'text-blue-600 dark:text-blue-400' }
+                                        : null;
+                                    const hasDebt = overdueCount > 0;
+                                    return (
+                                        <div className={`flex flex-col items-start gap-1 p-4 rounded-2xl border ${hasDebt ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/40' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}>
+                                            <div className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${hasDebt ? 'text-red-500 dark:text-red-400' : 'text-slate-400'}`}>
+                                                <DollarSign size={11} /> Debt Collection
+                                            </div>
+                                            {hasDebt && stage ? (
+                                                <>
+                                                    <p className={`text-[11px] font-bold leading-none mt-1 ${stage.cls}`}>● {stage.label}</p>
+                                                    <p className="text-[9px] leading-tight text-red-500 dark:text-red-400">{overdueCount} instalment{overdueCount !== 1 ? 's' : ''} overdue</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p className="text-sm font-bold text-slate-400 dark:text-slate-500 leading-none mt-1">Clear</p>
+                                                    <p className="text-[9px] leading-tight text-slate-400">No overdue instalments</p>
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                         {/* Zone 2: Details */}
